@@ -1,44 +1,44 @@
+
 import SwiftUI
 
-struct ContentView: View {
-    @EnvironmentObject var healthKitManager: HealthKitManager
-
-    @State private var selectedIndex = 1
+struct SearchView: View {
+    @Binding var selectedIndex: Int
+    @State private var searchText = ""
+    @FocusState private var searchFieldFocused: Bool
     @State private var keyboardHeight: CGFloat = 0
-    @State private var showProfileSheet = false
-    @State private var showInputSheet = false
 
     var body: some View {
-        ZStack {
-            TabView(selection: $selectedIndex) {
-                ProfileView().tag(0)
-                SummaryDashboardView(showInputSheet: $showInputSheet).tag(1)
-                CalendarView().tag(2)
-                StatsView().tag(3)
-                SearchView(selectedIndex: $selectedIndex).tag(4)
+        ZStack(alignment: .bottom) {
+            // Main content / search results
+            List {
+                Text("Sample Result 1 for \(searchText)")
+                Text("Sample Result 2 for \(searchText)")
             }
-            .onAppear { UITabBar.appearance().isHidden = true }
+            .listStyle(.plain)
+            .opacity(searchText.isEmpty ? 0 : 1)
 
-            if selectedIndex != 4 {
+            if searchText.isEmpty {
                 VStack {
-                    Spacer()
-                    FlymeFloatingTabBar(
-                        selectedTab: $selectedIndex,
-                        showProfileSheet: $showProfileSheet,
-                        onSearchTap: { selectedIndex = 4 }
-                    )
-                    .padding(.bottom, -14 + safeBottomInset)
+                    Image(systemName: "magnifyingglass")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                    Text("Search for records")
+                        .font(.title3)
+                        .padding(.top, 8)
                 }
+                .frame(maxHeight: .infinity)
             }
+
+            // Bottom Search Bar
+            BottomSearchBar(searchText: $searchText, isFocused: _searchFieldFocused) {
+                // On close, navigate back to the dashboard (index 1)
+                selectedIndex = 1
+            }
+            .padding(.bottom, keyboardHeight > 0 ? keyboardHeight : (safeBottomInset - 8))
         }
-        .edgesIgnoringSafeArea(.all)
-        .sheet(isPresented: $showProfileSheet) {
-            ProfilePopupView()
-                .presentationDetents([.medium])
-        }
-        .sheet(isPresented: $showInputSheet) { InputSheetView() }
         .onAppear(perform: setupKeyboardObservers)
         .onDisappear(perform: removeKeyboardObservers)
+        .edgesIgnoringSafeArea(.bottom)
     }
 
     private var safeBottomInset: CGFloat {
@@ -50,7 +50,7 @@ struct ContentView: View {
             if let info = notif.userInfo,
                let frame = info[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
                 withAnimation(.easeOut(duration: 0.22)) {
-                    keyboardHeight = frame.height - safeBottomInset
+                    keyboardHeight = frame.height
                 }
             }
         }
