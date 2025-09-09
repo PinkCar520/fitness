@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import HealthKit
 
 final class WeightManager: ObservableObject {
     @Published var records: [WeightRecord] = []
@@ -16,29 +17,38 @@ final class WeightManager: ObservableObject {
     }
 
     init() {
+        load()
         latestRecord = records.sorted { $0.date > $1.date }.first
-        if records.isEmpty { seedSampleData() }
+    }
+    
+    private func load() {
+        do {
+            let data = try Data(contentsOf: fileURL)
+            records = try JSONDecoder().decode([WeightRecord].self, from: data)
+        } catch {
+            records = []
+            print("Could not load records, starting fresh. Error: \(error)")
+        }
     }
     
     // MARK: - CRUD
-    func add(weight: Double, date: Date = Date(), note: String? = nil) {
+    func add(weight: Double, date: Date = Date()) {
         guard (30...200).contains(weight) else {
             alertMessage = "⚠️ 体重 \(weight)kg 不在有效范围 30~200kg"
             showAlert = true
             return
         }
-        let record = WeightRecord(date: date, weight: round(weight * 10)/10, note: note?.nilIfEmpty)
+        let record = WeightRecord(date: date, weight: round(weight * 10)/10)
         records.append(record)
         records.sort { $0.date < $1.date }
         latestRecord = records.sorted { $0.date > $1.date }.first
         persistAndSync()
     }
 
-    func update(_ record: WeightRecord, weight: Double, date: Date, note: String?) {
+    func update(_ record: WeightRecord, weight: Double, date: Date) {
         guard let idx = records.firstIndex(where: { $0.id == record.id }) else { return }
         records[idx].weight = round(weight * 10)/10
         records[idx].date = date
-        records[idx].note = note?.nilIfEmpty
         records.sort { $0.date < $1.date }
         latestRecord = records.sorted { $0.date > $1.date }.first
         persistAndSync()
@@ -56,6 +66,23 @@ final class WeightManager: ObservableObject {
         persistAndSync()
     }
     
+    func importHealthKitSamples(_ samples: [HKQuantitySample]) {
+        // Convert HKQuantitySample to WeightRecord and add to records
+        for sample in samples {
+            let weight = sample.quantity.doubleValue(for: .gramUnit(with: .kilo))
+            let date = sample.endDate
+            let newRecord = WeightRecord(date: date, weight: round(weight * 10)/10)
+            
+            // Check for duplicates before adding. Use date and weight for a simple check.
+            if !records.contains(where: { $0.date == newRecord.date && $0.weight == newRecord.weight }) {
+                records.append(newRecord)
+            }
+        }
+        records.sort { $0.date < $1.date } // Ensure records are sorted chronologically
+        latestRecord = records.sorted { $0.date > $1.date }.first
+        persistAndSync() // Persist the imported data
+    }
+
     // MARK: - 派生数据
     func weightChangeThisWeek() -> Double? {
         guard let latest = latestRecord else { return nil }
@@ -94,15 +121,6 @@ final class WeightManager: ObservableObject {
         // 3. 处理冲突
     }
     
-    private func seedSampleData() {
-        let today = Date()
-        let cal = Calendar.current
-        self.records = (0..<7).map { i in
-            let d = cal.date(byAdding: .day, value: -i, to: today) ?? today
-            return WeightRecord(date: d, weight: 67.0 + Double.random(in: -0.8...0.8), note: i == 0 ? "Sample" : nil)
-        }.sorted { $0.date < $1.date }
-        latestRecord = records.last
-    }
 }
 
 private extension String {

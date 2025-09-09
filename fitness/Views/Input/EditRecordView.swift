@@ -5,7 +5,6 @@ struct EditRecordView: View {
     var record: WeightRecord
 
     @State private var weightText: String = ""
-    @State private var note: String = ""
     @State private var date: Date = Date()
 
     var body: some View {
@@ -13,13 +12,12 @@ struct EditRecordView: View {
             Section("Edit") {
                 TextField("Weight", text: $weightText).keyboardType(.decimalPad)
                 DatePicker("Date", selection: $date, displayedComponents: [.date, .hourAndMinute])
-                TextField("Note", text: $note)
             }
             Section {
                 Button("Save Changes") {
                     let normalized = weightText.replacingOccurrences(of: ",", with: ".")
                     if let value = Double(normalized) {
-                        weightManager.update(record, weight: value, date: date, note: note)
+                        weightManager.update(record, weight: value, date: date)
                     }
                 }
             }
@@ -27,7 +25,6 @@ struct EditRecordView: View {
         .navigationTitle("Edit")
         .onAppear {
             weightText = String(format: "%.1f", record.weight)
-            note = record.note ?? ""
             date = record.date
         }
     }

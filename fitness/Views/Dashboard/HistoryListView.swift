@@ -15,9 +15,7 @@ struct HistoryListView: View {
                         HStack {
                             VStack(alignment: .leading) {
                                 Text(rec.date.yyyyMMddHHmm).font(.headline)
-                                if let note = rec.note, !note.isEmpty {
-                                    Text(note).font(.caption).foregroundStyle(.secondary)
-                                }
+                                
                             }
                             Spacer()
                             Text(String(format: "%.1f kg", rec.weight)).font(.headline)

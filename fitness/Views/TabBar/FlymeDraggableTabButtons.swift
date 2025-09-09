@@ -56,6 +56,9 @@ struct FlymeDraggableTabButtons: View {
                                 if abs(local.x - centerX) < buttonSize/1.15 { found = idx; break }
                             }
                             if dragHighlightIndex != found {
+                                if found != nil {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                }
                                 withAnimation(.interpolatingSpring(stiffness: 250, damping: 18)) { dragHighlightIndex = found }
                             }
                         }

@@ -1,66 +1,90 @@
-
 import SwiftUI
 
 struct SearchView: View {
+    @EnvironmentObject var weightManager: WeightManager
     @Binding var selectedIndex: Int
-    @State private var searchText = ""
-    @FocusState private var searchFieldFocused: Bool
-    @State private var keyboardHeight: CGFloat = 0
+    @Binding var searchText: String
+    @State private var selectedActivityType: ActivityType = .all
+
+    enum ActivityType: String, CaseIterable {
+        case all = "全部"
+        case weight = "体重"
+        case running = "跑步"
+        case swimming = "游泳"
+    }
+
+    var searchResults: [WeightRecord] {
+        var records = weightManager.records
+
+        if selectedActivityType == .weight {
+            // This is a placeholder for when other activity types are added.
+        } else if selectedActivityType != .all {
+            return []
+        }
+
+        if searchText.isEmpty {
+            return records
+        } else {
+            return records.filter { record in
+                let weightMatch = String(record.weight).localizedCaseInsensitiveContains(searchText)
+                return weightMatch
+            }
+        }
+    }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // Main content / search results
-            List {
-                Text("Sample Result 1 for \(searchText)")
-                Text("Sample Result 2 for \(searchText)")
-            }
-            .listStyle(.plain)
-            .opacity(searchText.isEmpty ? 0 : 1)
+        NavigationStack {
+            VStack {
+                // Filters
+                activityTypeFilter
 
-            if searchText.isEmpty {
-                VStack {
-                    Image(systemName: "magnifyingglass")
-                        .font(.largeTitle)
-                        .foregroundColor(.secondary)
-                    Text("Search for records")
-                        .font(.title3)
-                        .padding(.top, 8)
+                // Search Results
+                List(searchResults) { record in
+                    WeightRow(record: record)
                 }
-                .frame(maxHeight: .infinity)
+                .listStyle(.plain)
             }
-
-            // Bottom Search Bar
-            BottomSearchBar(searchText: $searchText, isFocused: _searchFieldFocused) {
-                // On close, navigate back to the dashboard (index 1)
-                selectedIndex = 1
-            }
-            .padding(.bottom, keyboardHeight > 0 ? keyboardHeight : (safeBottomInset - 8))
+            .navigationTitle("搜索")
+            .navigationBarTitleDisplayMode(.inline)
         }
-        .onAppear(perform: setupKeyboardObservers)
-        .onDisappear(perform: removeKeyboardObservers)
-        .edgesIgnoringSafeArea(.bottom)
     }
 
-    private var safeBottomInset: CGFloat {
-        UIApplication.shared.windows.first?.safeAreaInsets.bottom ?? 0
-    }
-
-    private func setupKeyboardObservers() {
-        NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { notif in
-            if let info = notif.userInfo,
-               let frame = info[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
-                withAnimation(.easeOut(duration: 0.22)) {
-                    keyboardHeight = frame.height
+    private var activityTypeFilter: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack {
+                ForEach(ActivityType.allCases, id: \.self) { type in
+                    Button(action: {
+                        selectedActivityType = type
+                    }) {
+                        Text(type.rawValue)
+                            .font(.subheadline)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(selectedActivityType == type ? Color.blue : Color.gray.opacity(0.2))
+                            .foregroundColor(selectedActivityType == type ? .white : .primary)
+                            .cornerRadius(10)
+                    }
                 }
             }
-        }
-        NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillHideNotification, object: nil, queue: .main) { _ in
-            withAnimation(.easeOut(duration: 0.22)) { keyboardHeight = 0 }
+            .padding()
         }
     }
+}
 
-    private func removeKeyboardObservers() {
-        NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillShowNotification, object: nil)
-        NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillHideNotification, object: nil)
+struct WeightRow: View {
+    let record: WeightRecord
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text("\(record.weight, specifier: "%.1f") kg")
+                    .font(.headline)
+                Text(record.date, style: .date)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.vertical, 8)
     }
 }

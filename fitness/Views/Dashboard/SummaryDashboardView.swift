@@ -15,7 +15,7 @@ struct SummaryDashboardView: View {
                         DistanceCard()
                     }
                     MonthlyChallengeCard()
-                    RecentActivityCard()
+                    HistoryListView()
                 }
                 .padding()
             }

@@ -5,75 +5,84 @@ struct InputSheetView: View {
     @EnvironmentObject var healthKitManager: HealthKitManager
     @Environment(\.dismiss) private var dismiss
 
-    @State private var weightText: String = ""
-    @State private var note: String = ""
+    @State private var currentWeight: Double?
     @State private var date: Date = Date()
     @FocusState private var focused: Bool
 
+    var baseWeight: Double {
+        if let sample = healthKitManager.lastWeightSample {
+            return sample.quantity.doubleValue(for: .gramUnit(with: .kilo))
+        }
+        return weightManager.latestRecord?.weight ?? 70.0
+    }
+
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Weight").font(.headline)
-                    HStack(spacing: 8) {
-                        TextField("67.2", text: $weightText)
-                            .keyboardType(.decimalPad)
-                            .focused($focused)
-                            .font(.system(size: 32, weight: .medium))
-                            .multilineTextAlignment(.center)
+            ScrollView {
+                VStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("体重").font(.headline)
+                        WeightSlider(weight: $currentWeight, initialWeight: baseWeight)
+                        if !isValid(currentWeight) {
+                            Text("体重必须在30到200公斤之间。")
+                                .foregroundColor(.red).font(.footnote)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("日期").font(.headline)
+                        DatePicker("", selection: $date, displayedComponents: [.date, .hourAndMinute])
+                            .labelsHidden()
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 12))
-                        Text("kg").font(.title2).foregroundStyle(.secondary)
+                            .background(Color(UIColor.systemGray6), in: RoundedRectangle(cornerRadius: 12))
                     }
-                    if let w = weightValue, !isValid(w) {
-//                        Text("体重 \(String(format: \"%.1f\", w))kg 不在有效范围 30~200kg")
-//                            .foregroundColor(.red).font(.footnote)
+
+                    Button(action: save) {
+                        Text("保存").frame(maxWidth: .infinity).padding(.vertical, 16)
                     }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!isValid(currentWeight))
+                    .padding(.top)
                 }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Date").font(.headline)
-                    DatePicker("", selection: $date, displayedComponents: [.date, .hourAndMinute])
-                        .labelsHidden()
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Note (Optional)").font(.headline)
-                    TextField("Add a note...", text: $note)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 12))
-                }
-
-                Spacer()
-
-                Button(action: save) {
-                    Text("Save").frame(maxWidth: .infinity).padding(.vertical, 16)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!(weightValue.flatMap(isValid) ?? false))
+                .padding(.horizontal)
             }
-            .padding(20)
-            .navigationTitle("Add Entry")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                    }
+                }
             }
         }
-        .onAppear { focused = true }
-        .presentationDetents([.medium, .large])
+        .onAppear { // 添加 onAppear
+            healthKitManager.readMostRecentWeight() // 从 HealthKit 读取最新体重
+            // 优先使用 HealthKit 的数据，其次是本地数据，最后是默认值
+            currentWeight = baseWeight
+        }
+        .presentationDetents([.fraction(0.5)])
         .presentationDragIndicator(.visible)
+        .presentationCornerRadius(32)
     }
 
-    private var weightValue: Double? {
-        Double(weightText.replacingOccurrences(of: ",", with: "."))
+    private func isValid(_ w: Double?) -> Bool { // 修改 isValid 接受 Optional<Double>
+        guard let weightValue = w else { return false } // 如果是 nil，则认为无效（或者根据需求处理“关”状态）
+        return (30...200).contains(weightValue)
     }
-    private func isValid(_ w: Double) -> Bool { (30...200).contains(w) }
 
     private func save() {
-        guard let value = weightValue, isValid(value) else { return }
-        weightManager.add(weight: value, date: date, note: note)
-        healthKitManager.saveWeight(value, date: date)
+        // 只有当 currentWeight 有值且有效时才保存
+        guard let weightToSave = currentWeight, isValid(weightToSave) else {
+            // 如果 currentWeight 为 nil (关) 或者无效，则不保存，直接 dismiss
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            dismiss()
+            return
+        }
+        weightManager.add(weight: weightToSave, date: date)
+        healthKitManager.saveWeight(weightToSave, date: date)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         dismiss()
     }

@@ -2,10 +2,10 @@
 import SwiftUI
 
 struct StepsCard: View {
-    let stepsData: [Double] = [100, 200, 150, 300, 250, 400, 350] // Sample data
+    @EnvironmentObject var healthKitManager: HealthKitManager
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("步数")
                     .font(.headline)
@@ -15,25 +15,20 @@ struct StepsCard: View {
                     .foregroundStyle(.purple)
             }
 
-            Text("8,520")
+            Text("\(Int(healthKitManager.stepCount))")
                 .font(.title)
                 .fontWeight(.bold)
 
-            Text("今天")
+            Text("本周")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            
+            StepBarChart(data: healthKitManager.weeklyStepData).frame(height:60)
+            // 柱状图
 
-            HStack(alignment: .bottom, spacing: 4) {
-                ForEach(0..<stepsData.count, id: \.self) { i in
-                    VStack {
-                        Rectangle()
-                            .fill(Color.purple.opacity(0.6))
-                            .frame(height: stepsData[i] / 8)
-                            .cornerRadius(4)
-                    }
-                }
-            }
-            .frame(height: 50)
+        }
+        .onAppear { // onAppear 应该在 VStack 之后
+            healthKitManager.readWeeklyStepCounts()
         }
         .padding()
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20))
@@ -43,5 +38,6 @@ struct StepsCard: View {
 struct StepsCard_Previews: PreviewProvider {
     static var previews: some View {
         StepsCard()
+            .environmentObject(HealthKitManager())
     }
 }

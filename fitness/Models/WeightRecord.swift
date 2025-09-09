@@ -6,7 +6,6 @@ struct WeightRecord: Identifiable, Codable, Equatable {
     var id: UUID = UUID()         // 唯一 ID
     var date: Date = Date()       // 记录日期
     var weight: Double            // 体重值（kg）
-    var note: String? = nil       // 备注，可选
 }
 
 // MARK: - Array 扩展

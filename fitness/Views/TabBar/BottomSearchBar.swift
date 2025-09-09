@@ -35,7 +35,7 @@ struct BottomSearchBar: View {
         .padding(.vertical, 4)
         .offset(x: appearOffset)
         .onAppear {
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.7)) {
+            withAnimation(.easeInOut(duration: 0.45)) {
                 appearOffset = 0
             }
         }

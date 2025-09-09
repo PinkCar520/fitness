@@ -638,4 +638,3 @@ struct FitnessGoal {
 *本文档版本：v1.0*  
 *最后更新时间：2024年11月*  
 *负责人：产品团队*
-![alt text](image-1.png)
