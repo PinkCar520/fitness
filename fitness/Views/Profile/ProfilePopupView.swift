@@ -1,177 +1,134 @@
 import SwiftUI
+import PhotosUI
+
+// A reusable view for each navigation row in the settings page
+struct SettingsNavigationRow<Destination: View>: View {
+    let title: String
+    let systemImageName: String
+    let destination: Destination
+
+    var body: some View {
+        NavigationLink(destination: destination) {
+            HStack(spacing: 16) {
+                Image(systemName: systemImageName)
+                    .font(.title3)
+                    .foregroundColor(.secondary)
+                    .frame(width: 30)
+                Text(title)
+                    .font(.body)
+                    .foregroundColor(.primary)
+            }
+            .padding(.vertical, 8)
+        }
+    }
+}
 
 struct ProfilePopupView: View {
     @EnvironmentObject var profileViewModel: ProfileViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedItem: PhotosPickerItem?
 
-    @State private var editingProfile: UserProfile
+    // Placeholder for navigation destinations
+    private struct PlaceholderView: View {
+        let title: String
+        var body: some View { Text("\(title) Page").navigationTitle(title) }
+    }
+    
+    // 1. Centered Profile Header View, designed to live inside a List
+    private var profileHeader: some View {
+        VStack(spacing: 12) {
+            PhotosPicker(selection: $selectedItem, matching: .images) {
+                ZStack(alignment: .bottomTrailing) {
+                    Image(uiImage: profileViewModel.displayAvatar)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 100, height: 100)
+                        .clipShape(Circle())
 
-    init() {
-        _editingProfile = State(initialValue: ProfileViewModel().userProfile)
+                    Image(systemName: "camera.circle.fill")
+                        .symbolRenderingMode(.multicolor)
+                        .font(.system(size: 28))
+                        .foregroundColor(.accentColor)
+                }
+            }
+            
+            Text(profileViewModel.userProfile.name)
+                .font(.title.bold())
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.vertical)
+        .onChange(of: selectedItem) { newItem in
+            profileViewModel.setAvatar(from: newItem)
+        }
     }
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) { // Overall spacing between sections
-                    // MARK: - Profile Picture
-                    VStack {
-                        Image(systemName: "person.crop.circle.fill")
-                            .resizable()
-                            .frame(width: 80, height: 80)
-                            .foregroundColor(.gray)
-                            .clipShape(Circle())
-                        Text("点击更换头像")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.bottom, 10)
-
-                    // MARK: - Basic Information
-                    VStack(alignment: .leading, spacing: 15) { // Spacing within section
-                        Text("基本信息")
-                            .font(.headline)
-                            .foregroundColor(.primary) // Ensure good contrast
-                            .padding(.leading, 5) // Align with content
-
-                        VStack(spacing: 10) { // Spacing between input rows
-                            HStack {
-                                Text("昵称")
-                                Spacer() // Push TextField to the right
-                                TextField("您的昵称", text: $editingProfile.name)
-                                    .multilineTextAlignment(.trailing) // Align text to right
-                                    .flymeInputStyle() // Apply custom style
-                            }
-                            
-                            HStack {
-                                Text("性别")
-                                Spacer() // Push Picker to the right
-                                Picker("性别", selection: $editingProfile.gender) {
-                                    ForEach(Gender.allCases) { gender in
-                                        Text(gender.rawValue).tag(gender)
-                                    }
-                                }
-                                .pickerStyle(.segmented)
-                                .frame(width: 200) // Constrain width for segmented picker
-                            }
-                            .flymeInputStyle() // Apply custom style to HStack for background
-
-                            HStack {
-                                Text("出生日期")
-                                Spacer() // Push DatePicker to the right
-                                DatePicker("", selection: $editingProfile.dateOfBirth, displayedComponents: .date)                                    .labelsHidden() // Hide default picker label
-                                    .datePickerStyle(.compact) // Use compact for cleaner look
-                            }
-                            .flymeInputStyle() // Apply custom style to HStack for background
-                        }
-                    }
-                    .padding(.horizontal) // Padding for the whole section
-
-                    // MARK: - Health & Goals
-                    VStack(alignment: .leading, spacing: 15) {
-                        Text("健康与目标")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                            .padding(.leading, 5)
-
-                        VStack(spacing: 10) {
-                            HStack {
-                                Text("身高")
-                                Spacer()
-                                TextField("您的身高", value: $editingProfile.height, format: .number)
-                                    .keyboardType(.decimalPad)
-                                    .multilineTextAlignment(.trailing)
-                                    .flymeInputStyle()
-                                Picker("单位", selection: $editingProfile.heightUnit) {
-                                    ForEach(HeightUnit.allCases) { unit in
-                                        Text(unit.rawValue).tag(unit)
-                                    }
-                                }
-                                .pickerStyle(.segmented)
-                                .frame(width: 100) // Constrain width
-                            }
-                            
-                            HStack {
-                                Text("目标体重")
-                                Spacer()
-                                TextField("您的目标体重", value: $editingProfile.targetWeight, format: .number)
-                                    .keyboardType(.decimalPad)
-                                    .multilineTextAlignment(.trailing)
-                                    .flymeInputStyle()
-                                Picker("单位", selection: $editingProfile.weightUnit) {
-                                    ForEach(WeightUnit.allCases) { unit in
-                                        Text(unit.rawValue).tag(unit)
-                                    }
-                                }
-                                .pickerStyle(.segmented)
-                                .frame(width: 100) // Constrain width
-                            }
-                            
-                            HStack {
-                                Text("活动水平")
-                                Spacer()
-                                Picker("活动水平", selection: $editingProfile.activityLevel) {
-                                    ForEach(ActivityLevel.allCases) { level in
-                                        Text(level.rawValue).tag(level)
-                                    }
-                                }
-                                .pickerStyle(.menu)
-                                .labelsHidden() // Hide default picker label
-                            }
-                            .flymeInputStyle() // Apply custom style to HStack for background
-                        }
-                    }
-                    .padding(.horizontal) // Padding for the whole section
-
+            List {
+                // Section 0: Visually independent header
+                Section {
+                    profileHeader
                 }
-                .padding(.horizontal, 24) // Increased horizontal padding for the whole content
-                .padding(.vertical) // Keep vertical padding
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+
+                // Section 1: Profile & Health
+                Section {
+                    SettingsNavigationRow(title: "基本信息", systemImageName: "person.text.rectangle.fill", destination: BasicInfoSettingsView().environmentObject(profileViewModel))
+                    SettingsNavigationRow(title: "健康与目标", systemImageName: "target", destination: HealthGoalsSettingsView().environmentObject(profileViewModel))
+                }
+                .listRowSeparator(.hidden)
+
+                // Section 2: Core Settings
+                Section {
+                    SettingsNavigationRow(title: "外观", systemImageName: "paintbrush.fill", destination: AppearanceSettingsView())
+                    SettingsNavigationRow(title: "通知", systemImageName: "bell.badge.fill", destination: NotificationSettingsView().environmentObject(profileViewModel))
+                    SettingsNavigationRow(title: "数据与隐私", systemImageName: "hand.raised.fill", destination: DataPrivacySettingsView())
+                }
+                .listRowSeparator(.hidden)
+
+                // Section 3: Support
+                Section {
+                    SettingsNavigationRow(title: "帮助与支持", systemImageName: "questionmark.circle.fill", destination: PlaceholderView(title: "帮助与支持"))
+                    Link(destination: URL(string: "https://www.example.com/privacy")!) {
+                        HStack(spacing: 16) {
+                            Image(systemName: "lock.shield.fill").font(.title3).foregroundColor(.secondary).frame(width: 30)
+                            Text("隐私政策").font(.body).foregroundColor(.primary)
+                            Spacer()
+                            Image(systemName: "arrow.up.right.square").foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 8)
+                    }
+                    SettingsNavigationRow(title: "发送反馈", systemImageName: "paperplane.fill", destination: PlaceholderView(title: "发送反馈"))
+                }
+                .listRowSeparator(.hidden)
+                
+                // Section 4: Version Footer
+                Section {
+                    HStack {
+                        Spacer()
+                        VStack {
+                            Text("Fitness Tracker")
+                                .font(.subheadline)
+                            Text("Version 2.1.0")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                    }
+                }
+                .listRowBackground(Color.clear)
             }
-            .navigationTitle("个人资料")
+            .listStyle(.insetGrouped)
+            .navigationTitle("个人资料与设置")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark.circle.fill") // Changed to filled circle
-                            .font(.title2)
-                            .foregroundColor(.secondary)
-                    }
-                }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        profileViewModel.userProfile = editingProfile
-                        profileViewModel.saveProfile()
-                        dismiss()
-                    }) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.accentColor)
-                    }
+                    Button("完成", action: { dismiss() })
                 }
             }
         }
-        .onAppear {
-            editingProfile = profileViewModel.userProfile
-        }
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .presentationCornerRadius(32)
     }
 }
 
-// Custom Input Field Style
-struct FlymeInputBackground: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .padding(.vertical, 12)
-            .padding(.horizontal, 16)
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(10)
-    }
-}
 
-extension View {
-    func flymeInputStyle() -> some View {
-        self.modifier(FlymeInputBackground())
-    }
-}

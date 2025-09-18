@@ -19,16 +19,16 @@ struct BottomSearchBar: View {
                     .focused($isFocused)
                     .submitLabel(.search)
             }
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 32))
-            .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 32))
+            
             Button {
                 onClose()
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.title2)
                     .padding(16)
-                    .background(Color.white, in: RoundedRectangle(cornerRadius: 32))
-                    .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 32))
+                    
             }
         }
         .padding(.horizontal, 10)

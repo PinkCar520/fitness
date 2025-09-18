@@ -1,7 +1,8 @@
-
 import SwiftUI
 
 struct RecentActivityCard: View {
+    @StateObject private var viewModel = RecentActivityViewModel()
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -13,38 +14,58 @@ struct RecentActivityCard: View {
                     .foregroundStyle(.orange)
             }
 
-            Text("跑步")
-                .font(.title)
-                .fontWeight(.bold)
+            if viewModel.isLoading {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+                .frame(height: 80)
+            } else if viewModel.workoutFound {
+                // Content for when a workout is found
+                Text(viewModel.activityName)
+                    .font(.title)
+                    .fontWeight(.bold)
 
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("距离")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text("5.2 km")
-                        .font(.headline)
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text("距离")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(viewModel.distance)
+                            .font(.headline)
+                    }
+                    Spacer()
+                    VStack(alignment: .leading) {
+                        Text("时长")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(viewModel.duration)
+                            .font(.headline)
+                    }
+                    Spacer()
+                    VStack(alignment: .leading) {
+                        Text("日期")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(viewModel.date)
+                            .font(.headline)
+                    }
                 }
-                Spacer()
-                VStack(alignment: .leading) {
-                    Text("时长")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text("30 min")
-                        .font(.headline)
+            } else {
+                // Content for when no workout is found
+                HStack {
+                    Spacer()
+                    Text("无最近活动记录")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Spacer()
                 }
-                Spacer()
-                VStack(alignment: .leading) {
-                    Text("日期")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text("今天")
-                        .font(.headline)
-                }
+                .frame(height: 80)
             }
         }
         .padding()
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
     }
 }
 

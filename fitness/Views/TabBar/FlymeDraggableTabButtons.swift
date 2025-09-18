@@ -17,8 +17,7 @@ struct FlymeDraggableTabButtons: View {
     var body: some View {
         ZStack {
             Capsule()
-                .fill(Color.white.opacity(0.97))
-                .shadow(color: .black.opacity(0.08), radius: 9, x: 0, y: 3)
+                .fill(.thinMaterial)
             GeometryReader { geo in
                 HStack(spacing: buttonSpacing) {
                     ForEach(0..<buttonCount, id: \.self) { idx in

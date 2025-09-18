@@ -7,8 +7,15 @@ struct ProfileView: View {
     var body: some View {
         VStack {
             Spacer()
-            Image(systemName: "person.crop.circle")
-                .resizable().frame(width: 80, height: 80)
+            if let avatarPath = profileViewModel.userProfile.avatarPath, !avatarPath.isEmpty {
+                Image(uiImage: profileViewModel.displayAvatar)
+                    .resizable()
+                    .frame(width: 80, height: 80)
+            } else {
+                Image(systemName: "person.crop.circle")
+                    .resizable()
+                    .frame(width: 80, height: 80)
+            }
             Text("Profile").font(.largeTitle).padding(.top, 12)
             
             Button("编辑个人资料") { // Button to open the popup
@@ -23,7 +30,6 @@ struct ProfileView: View {
         }
         .sheet(isPresented: $showingProfilePopup) {
             ProfilePopupView()
-                .environmentObject(profileViewModel) // Pass the ViewModel to the sheet
         }
     }
 }

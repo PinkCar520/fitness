@@ -1,4 +1,3 @@
-
 import Foundation
 import HealthKit
 import SwiftUI
@@ -16,7 +15,12 @@ struct DailyDistanceData: Identifiable {
     let distance: Double
 }
 
-final class HealthKitManager: ObservableObject {
+protocol HealthKitManagerProtocol: ObservableObject {
+    func saveWeight(_ weight: Double, date: Date)
+    // Add other methods that WeightManager directly calls on HealthKitManager if needed
+}
+
+final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
     private let healthStore = HKHealthStore()
     
     @Published var lastWeightSample: HKQuantitySample?
@@ -80,6 +84,25 @@ final class HealthKitManager: ObservableObject {
             DispatchQueue.main.async {
                 self.lastWeightSample = results?.first as? HKQuantitySample
             }
+        }
+        healthStore.execute(query)
+    }
+
+    // 读取最近体重 for widget
+    func fetchMostRecentWeight(completion: @escaping (Double?) -> Void) {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .bodyMass) else {
+            completion(nil)
+            return
+        }
+        
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+        let query = HKSampleQuery(sampleType: type, predicate: nil, limit: 1, sortDescriptors: [sortDescriptor]) { _, results, error in
+            guard error == nil, let sample = results?.first as? HKQuantitySample else {
+                completion(nil)
+                return
+            }
+            let weight = sample.quantity.doubleValue(for: .gramUnit(with: .kilo))
+            completion(weight)
         }
         healthStore.execute(query)
     }
@@ -261,6 +284,97 @@ final class HealthKitManager: ObservableObject {
         healthStore.execute(query)
     }
 
+    // New function to fetch monthly activity summaries
+    func fetchMonthlyActivitySummaries(completion: @escaping ([Int: Bool]) -> Void) {
+        let calendar = Calendar.current
+        let now = Date()
+        guard let monthInterval = calendar.dateInterval(of: .month, for: now),
+              let numberOfDays = calendar.range(of: .day, in: .month, for: now)?.count else {
+            completion([:])
+            return
+        }
+
+        var dailyResults: [Int: Bool] = [:]
+        let dispatchGroup = DispatchGroup()
+
+        for dayOffset in 0..<numberOfDays {
+            dispatchGroup.enter()
+            guard let date = calendar.date(byAdding: .day, value: dayOffset, to: monthInterval.start) else {
+                dispatchGroup.leave()
+                continue
+            }
+
+            var components = calendar.dateComponents([.year, .month, .day], from: date)
+            components.calendar = calendar
+
+            let predicate = HKQuery.predicateForActivitySummary(with: components)
+            let query = HKActivitySummaryQuery(predicate: predicate) { _, summaries, error in
+                let day = calendar.component(.day, from: date)
+                if let summary = summaries?.first {
+                    let energyGoal = summary.activeEnergyBurnedGoal.doubleValue(for: .kilocalorie())
+                    let exerciseGoal = summary.appleExerciseTimeGoal.doubleValue(for: .minute())
+                    let standGoal = summary.appleStandHoursGoal.doubleValue(for: .count())
+
+                    let energyMet = energyGoal > 0 && summary.activeEnergyBurned.doubleValue(for: .kilocalorie()) >= energyGoal
+                    let exerciseMet = exerciseGoal > 0 && summary.appleExerciseTime.doubleValue(for: .minute()) >= exerciseGoal
+                    let standMet = standGoal > 0 && summary.appleStandHours.doubleValue(for: .count()) >= standGoal
+
+                    dailyResults[day] = energyMet && exerciseMet && standMet
+                } else {
+                    dailyResults[day] = false
+                }
+                dispatchGroup.leave()
+            }
+            healthStore.execute(query)
+        }
+
+        dispatchGroup.notify(queue: .main) {
+            completion(dailyResults)
+        }
+    }
+
+    func fetchTotalActiveEnergy(for days: Int, completion: @escaping (Double) -> Void) {
+        guard let activeEnergyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) else {
+            completion(0)
+            return
+        }
+
+        let now = Date()
+        let startDate = Calendar.current.date(byAdding: .day, value: -days, to: now)!
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: now, options: .strictStartDate)
+
+        let query = HKStatisticsQuery(quantityType: activeEnergyType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
+            DispatchQueue.main.async {
+                guard let result = result, let sum = result.sumQuantity() else {
+                    completion(0)
+                    return
+                }
+                completion(sum.doubleValue(for: .kilocalorie()))
+            }
+        }
+        healthStore.execute(query)
+    }
+
+    func fetchWorkoutDays(for days: Int, completion: @escaping (Int) -> Void) {
+        let workoutType = HKObjectType.workoutType()
+        let now = Date()
+        let startDate = Calendar.current.date(byAdding: .day, value: -days, to: now)!
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: now, options: .strictStartDate)
+
+        let query = HKSampleQuery(sampleType: workoutType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
+            DispatchQueue.main.async {
+                guard let workouts = samples as? [HKWorkout] else {
+                    completion(0)
+                    return
+                }
+                let distinctDays = Set(workouts.map { Calendar.current.startOfDay(for: $0.startDate) })
+                completion(distinctDays.count)
+            }
+        }
+        healthStore.execute(query)
+    }
+
+    #if !os(watchOS)
     // New method to encapsulate HealthKit setup and initial data import
     func setupHealthKitData(weightManager: WeightManager) {
         requestAuthorization { success in
@@ -271,8 +385,10 @@ final class HealthKitManager: ObservableObject {
                     print("Performing initial HealthKit import...")
                     self.readAllWeightSamples { samples, error in
                         if let samples = samples {
-                            weightManager.importHealthKitSamples(samples)
-                            UserDefaults.standard.set(true, forKey: "hasPerformedInitialHealthKitImport")
+                            DispatchQueue.main.async {
+                                weightManager.importHealthKitSamples(samples)
+                                UserDefaults.standard.set(true, forKey: "hasPerformedInitialHealthKitImport")
+                            }
                         } else if let error = error {
                             print("Failed to import HealthKit samples: \(error.localizedDescription)")
                             UserDefaults.standard.set(true, forKey: "hasPerformedInitialHealthKitImport")
@@ -292,5 +408,23 @@ final class HealthKitManager: ObservableObject {
                 }
             }
         }
+    }
+#endif
+
+    // Fetches the most recent workout
+    func fetchMostRecentWorkout(completion: @escaping (HKWorkout?) -> Void) {
+        let workoutType = HKObjectType.workoutType()
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+        
+        let query = HKSampleQuery(sampleType: workoutType, predicate: nil, limit: 1, sortDescriptors: [sortDescriptor]) { _, samples, error in
+            DispatchQueue.main.async {
+                guard error == nil, let mostRecentWorkout = samples?.first as? HKWorkout else {
+                    completion(nil)
+                    return
+                }
+                completion(mostRecentWorkout)
+            }
+        }
+        healthStore.execute(query)
     }
 }

@@ -57,6 +57,7 @@ struct FlymeFloatingTabBar: View {
                         .padding(.leading, 16)
 
                     TextField("通过备注搜索...", text: $searchText)
+                        .foregroundColor(.primary)
                         .focused($searchFieldFocused)
                         .submitLabel(.search)
                         .padding(.vertical, 15)
@@ -99,8 +100,6 @@ struct FlymeFloatingTabBar: View {
     @ViewBuilder
     private func roundButton(iconName: String, label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         ZStack {
-            Circle().fill(Color.white.opacity(0.97))
-                .shadow(color: .black.opacity(0.08), radius: 9, x: 0, y: 3)
             Button {
                 pressedButton = 99 // Use a dummy index for animation
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
@@ -119,6 +118,7 @@ struct FlymeFloatingTabBar: View {
             .accessibilityLabel(label) // Use passed label
         }
         .frame(width: 60, height: 60)
+        .background(Color(UIColor.secondarySystemGroupedBackground), in: Circle())
     }
 
     private var safeBottomInset: CGFloat {

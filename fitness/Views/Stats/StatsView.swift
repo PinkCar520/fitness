@@ -1,40 +1,59 @@
 import SwiftUI
+import SwiftData
 
 struct StatsView: View {
+    @EnvironmentObject var profileViewModel: ProfileViewModel
+    @EnvironmentObject var healthKitManager: HealthKitManager
+    
+    @Query(sort: \HealthMetric.date, order: .reverse) private var records: [HealthMetric]
+    
     @State private var selectedTimeFrame: TimeFrame = .sevenDays
+    @State private var totalCalories: Double = 0
+    @State private var workoutDays: Int = 0
+    @State private var reportImage: UIImage?
+    @State private var showShareSheet = false
 
     enum TimeFrame: String, CaseIterable {
         case sevenDays = "7天"
         case thirtyDays = "30天"
-        case threeMonths = "3月"
+        case threeMonths = "90天"
+        case halfYear = "半年"
         case oneYear = "1年"
+        
+        var days: Int {
+            switch self {
+            case .sevenDays: return 7
+            case .thirtyDays: return 30
+            case .threeMonths: return 90
+            case .halfYear: return 180
+            case .oneYear: return 365
+            }
+        }
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    // Time Frame Switcher
                     timeFrameSwitcher
-
-                    // Core Metrics Grid
                     coreMetricsGrid
-
-                    // Weight Trend Chart
-                    ChartSection()
-
-                    // Workout Analysis (Placeholder)
+                    ChartSection(selectedTimeFrame: selectedTimeFrame)
                     workoutAnalysisSection
-
-                    // Smart Suggestions (Placeholder)
                     smartSuggestionsSection
-
-                    // Action Buttons (Placeholder)
                     actionButtonsSection
                 }
                 .padding()
             }
             .navigationTitle("统计")
+            .onAppear(perform: fetchStats)
+            .onChange(of: selectedTimeFrame) { _ in
+                fetchStats()
+            }
+        }
+        .sheet(isPresented: $showShareSheet) {
+            if let reportImage = self.reportImage {
+                ShareSheet(items: [reportImage])
+            }
         }
     }
 
@@ -43,7 +62,7 @@ struct StatsView: View {
             ForEach(TimeFrame.allCases, id: \.self) { timeFrame in
                 Button(action: {
                     selectedTimeFrame = timeFrame
-                }) {
+                }) { 
                     Text(timeFrame.rawValue)
                         .font(.subheadline)
                         .fontWeight(.semibold)
@@ -57,12 +76,66 @@ struct StatsView: View {
         }
     }
 
+    private var weightChange: Double? {
+        guard records.count > 1 else { return nil }
+        
+        let days = selectedTimeFrame.days
+        guard days > 0 else { return 0 }
+        
+        let calendar = Calendar.current
+        let now = Date()
+        
+        let latestRecord = records[0]
+        
+        guard let referenceDate = calendar.date(byAdding: .day, value: -days, to: now) else { return nil }
+        
+        let referenceRecord = records.first { $0.date <= referenceDate }
+        
+        guard let referenceWeight = referenceRecord?.value else { return nil }
+        
+        return latestRecord.value - referenceWeight
+    }
+
+    private var weightChangeValue: String {
+        if let change = weightChange {
+            return String(format: "%+.1f", change)
+        } else {
+            return "--"
+        }
+    }
+
+    private var weightChangeColor: Color {
+        if let change = weightChange {
+            return change > 0 ? .red : .green
+        } else {
+            return .primary
+        }
+    }
+    
+    private var goalAchievementPercentage: String {
+        let targetWeight = profileViewModel.userProfile.targetWeight
+        guard let latestWeight = records.first?.value else {
+            return "--"
+        }
+        
+        var progress: Double = 0
+        if targetWeight > 0 {
+            if latestWeight <= targetWeight { // Weight loss goal achieved or surpassed
+                progress = 1.0
+            } else { // Weight loss goal in progress
+                progress = targetWeight / latestWeight
+            }
+        }
+        
+        return String(format: "%.0f", progress * 100)
+    }
+
     private var coreMetricsGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-            StatsMetricCard(title: "体重变化", value: "-1.2", unit: "kg", icon: "scalemass.fill", color: .green)
-            StatsMetricCard(title: "目标达成", value: "85", unit: "%", icon: "checkmark.circle.fill", color: .blue)
-            StatsMetricCard(title: "总卡路里", value: "2,30", unit: "kcal", icon: "flame.fill", color: .purple)
-            StatsMetricCard(title: "运动天数", value: "5", unit: "天", icon: "figure.walk", color: .orange)
+            StatsMetricCard(title: "体重变化", value: weightChangeValue, unit: "kg", icon: "scalemass.fill", color: weightChangeColor)
+            StatsMetricCard(title: "目标达成", value: goalAchievementPercentage, unit: "%", icon: "checkmark.circle.fill", color: .blue)
+            StatsMetricCard(title: "总卡路里", value: String(format: "%.0f", totalCalories), unit: "kcal", icon: "flame.fill", color: .purple)
+            StatsMetricCard(title: "运动天数", value: "\(workoutDays)", unit: "天", icon: "figure.walk", color: .orange)
         }
     }
 
@@ -91,105 +164,45 @@ struct StatsView: View {
     }
 
     private var actionButtonsSection: some View {
-        HStack(spacing: 16) {
-            Button(action: {}) {
-                Label("导出数据", systemImage: "square.and.arrow.down")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
-            }
-            Button(action: {}) {
-                Label("分享报告", systemImage: "square.and.arrow.up")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.gray.opacity(0.5))
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
-            }
+        Button(action: {
+            let reportView = ReportView(
+                profileViewModel: profileViewModel,
+                selectedTimeFrame: selectedTimeFrame,
+                totalCalories: totalCalories,
+                workoutDays: workoutDays
+            )
+            self.reportImage = reportView.snapshot()
+            self.showShareSheet = true
+        }) { 
+            Label("分享报告", systemImage: "square.and.arrow.up")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(12)
+        }
+    }
+    
+    private func fetchStats() {
+        healthKitManager.fetchTotalActiveEnergy(for: selectedTimeFrame.days) { calories in
+            self.totalCalories = calories
+        }
+        healthKitManager.fetchWorkoutDays(for: selectedTimeFrame.days) { days in
+            self.workoutDays = days
         }
     }
 }
 
-private struct StatsMetricCard: View {
-    let title: String
-    let value: String
-    let unit: String
-    let icon: String
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: 15) {
-            Image(systemName: icon)
-                .font(.title)
-                .foregroundColor(color)
-                .frame(width: 40)
-
-            VStack(alignment: .center) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundColor(.secondary)
-                HStack(alignment: .lastTextBaseline) {
-                    Text(value)
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-                    Text(unit)
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .padding()
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 15))
-        .frame(height: 100)
-    }
-}
-
-
-
-struct WorkoutProgress: View {
-    let type: String
-    let percentage: Double
-    let color: Color
-
-    var body: some View {
-        VStack(alignment: .leading) {
-            HStack {
-                Text(type)
-                Spacer()
-                Text("\(Int(percentage * 100))%")
-            }
-            ProgressView(value: percentage)
-                .progressViewStyle(LinearProgressViewStyle(tint: color))
-        }
-    }
-}
-
-struct SuggestionCard: View {
-    let text: String
-    let color: Color
-
-    var body: some View {
-        HStack {
-            Image(systemName: "lightbulb")
-                .foregroundColor(color)
-            Text(text)
-                .font(.footnote)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(color.opacity(0.1))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(color, lineWidth: 1)
-        )
-        .cornerRadius(12)
+struct StatsView_Previews: PreviewProvider {
+    static var previews: some View {
+        // This preview will need a model container to work correctly.
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try! ModelContainer(for: HealthMetric.self, configurations: config)
+        
+        return StatsView()
+            .modelContainer(container)
+            .environmentObject(ProfileViewModel())
+            .environmentObject(HealthKitManager())
     }
 }

@@ -1,125 +1,93 @@
 import Foundation
 import Combine
+import SwiftData
 import HealthKit
+import WidgetKit
 
 final class WeightManager: ObservableObject {
-    @Published var records: [WeightRecord] = []
-    @Published var latestRecord: WeightRecord? = nil
+    // @Published var records: [WeightRecord] = [] // This will be replaced by @Query in views
+    // @Published var latestRecord: WeightRecord? = nil // This will be replaced by @Query in views
     
     // Alert 信息供 UI 绑定
     @Published var showAlert: Bool = false
     @Published var alertMessage: String = ""
     
-    private let filename = "weights.json"
-    private var fileURL: URL {
-        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return dir.appendingPathComponent(filename)
-    }
+    private let modelContainer: ModelContainer
+    private let healthKitManager: any HealthKitManagerProtocol
 
-    init() {
-        load()
-        latestRecord = records.sorted { $0.date > $1.date }.first
+    init(healthKitManager: any HealthKitManagerProtocol, modelContainer: ModelContainer) {
+        self.healthKitManager = healthKitManager
+        self.modelContainer = modelContainer
     }
     
-    private func load() {
-        do {
-            let data = try Data(contentsOf: fileURL)
-            records = try JSONDecoder().decode([WeightRecord].self, from: data)
-        } catch {
-            records = []
-            print("Could not load records, starting fresh. Error: \(error)")
-        }
-    }
-    
+    // `load()` is no longer needed with SwiftData.
+
     // MARK: - CRUD
+#if !os(watchOS)
+    @MainActor
     func add(weight: Double, date: Date = Date()) {
         guard (30...200).contains(weight) else {
             alertMessage = "⚠️ 体重 \(weight)kg 不在有效范围 30~200kg"
             showAlert = true
             return
         }
-        let record = WeightRecord(date: date, weight: round(weight * 10)/10)
-        records.append(record)
-        records.sort { $0.date < $1.date }
-        latestRecord = records.sorted { $0.date > $1.date }.first
-        persistAndSync()
+        let newMetric = HealthMetric(date: date, value: round(weight * 10)/10, type: .weight)
+        let context = modelContainer.mainContext
+        context.insert(newMetric)
+        
+        // Persist to HealthKit and notify widgets
+        healthKitManager.saveWeight(weight, date: date)
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
-    func update(_ record: WeightRecord, weight: Double, date: Date) {
-        guard let idx = records.firstIndex(where: { $0.id == record.id }) else { return }
-        records[idx].weight = round(weight * 10)/10
-        records[idx].date = date
-        records.sort { $0.date < $1.date }
-        latestRecord = records.sorted { $0.date > $1.date }.first
-        persistAndSync()
+    // The update logic will be handled directly by modifying the object in the view,
+    // as SwiftData tracks changes automatically.
+
+    @MainActor
+    func delete(_ metric: HealthMetric) {
+        let context = modelContainer.mainContext
+        context.delete(metric)
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
-    func delete(_ record: WeightRecord) {
-        records.removeAll { $0.id == record.id }
-        latestRecord = records.sorted { $0.date > $1.date }.first
-        persistAndSync()
-    }
-
+    @MainActor
     func clearAll() {
-        records.removeAll()
-        latestRecord = nil
-        persistAndSync()
+        let context = modelContainer.mainContext
+        do {
+            try context.delete(model: HealthMetric.self)
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            print("Failed to clear all HealthMetrics: \(error)")
+        }
     }
     
+    @MainActor
     func importHealthKitSamples(_ samples: [HKQuantitySample]) {
-        // Convert HKQuantitySample to WeightRecord and add to records
+        let context = modelContainer.mainContext
+        
+        // Fetch existing metrics to prevent duplicates
+        let existingMetrics = (try? context.fetch(FetchDescriptor<HealthMetric>())) ?? []
+        let existingDates = Set(existingMetrics.map { $0.date })
+
         for sample in samples {
-            let weight = sample.quantity.doubleValue(for: .gramUnit(with: .kilo))
             let date = sample.endDate
-            let newRecord = WeightRecord(date: date, weight: round(weight * 10)/10)
-            
-            // Check for duplicates before adding. Use date and weight for a simple check.
-            if !records.contains(where: { $0.date == newRecord.date && $0.weight == newRecord.weight }) {
-                records.append(newRecord)
+            // Check for duplicates before adding
+            if !existingDates.contains(date) {
+                let weight = sample.quantity.doubleValue(for: .gramUnit(with: .kilo))
+                let newMetric = HealthMetric(date: date, value: round(weight * 10)/10, type: .weight)
+                context.insert(newMetric)
             }
         }
-        records.sort { $0.date < $1.date } // Ensure records are sorted chronologically
-        latestRecord = records.sorted { $0.date > $1.date }.first
-        persistAndSync() // Persist the imported data
+        
+        // Notify widgets to reload their timelines
+        WidgetCenter.shared.reloadAllTimelines()
     }
+#endif
 
     // MARK: - 派生数据
-    func weightChangeThisWeek() -> Double? {
-        guard let latest = latestRecord else { return nil }
-        let oneWeekAgo = Calendar.current.date(byAdding: .day, value: -7, to: latest.date)!
-        let weekAgoRecord = records.filter { $0.date <= oneWeekAgo }.sorted { $0.date > $1.date }.first
-        if let weekAgo = weekAgoRecord { return latest.weight - weekAgo.weight }
-        return nil
-    }
-
-    func averageWeight(days: Int = 7) -> Double? {
-        let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
-        let recent = records.filter { $0.date >= cutoff }
-        guard !recent.isEmpty else { return nil }
-        return recent.reduce(0) { $0 + $1.weight } / Double(recent.count)
-    }
-
-    // MARK: - 持久化 & 云同步
-    private func persistAndSync() {
-        persist()
-        syncToCloud()
-    }
-    
-    private func persist() {
-        do {
-            let data = try JSONEncoder().encode(records)
-            try data.write(to: fileURL, options: [.atomic])
-        } catch {
-            print("Persist error: \(error)")
-        }
-    }
-    
-    func syncToCloud() {
-        // TODO: 接入 CloudKit/iCloud
-        // 1. 上传本地 records
-        // 2. 合并云端数据
-        // 3. 处理冲突
-    }
+    // The derived data functions (weightChange, averageWeight) will be
+    // re-implemented directly in the UI layer using SwiftData's @Query property wrapper,
+    // which is more efficient.
     
 }
 

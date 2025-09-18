@@ -6,7 +6,20 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		E8ED20222E717493005E9F3B /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E8ED20212E717493005E9F3B /* WidgetKit.framework */; };
+		E8ED20242E717493005E9F3B /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E8ED20232E717493005E9F3B /* SwiftUI.framework */; };
+		E8ED20312E717493005E9F3B /* WeightWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E8ED201F2E717493005E9F3B /* WeightWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
+		E8ED202F2E717493005E9F3B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E8F4AC3A2E66AFDA008B8668 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E8ED201E2E717493005E9F3B;
+			remoteInfo = WeightWidgetsExtension;
+		};
 		E8F4AC502E66AFDC008B8668 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = E8F4AC3A2E66AFDA008B8668 /* Project object */;
@@ -23,15 +36,72 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		E8ED20322E717493005E9F3B /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				E8ED20312E717493005E9F3B /* WeightWidgetsExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		E8ED201F2E717493005E9F3B /* WeightWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WeightWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E8ED20212E717493005E9F3B /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		E8ED20232E717493005E9F3B /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		E8ED20372E7174B6005E9F3B /* WeightWidgetsExtensionDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WeightWidgetsExtensionDebug.entitlements; sourceTree = "<group>"; };
 		E8F4AC422E66AFDA008B8668 /* fitness.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = fitness.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E8F4AC4F2E66AFDC008B8668 /* fitnessTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = fitnessTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E8F4AC592E66AFDC008B8668 /* fitnessUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = fitnessUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		E8194F5D2E793160008E81F4 /* Exceptions for "fitness" folder in "fitness" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			platformFiltersByRelativePath = {
+				ViewModels/ProfileViewModel.swift = (ios, );
+			};
+			target = E8F4AC412E66AFDA008B8668 /* fitness */;
+		};
+		E8ED20352E717493005E9F3B /* Exceptions for "WeightWidgets" folder in "WeightWidgetsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = E8ED201E2E717493005E9F3B /* WeightWidgetsExtension */;
+		};
+		E8ED20392E717BEF005E9F3B /* Exceptions for "fitness" folder in "WeightWidgetsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Managers/HealthKitManager.swift,
+				Managers/NotificationManager.swift,
+				Models/HealthMetric.swift,
+				ViewModels/WeightManager.swift,
+			);
+			target = E8ED201E2E717493005E9F3B /* WeightWidgetsExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		E8ED20252E717493005E9F3B /* WeightWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				E8ED20352E717493005E9F3B /* Exceptions for "WeightWidgets" folder in "WeightWidgetsExtension" target */,
+			);
+			path = WeightWidgets;
+			sourceTree = "<group>";
+		};
 		E8F4AC442E66AFDA008B8668 /* fitness */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				E8194F5D2E793160008E81F4 /* Exceptions for "fitness" folder in "fitness" target */,
+				E8ED20392E717BEF005E9F3B /* Exceptions for "fitness" folder in "WeightWidgetsExtension" target */,
+			);
 			path = fitness;
 			sourceTree = "<group>";
 		};
@@ -53,6 +123,15 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		E8ED201C2E717493005E9F3B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E8ED20242E717493005E9F3B /* SwiftUI.framework in Frameworks */,
+				E8ED20222E717493005E9F3B /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E8F4AC3F2E66AFDA008B8668 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -77,13 +156,25 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		E8ED20202E717493005E9F3B /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				E8ED20212E717493005E9F3B /* WidgetKit.framework */,
+				E8ED20232E717493005E9F3B /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		E8F4AC392E66AFDA008B8668 = {
 			isa = PBXGroup;
 			children = (
+				E8ED20372E7174B6005E9F3B /* WeightWidgetsExtensionDebug.entitlements */,
 				E8F4ACAF2E66B522008B8668 /* doc */,
 				E8F4AC442E66AFDA008B8668 /* fitness */,
 				E8F4AC522E66AFDC008B8668 /* fitnessTests */,
 				E8F4AC5C2E66AFDC008B8668 /* fitnessUITests */,
+				E8ED20252E717493005E9F3B /* WeightWidgets */,
+				E8ED20202E717493005E9F3B /* Frameworks */,
 				E8F4AC432E66AFDA008B8668 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -94,6 +185,7 @@
 				E8F4AC422E66AFDA008B8668 /* fitness.app */,
 				E8F4AC4F2E66AFDC008B8668 /* fitnessTests.xctest */,
 				E8F4AC592E66AFDC008B8668 /* fitnessUITests.xctest */,
+				E8ED201F2E717493005E9F3B /* WeightWidgetsExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -101,6 +193,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		E8ED201E2E717493005E9F3B /* WeightWidgetsExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E8ED20362E717493005E9F3B /* Build configuration list for PBXNativeTarget "WeightWidgetsExtension" */;
+			buildPhases = (
+				E8ED201B2E717493005E9F3B /* Sources */,
+				E8ED201C2E717493005E9F3B /* Frameworks */,
+				E8ED201D2E717493005E9F3B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				E8ED20252E717493005E9F3B /* WeightWidgets */,
+			);
+			name = WeightWidgetsExtension;
+			packageProductDependencies = (
+			);
+			productName = WeightWidgetsExtension;
+			productReference = E8ED201F2E717493005E9F3B /* WeightWidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		E8F4AC412E66AFDA008B8668 /* fitness */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = E8F4AC632E66AFDC008B8668 /* Build configuration list for PBXNativeTarget "fitness" */;
@@ -108,10 +222,12 @@
 				E8F4AC3E2E66AFDA008B8668 /* Sources */,
 				E8F4AC3F2E66AFDA008B8668 /* Frameworks */,
 				E8F4AC402E66AFDA008B8668 /* Resources */,
+				E8ED20322E717493005E9F3B /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				E8ED20302E717493005E9F3B /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				E8F4AC442E66AFDA008B8668 /* fitness */,
@@ -177,9 +293,12 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1630;
-				LastUpgradeCheck = 1630;
+				LastSwiftUpdateCheck = 2600;
+				LastUpgradeCheck = 2600;
 				TargetAttributes = {
+					E8ED201E2E717493005E9F3B = {
+						CreatedOnToolsVersion = 26.0;
+					};
 					E8F4AC412E66AFDA008B8668 = {
 						CreatedOnToolsVersion = 16.3;
 					};
@@ -210,11 +329,19 @@
 				E8F4AC412E66AFDA008B8668 /* fitness */,
 				E8F4AC4E2E66AFDC008B8668 /* fitnessTests */,
 				E8F4AC582E66AFDC008B8668 /* fitnessUITests */,
+				E8ED201E2E717493005E9F3B /* WeightWidgetsExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		E8ED201D2E717493005E9F3B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E8F4AC402E66AFDA008B8668 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -239,6 +366,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		E8ED201B2E717493005E9F3B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E8F4AC3E2E66AFDA008B8668 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -263,6 +397,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		E8ED20302E717493005E9F3B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E8ED201E2E717493005E9F3B /* WeightWidgetsExtension */;
+			targetProxy = E8ED202F2E717493005E9F3B /* PBXContainerItemProxy */;
+		};
 		E8F4AC512E66AFDC008B8668 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = E8F4AC412E66AFDA008B8668 /* fitness */;
@@ -276,6 +415,69 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		E8ED20332E717493005E9F3B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = WeightWidgetsExtensionDebug.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 336T6QZLR5;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = WeightWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = WeightWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.pineapple.fitness.WeightWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		E8ED20342E717493005E9F3B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 336T6QZLR5;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = WeightWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = WeightWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.pineapple.fitness.WeightWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		E8F4AC612E66AFDC008B8668 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -329,12 +531,13 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -387,11 +590,12 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -408,6 +612,7 @@
 				DEVELOPMENT_TEAM = 336T6QZLR5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "我们需要读取您的健康数据（如体重），以便更好地为您服务。";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "我们需要写入您的健康数据（如体重），以便记录您的进步";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -415,6 +620,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -433,11 +639,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = fitness/fitness.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 336T6QZLR5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "我们需要读取您的健康数据（如体重），以便更好地为您服务。";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "我们需要写入您的健康数据（如体重），以便记录您的进步";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -445,6 +653,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -466,7 +675,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 336T6QZLR5;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pineapple.fitnessTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -485,7 +694,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 336T6QZLR5;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pineapple.fitnessTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -533,6 +742,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		E8ED20362E717493005E9F3B /* Build configuration list for PBXNativeTarget "WeightWidgetsExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E8ED20332E717493005E9F3B /* Debug */,
+				E8ED20342E717493005E9F3B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		E8F4AC3D2E66AFDA008B8668 /* Build configuration list for PBXProject "fitness" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

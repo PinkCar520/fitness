@@ -19,18 +19,23 @@ struct WeightSlider: View {
 
     private var majorMarks: [Double] {
         var marks: [Double] = []
-        let lower = Int(floor(initialWeight - rangeSpan))
-        let upper = Int(ceil(initialWeight + rangeSpan))
-        for i in lower...upper {
-            if i >= 30 && i <= 200 {
-                marks.append(Double(i))
-            }
+        let actualLowerBound = max(30.0, initialWeight - rangeSpan)
+        let actualUpperBound = min(200.0, initialWeight + rangeSpan)
+
+        let lowerInt = Int(ceil(actualLowerBound))
+        let upperInt = Int(floor(actualUpperBound))
+
+        for i in lowerInt...upperInt {
+            marks.append(Double(i))
         }
         return marks.sorted()
     }
 
+    private var halfMajorMarks: [Double] {
+        return allPossibleWeights.filter { isHalfMajor($0) }
+    }
+
     // MARK: - State
-    @State private var lastDragThumbCenter: CGFloat = 0
     private let feedbackGenerator = UISelectionFeedbackGenerator()
 
     // MARK: - Init
@@ -56,18 +61,17 @@ struct WeightSlider: View {
                     ForEach(0..<allPossibleWeights.count, id: \.self) { index in
                         let markValue = allPossibleWeights[index]
                         let isMajor = majorMarks.contains(markValue)
+                        let isHalf = isHalfMajor(markValue)
+                        let tickHeight: CGFloat = isMajor ? 16 : (isHalf ? 13 : 10)
                         Rectangle()
-                            .fill(Color.gray.opacity(isMajor ? 0.8 : 0.4))
-                            .frame(width: 1, height: isMajor ? 12 : 10)
+                            .fill(Color.gray.opacity(isMajor ? 0.8 : (isHalf ? 0.6 : 0.4)))
+                            .frame(width: 1, height: tickHeight)
                             .offset(x: positionForValue(markValue, sliderWidth: sliderWidth) - 0.5)
                     }
 
                     // Major Mark Labels
                     ForEach(majorMarks, id: \.self) { markValue in
                         VStack(spacing: 2) {
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.8))
-                                .frame(width: 1, height: 8)
                             Text(String(format: "%.0f", markValue))
                                 .font(.caption)
                                 .foregroundColor(getMarkColor(for: markValue))
@@ -90,35 +94,29 @@ struct WeightSlider: View {
                         .frame(width: thumbWidth, height: thumbWidth)
                         .overlay(Text(getThumbText()).font(.headline).foregroundColor(.black))
                         .offset(x: getThumbXOffset(sliderWidth: sliderWidth))
-                        .gesture(
-                            DragGesture()
-                                .onChanged { gesture in
-                                    let newThumbCenterX = lastDragThumbCenter + gesture.translation.width
-                                    let trackStart = (thumbWidth / 2) + trackPadding
-                                    let trackEnd = sliderWidth - (thumbWidth / 2) - trackPadding
-                                    let clampedX = max(trackStart, min(newThumbCenterX, trackEnd))
-                                    
-                                    let continuousValue = valueForPosition(clampedX, sliderWidth: sliderWidth)
-                                    let snappedValue = round(continuousValue * 10) / 10.0
-                                    
-                                    if self.weight != snappedValue {
-                                        self.weight = snappedValue
-                                        self.feedbackGenerator.selectionChanged()
-                                    }
-                                }
-                                .onEnded { gesture in
-                                    if let w = weight {
-                                        lastDragThumbCenter = positionForValue(w, sliderWidth: sliderWidth)
-                                    }
-                                }
-                        )
                 }
                 .frame(width: sliderWidth)
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { gesture in
+                            let newThumbCenterX = gesture.location.x
+                            let trackStart = (thumbWidth / 2) + trackPadding
+                            let trackEnd = sliderWidth - (thumbWidth / 2) - trackPadding
+                            let clampedX = max(trackStart, min(newThumbCenterX, trackEnd))
+                            
+                            let continuousValue = valueForPosition(clampedX, sliderWidth: sliderWidth)
+                            let snappedValue = round(continuousValue * 10) / 10.0
+                            
+                            if self.weight != snappedValue {
+                                self.weight = snappedValue
+                                self.feedbackGenerator.selectionChanged()
+                            }
+                        }
+                )
             }
             .frame(width: geometry.size.width)
             .onAppear {
                 weight = initialWeight
-                lastDragThumbCenter = positionForValue(initialWeight, sliderWidth: sliderWidth)
                 feedbackGenerator.prepare()
             }
         }
@@ -173,5 +171,9 @@ struct WeightSlider: View {
             return positionForValue(w, sliderWidth: sliderWidth)
         }
         return positionForValue(initialWeight, sliderWidth: sliderWidth)
+    }
+
+    private func isHalfMajor(_ value: Double) -> Bool {
+        return value.truncatingRemainder(dividingBy: 1.0) == 0.5
     }
 }

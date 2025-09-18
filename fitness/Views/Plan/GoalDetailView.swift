@@ -1,149 +1,125 @@
 import SwiftUI
+import SwiftData
+import Charts
 
 struct GoalDetailView: View {
-    @State private var selectedSegment: PlanType = .exercise
+    @EnvironmentObject var profileViewModel: ProfileViewModel
+    
+    @Query(sort: \HealthMetric.date, order: .forward) private var allMetrics: [HealthMetric]
 
-    enum PlanType: String, CaseIterable {
-        case exercise = "运动"
-        case diet = "饮食"
+    private var weightMetrics: [HealthMetric] {
+        allMetrics.filter { $0.type == .weight }
     }
 
     var body: some View {
-        NavigationStack {
-            VStack {
-                goalSummaryCard
+        let userProfile = profileViewModel.userProfile
+        
+        let startWeight = weightMetrics.first?.value ?? weightMetrics.last?.value ?? 0
+        let targetWeight = userProfile.targetWeight
+        let currentWeight = weightMetrics.last?.value ?? 0
+        
+        let progress = (startWeight > 0 && startWeight != targetWeight) ? (startWeight - currentWeight) / (startWeight - targetWeight) : 0
+        let chartData = Array(weightMetrics.suffix(30)) // Last 30 records for the chart
+
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
                 
-                Picker("Plan Type", selection: $selectedSegment) {
-                    ForEach(PlanType.allCases, id: \.self) { type in
-                        Text(type.rawValue).tag(type)
+                // Header
+                Text("目标详情")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .padding(.horizontal)
+
+                // Goal Summary Card
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "target")
+                            .font(.title)
+                            .foregroundColor(.accentColor)
+                        Text("减重至 \(targetWeight, specifier: "%.1f") kg")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                    }
+                    
+                    Text("从 \(startWeight, specifier: "%.1f") kg 开始，已完成 \(Int(progress * 100))%")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    ProgressView(value: progress)
+                        .progressViewStyle(LinearProgressViewStyle(tint: .accentColor))
+                        .scaleEffect(x: 1, y: 2, anchor: .center)
+                }
+                .padding()
+                .background(Color(UIColor.systemGray6))
+                .cornerRadius(16)
+                .padding(.horizontal)
+
+                // Weight Trend Chart
+                if !chartData.isEmpty {
+                    VStack(alignment: .leading) {
+                        Text("体重趋势")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .padding(.horizontal)
+                        
+                        Chart(chartData) { record in
+                            LineMark(
+                                x: .value("日期", record.date),
+                                y: .value("体重", record.value)
+                            )
+                            .foregroundStyle(.blue)
+                        }
+                        .frame(height: 200)
+                        .padding()
+                        .background(Color(UIColor.systemGray6))
+                        .cornerRadius(16)
+                        .padding(.horizontal)
                     }
                 }
-                .pickerStyle(.segmented)
-                .padding()
 
-                if selectedSegment == .exercise {
-                    exerciseSection
-                } else {
-                    dietSection
-                }
-
-                Spacer()
-            }
-            .navigationTitle("减脂目标")
-            .navigationBarTitleDisplayMode(.inline)
-        }
-    }
-
-    private var goalSummaryCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("目标: 减脂").font(.title2).bold()
-            HStack {
+                // Action Plan
                 VStack(alignment: .leading) {
-                    Text("当前体重").font(.subheadline).foregroundColor(.secondary)
-                    Text("66.7 kg").font(.title).bold()
-                }
-                Spacer()
-                VStack(alignment: .leading) {
-                    Text("目标体重").font(.subheadline).foregroundColor(.secondary)
-                    Text("65.0 kg").font(.title).bold()
-                }
-            }
-            ProgressView(value: 0.8)
-            HStack {
-                Text("起始日期: 2024-01-01")
-                Spacer()
-                Text("截止日期: 2024-12-31")
-            }
-            .font(.footnote)
-            .foregroundColor(.secondary)
-        }
-        .padding()
-        .background(Color.gray.opacity(0.1))
-        .cornerRadius(16)
-        .padding()
-    }
-
-    private var dietSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("饮食计划").font(.title3).bold().padding(.horizontal)
-            ScrollView {
-                VStack(spacing: 16) {
-                    MealCardView(meal: .breakfast, recommendedCalories: "400-500", foodItems: ["燕麦片 (50g)", "牛奶 (200ml)", "鸡蛋 (1个)"])
-                    MealCardView(meal: .lunch, recommendedCalories: "600-700", foodItems: ["鸡胸肉 (150g)", "西兰花 (100g)", "糙米饭 (1碗)"])
-                    MealCardView(meal: .dinner, recommendedCalories: "500-600", foodItems: ["三文鱼 (100g)", "芦笋 (100g)", "红薯 (1个)"])
-                    MealCardView(meal: .snacks, recommendedCalories: "200-300", foodItems: ["坚果 (30g)", "酸奶 (150g)"])
-                }
-                .padding()
-            }
-        }
-    }
-
-    private var exerciseSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("运动计划").font(.title3).bold().padding(.horizontal)
-            ScrollView {
-                VStack(spacing: 16) {
-                    PlanRow(name: "力量提升", progress: 0.30, color: .orange)
-                    PlanRow(name: "有氧", progress: 0.50, color: .cyan)
-                    PlanRow(name: "游泳", progress: 0.20, color: .blue)
-                    PlanRow(name: "跑步", progress: 0.80, color: .green)
-                    PlanRow(name: "羽毛球", progress: 0.10, color: .purple)
-                    PlanRow(name: "晨间瑜伽", progress: 0.90, color: .pink)
-                }
-                .padding()
-            }
-        }
-    }
-}
-
-enum Meal: String {
-    case breakfast = "早餐"
-    case lunch = "午餐"
-    case dinner = "晚餐"
-    case snacks = "加餐"
-
-    var icon: String {
-        switch self {
-        case .breakfast: return "sun.and.horizon"
-        case .lunch: return "sun.max"
-        case .dinner: return "moon"
-        case .snacks: return "cup.and.saucer"
-        }
-    }
-}
-
-struct MealCardView: View {
-    let meal: Meal
-    let recommendedCalories: String
-    let foodItems: [String]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: meal.icon)
-                    .font(.title2)
-                    .foregroundColor(.blue)
-                Text(meal.rawValue)
-                    .font(.title2).bold()
-                Spacer()
-                Button(action: {}) {
-                    Image(systemName: "plus.circle.fill")
+                    Text("行动计划")
                         .font(.title2)
-                        .foregroundColor(.blue)
+                        .fontWeight(.bold)
+                        .padding(.horizontal)
+                    
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("每周锻炼5次，每次至少30分钟", systemImage: "figure.run")
+                        Label("每日饮水2升", systemImage: "drop.fill")
+                        Label("保持均衡饮食，减少高热量食物摄入", systemImage: "leaf.fill")
+                    }
+                    .padding()
+                    .background(Color(UIColor.systemGray6))
+                    .cornerRadius(16)
+                    .padding(.horizontal)
                 }
+                
+                Spacer()
             }
-            Text("建议: \(recommendedCalories)千卡")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(foodItems, id: \.self) { item in
-                    Text(item)
-                }
-            }
+            .padding(.vertical)
         }
-        .padding()
-        .background(Color.gray.opacity(0.1))
-        .cornerRadius(16)
+        .navigationTitle("目标详情")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct GoalDetailView_Previews: PreviewProvider {
+    static var previews: some View {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try! ModelContainer(for: HealthMetric.self, configurations: config)
+        
+        let sampleData = [
+            HealthMetric(date: Date().addingTimeInterval(-86400*6), value: 70.5, type: .weight),
+            HealthMetric(date: Date().addingTimeInterval(-86400*1), value: 69.9, type: .weight),
+            HealthMetric(date: Date(), value: 69.5, type: .weight),
+        ]
+        sampleData.forEach { container.mainContext.insert($0) }
+
+        return NavigationView {
+            GoalDetailView()
+                .modelContainer(container)
+                .environmentObject(ProfileViewModel())
+        }
     }
 }

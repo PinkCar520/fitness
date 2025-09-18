@@ -1,11 +1,32 @@
 import SwiftUI
+import SwiftData
 
 struct BodyMetricsView: View {
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var profileViewModel: ProfileViewModel
+    
+    @Query(sort: \HealthMetric.date, order: .reverse) private var records: [HealthMetric]
 
+    // MARK: - Computed Properties
+    private var currentWeight: Double {
+        records.first?.value ?? 0
+    }
+
+    private var bmi: Double {
+        let userHeight: Double = profileViewModel.userProfile.height
+        guard userHeight > 0, currentWeight > 0 else {
+            return 0
+        }
+        let heightInMeters: Double = userHeight / 100.0
+        let heightSquared: Double = heightInMeters * heightInMeters
+        if heightSquared == 0 {
+            return 0
+        }
+        let result: Double = currentWeight / heightSquared
+        return result
+    }
+    
     // Placeholder data for demonstration
-    let currentWeight: Double = 65.5
-    let bmi: Double = 22.3
     let bodyFat: Double = 18.2 // Assuming this is a percentage
     let muscleMass: Double = 45.1
 
@@ -67,6 +88,7 @@ struct BodyMetricsView: View {
         .presentationCornerRadius(32)
     }
 }
+
 
 // MARK: - Helper Views
 
@@ -318,6 +340,11 @@ struct BodyCompositionChart: View {
 
 struct BodyMetricsView_Previews: PreviewProvider {
     static var previews: some View {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try! ModelContainer(for: HealthMetric.self, configurations: config)
+        
         BodyMetricsView()
+            .modelContainer(container)
+            .environmentObject(ProfileViewModel())
     }
 }

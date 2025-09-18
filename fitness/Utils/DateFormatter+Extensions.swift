@@ -1,16 +1,34 @@
-
 import Foundation
 
-//extension Array where Element == WeightRecord {
-//    func sortedByDateDesc() -> [WeightRecord] {
-//        sorted { $0.date > $1.date }
-//    }
-//}
+extension DateFormatter {
+    static let yyyyMMddHHmm: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter
+    }()
+
+    static let shortDate: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .none
+        return formatter
+    }()
+
+    static let MMddHHmm: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM-dd HH:mm"
+        return formatter
+    }()
+}
 
 extension Date {
     var yyyyMMddHHmm: String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd HH:mm"
-        return f.string(from: self)
+        DateFormatter.yyyyMMddHHmm.string(from: self)
+    }
+    var shortDate: String {
+        DateFormatter.shortDate.string(from: self)
+    }
+    var MMddHHmm: String {
+        DateFormatter.MMddHHmm.string(from: self)
     }
 }

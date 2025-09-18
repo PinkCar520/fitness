@@ -1,10 +1,12 @@
 import SwiftUI
+import SwiftData
 
 struct SearchView: View {
-    @EnvironmentObject var weightManager: WeightManager
     @Binding var selectedIndex: Int
     @Binding var searchText: String
     @State private var selectedActivityType: ActivityType = .all
+
+    @Query(sort: \HealthMetric.date, order: .reverse) private var metrics: [HealthMetric]
 
     enum ActivityType: String, CaseIterable {
         case all = "全部"
@@ -13,20 +15,23 @@ struct SearchView: View {
         case swimming = "游泳"
     }
 
-    var searchResults: [WeightRecord] {
-        var records = weightManager.records
+    var searchResults: [HealthMetric] {
+        var filteredMetrics = metrics
 
+        // Filter by activity type
         if selectedActivityType == .weight {
-            // This is a placeholder for when other activity types are added.
+            filteredMetrics = metrics.filter { $0.type == .weight }
         } else if selectedActivityType != .all {
-            return []
+            return [] // Placeholder for other types
         }
 
+        // Filter by search text
         if searchText.isEmpty {
-            return records
+            return filteredMetrics
         } else {
-            return records.filter { record in
-                let weightMatch = String(record.weight).localizedCaseInsensitiveContains(searchText)
+            return filteredMetrics.filter { metric in
+                let weightMatch = String(metric.value).localizedCaseInsensitiveContains(searchText)
+                // You could add date matching here as well if desired
                 return weightMatch
             }
         }
@@ -72,12 +77,12 @@ struct SearchView: View {
 }
 
 struct WeightRow: View {
-    let record: WeightRecord
+    let record: HealthMetric
 
     var body: some View {
         HStack {
             VStack(alignment: .leading) {
-                Text("\(record.weight, specifier: "%.1f") kg")
+                Text("\(record.value, specifier: "%.1f") kg")
                     .font(.headline)
                 Text(record.date, style: .date)
                     .font(.subheadline)

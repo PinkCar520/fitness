@@ -1,19 +1,18 @@
 import SwiftUI
+import SwiftData
 
 struct InputSheetView: View {
     @EnvironmentObject var weightManager: WeightManager
-    @EnvironmentObject var healthKitManager: HealthKitManager
     @Environment(\.dismiss) private var dismiss
+
+    @Query(sort: \HealthMetric.date, order: .reverse) private var records: [HealthMetric]
 
     @State private var currentWeight: Double?
     @State private var date: Date = Date()
     @FocusState private var focused: Bool
 
     var baseWeight: Double {
-        if let sample = healthKitManager.lastWeightSample {
-            return sample.quantity.doubleValue(for: .gramUnit(with: .kilo))
-        }
-        return weightManager.latestRecord?.weight ?? 70.0
+        records.first?.value ?? 70.0
     }
 
     var body: some View {
@@ -36,12 +35,9 @@ struct InputSheetView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(Color(UIColor.systemGray6), in: RoundedRectangle(cornerRadius: 12))
+//                            .background(Color(UIColor.systemGray6), in: RoundedRectangle(cornerRadius: 12))
                     }
 
-                    Button(action: save) {
-                        Text("保存").frame(maxWidth: .infinity).padding(.vertical, 16)
-                    }
                     .buttonStyle(.borderedProminent)
                     .disabled(!isValid(currentWeight))
                     .padding(.top)
@@ -50,20 +46,19 @@ struct InputSheetView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark.circle.fill")
+                    Button(action: save) {
+                        Image(systemName: "checkmark.circle.fill")
                             .font(.title2)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.accentColor)
                     }
                 }
             }
         }
         .onAppear { // 添加 onAppear
-            healthKitManager.readMostRecentWeight() // 从 HealthKit 读取最新体重
             // 优先使用 HealthKit 的数据，其次是本地数据，最后是默认值
             currentWeight = baseWeight
         }
-        .presentationDetents([.fraction(0.5)])
+        .presentationDetents([.fraction(0.38)])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(32)
     }
@@ -82,7 +77,6 @@ struct InputSheetView: View {
             return
         }
         weightManager.add(weight: weightToSave, date: date)
-        healthKitManager.saveWeight(weightToSave, date: date)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         dismiss()
     }

@@ -26,7 +26,7 @@ struct DistanceCard: View {
                 .frame(height: 60)
         }
         .padding()
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
         .onAppear {
             healthKitManager.readWeeklyDistance()
         }

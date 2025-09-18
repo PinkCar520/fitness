@@ -38,26 +38,39 @@ enum HeightUnit: String, Codable, CaseIterable, Identifiable {
 struct UserProfile: Codable, Identifiable {
     let id: UUID
     var name: String
+    var avatarPath: String? // ADDED: To store the file name of the user's avatar image
     var gender: Gender
     var dateOfBirth: Date
     var height: Double // in cm by default
     var targetWeight: Double // in kg by default
+    var targetDate: Date?
     var activityLevel: ActivityLevel
     var weightUnit: WeightUnit
     var heightUnit: HeightUnit
+    
+    // Notification Settings
+    var trainingReminder: Bool
+    var recordingReminder: Bool
+    var restDayReminder: Bool
 
     // Default initializer
     init(id: UUID = UUID(),
          name: String = "新用户",
+         avatarPath: String? = nil, // ADDED
          gender: Gender = .preferNotToSay,
          dateOfBirth: Date = Calendar.current.date(byAdding: .year, value: -25, to: Date())!, // Default to 25 years ago
          height: Double = 170.0, // Default to 170 cm
          targetWeight: Double = 60.0, // Default to 60 kg
          activityLevel: ActivityLevel = .sedentary,
          weightUnit: WeightUnit = .kg,
-         heightUnit: HeightUnit = .cm) {
+         heightUnit: HeightUnit = .cm,
+         targetDate: Date? = nil,
+         trainingReminder: Bool = true,
+         recordingReminder: Bool = true,
+         restDayReminder: Bool = false) {
         self.id = id
         self.name = name
+        self.avatarPath = avatarPath // ADDED
         self.gender = gender
         self.dateOfBirth = dateOfBirth
         self.height = height
@@ -65,5 +78,9 @@ struct UserProfile: Codable, Identifiable {
         self.activityLevel = activityLevel
         self.weightUnit = weightUnit
         self.heightUnit = heightUnit
+        self.targetDate = targetDate
+        self.trainingReminder = trainingReminder
+        self.recordingReminder = recordingReminder
+        self.restDayReminder = restDayReminder
     }
 }
