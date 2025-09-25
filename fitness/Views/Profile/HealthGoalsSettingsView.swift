@@ -32,8 +32,8 @@ struct HealthGoalsSettingsView: View {
                 }.pickerStyle(.segmented).frame(width: 100)
             }
 
-            Picker("活动水平", selection: $editingProfile.activityLevel) {
-                ForEach(ActivityLevel.allCases) { level in Text(level.rawValue).tag(level) }
+            Picker("训练频率", selection: $editingProfile.workoutFrequency) {
+                ForEach(WorkoutFrequency.allCases) { level in Text(level.rawValue).tag(level as WorkoutFrequency?) }
             }
         }
         .navigationTitle("健康与目标")

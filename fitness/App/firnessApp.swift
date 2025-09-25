@@ -8,6 +8,8 @@ struct firnessApp: App {
     @StateObject private var weightManager: WeightManager
     @StateObject private var profileViewModel = ProfileViewModel()
     @StateObject private var appearanceViewModel = AppearanceViewModel()
+    @StateObject private var recommendationManager: RecommendationManager
+    @StateObject private var achievementManager: AchievementManager
     
     let modelContainer: ModelContainer
 
@@ -30,6 +32,11 @@ struct firnessApp: App {
         // 3. Assign to StateObjects.
         _healthKitManager = StateObject(wrappedValue: healthKitManager)
         _weightManager = StateObject(wrappedValue: weightManager)
+        
+        let initialProfileViewModel = ProfileViewModel()
+        _profileViewModel = StateObject(wrappedValue: initialProfileViewModel)
+        _recommendationManager = StateObject(wrappedValue: RecommendationManager(profileViewModel: initialProfileViewModel))
+        _achievementManager = StateObject(wrappedValue: AchievementManager(profileViewModel: initialProfileViewModel))
     }
 
     var body: some Scene {
@@ -42,6 +49,8 @@ struct firnessApp: App {
                 .onAppear {
                     healthKitManager.setupHealthKitData(weightManager: weightManager)
                 }
+                .environmentObject(recommendationManager)
+                .environmentObject(achievementManager)
                 .onOpenURL { url in
                     // Handle the deep link from the widget
                     if url.scheme == "fitness" && url.host == "add-weight" {

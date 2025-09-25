@@ -5,6 +5,7 @@ import SwiftData
 enum MetricType: String, Codable, CaseIterable {
     case weight = "体重"
     case bodyFatPercentage = "体脂率"
+    case waistCircumference = "腰围"
     // Future types can be added here, e.g.:
     // case height = "身高"
     // case bodyMassIndex = "BMI"
@@ -15,6 +16,8 @@ enum MetricType: String, Codable, CaseIterable {
             return "kg"
         case .bodyFatPercentage:
             return "%"
+        case .waistCircumference:
+            return "cm"
         }
     }
 }

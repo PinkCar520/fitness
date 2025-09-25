@@ -46,7 +46,7 @@ struct StatsView: View {
             }
             .navigationTitle("统计")
             .onAppear(perform: fetchStats)
-            .onChange(of: selectedTimeFrame) { _ in
+            .onChange(of: selectedTimeFrame) {
                 fetchStats()
             }
         }
@@ -143,9 +143,11 @@ struct StatsView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("运动分析").font(.title3).bold()
             VStack(alignment: .leading, spacing: 12) {
+                if let pushups = profileViewModel.userProfile.benchmarks?.pushups {
+                    WorkoutProgress(type: "俯卧撑基准", percentage: Double(pushups) / 100.0, color: .red) // Assuming 100 is a max benchmark for visualization
+                }
                 WorkoutProgress(type: "跑步", percentage: 0.67, color: .green)
                 WorkoutProgress(type: "游泳", percentage: 0.50, color: .cyan)
-                WorkoutProgress(type: "力量", percentage: 0.33, color: .purple)
             }
             .padding()
             .background(Color.gray.opacity(0.1))
@@ -157,8 +159,19 @@ struct StatsView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("智能建议").font(.title3).bold()
             VStack(alignment: .leading, spacing: 12) {
-                SuggestionCard(text: "本周运动频率提升20%", color: .blue)
-                SuggestionCard(text: "建议增加力量训练", color: .yellow)
+                if let bodyType = profileViewModel.userProfile.bodyType?.current {
+                    switch bodyType {
+                    case .slim:
+                        SuggestionCard(text: "建议增加健康卡路里摄入", color: .blue)
+                    case .heavy:
+                        SuggestionCard(text: "建议关注减脂和有氧训练", color: .orange)
+                    default:
+                        SuggestionCard(text: "保持均衡训练，持续进步", color: .green)
+                    }
+                } else {
+                    SuggestionCard(text: "本周运动频率提升20%", color: .blue)
+                    SuggestionCard(text: "建议增加力量训练", color: .yellow)
+                }
             }
         }
     }

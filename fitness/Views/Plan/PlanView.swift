@@ -1,7 +1,13 @@
 import SwiftUI
 
 struct PlanView: View {
-    @StateObject private var planViewModel = PlanViewModel()
+    var profileViewModel: ProfileViewModel
+    @StateObject private var planViewModel: PlanViewModel
+
+    init(profileViewModel: ProfileViewModel) {
+        self.profileViewModel = profileViewModel
+        _planViewModel = StateObject(wrappedValue: PlanViewModel(profileViewModel: profileViewModel))
+    }
 
     var body: some View {
         NavigationStack {
@@ -75,6 +81,7 @@ struct PlanView: View {
 
 struct PlanView_Previews: PreviewProvider {
     static var previews: some View {
-        PlanView()
+        PlanView(profileViewModel: ProfileViewModel())
+            .environmentObject(ProfileViewModel())
     }
 }

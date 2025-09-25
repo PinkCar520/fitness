@@ -3,19 +3,7 @@ import SwiftUI
 struct DataPrivacySettingsView: View {
     var body: some View {
         Form {
-            Button(action: {
-                // Open app settings
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(url)
-                }
-            }) {
-                HStack {
-                    Text("管理HealthKit权限")
-                    Spacer()
-                    Image(systemName: "arrow.up.forward.app")
-                }
-                .foregroundColor(.primary)
-            }
+
 
             Link(destination: URL(string: "https://www.example.com/privacy")!) {
                 HStack {

@@ -8,6 +8,10 @@ class MockHealthKitManager: HealthKitManagerProtocol {
     var saveWeightCalled = false
     var savedWeight: Double?
     var savedDate: Date?
+    var saveBodyFatPercentageCalled = false
+    var savedBodyFatPercentage: Double?
+    var saveWaistCircumferenceCalled = false
+    var savedWaistCircumference: Double?
 
     // ObservableObject conformance for the protocol
     var objectWillChange = ObservableObjectPublisher()
@@ -15,6 +19,18 @@ class MockHealthKitManager: HealthKitManagerProtocol {
     func saveWeight(_ weight: Double, date: Date) {
         saveWeightCalled = true
         savedWeight = weight
+        savedDate = date
+    }
+
+    func saveBodyFatPercentage(_ percentage: Double, date: Date) {
+        saveBodyFatPercentageCalled = true
+        savedBodyFatPercentage = percentage
+        savedDate = date
+    }
+    
+    func saveWaistCircumference(_ circumference: Double, date: Date) {
+        saveWaistCircumferenceCalled = true
+        savedWaistCircumference = circumference
         savedDate = date
     }
 }
@@ -184,5 +200,58 @@ final class WeightManagerTests: XCTestCase {
         
         // Verify all metrics were deleted
         XCTAssertEqual(try fetchAllMetrics().count, 0)
+    }
+    func testAddValidBodyFatRecord() throws {
+        let testPercentage = 22.5
+        let testDate = Date()
+
+        // Pre-condition: No metrics in the store
+        XCTAssertEqual(try fetchAllMetrics().count, 0)
+
+        let metric = HealthMetric(date: testDate, value: testPercentage, type: .bodyFatPercentage)
+        weightManager.addMetric(metric)
+
+        // Verification
+        let metrics = try fetchAllMetrics()
+        XCTAssertEqual(metrics.count, 1)
+        XCTAssertEqual(metrics.first?.value, testPercentage)
+        XCTAssertEqual(metrics.first?.date, testDate)
+        XCTAssertEqual(metrics.first?.type, .bodyFatPercentage)
+
+        // Verify HealthKitManager interaction
+        XCTAssertTrue(mockHealthKitManager.saveBodyFatPercentageCalled)
+        XCTAssertEqual(mockHealthKitManager.savedBodyFatPercentage, testPercentage)
+        XCTAssertEqual(mockHealthKitManager.savedDate, testDate)
+
+        // Verify alert state
+        XCTAssertFalse(weightManager.showAlert)
+        XCTAssertTrue(weightManager.alertMessage.isEmpty)
+    }
+
+    func testAddValidWaistCircumferenceRecord() throws {
+        let testCircumference = 85.0
+        let testDate = Date()
+
+        // Pre-condition: No metrics in the store
+        XCTAssertEqual(try fetchAllMetrics().count, 0)
+
+        let metric = HealthMetric(date: testDate, value: testCircumference, type: .waistCircumference)
+        weightManager.addMetric(metric)
+
+        // Verification
+        let metrics = try fetchAllMetrics()
+        XCTAssertEqual(metrics.count, 1)
+        XCTAssertEqual(metrics.first?.value, testCircumference)
+        XCTAssertEqual(metrics.first?.date, testDate)
+        XCTAssertEqual(metrics.first?.type, .waistCircumference)
+
+        // Verify HealthKitManager interaction
+        XCTAssertTrue(mockHealthKitManager.saveWaistCircumferenceCalled)
+        XCTAssertEqual(mockHealthKitManager.savedWaistCircumference, testCircumference)
+        XCTAssertEqual(mockHealthKitManager.savedDate, testDate)
+
+        // Verify alert state
+        XCTAssertFalse(weightManager.showAlert)
+        XCTAssertTrue(weightManager.alertMessage.isEmpty)
     }
 }

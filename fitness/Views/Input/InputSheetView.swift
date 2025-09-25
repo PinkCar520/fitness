@@ -7,24 +7,78 @@ struct InputSheetView: View {
 
     @Query(sort: \HealthMetric.date, order: .reverse) private var records: [HealthMetric]
 
+    @State private var selectedMetric: MetricType = .weight
     @State private var currentWeight: Double?
+    @State private var bodyFatPercentage: Double?
+    @State private var waistCircumference: Double?
     @State private var date: Date = Date()
     @FocusState private var focused: Bool
 
     var baseWeight: Double {
-        records.first?.value ?? 70.0
+        records.first(where: { $0.type == .weight })?.value ?? 70.0
+    }
+    
+    var baseBodyFat: Double {
+        records.first(where: { $0.type == .bodyFatPercentage })?.value ?? 20.0
+    }
+    
+    var baseWaistCircumference: Double {
+        records.first(where: { $0.type == .waistCircumference })?.value ?? 80.0
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 10) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("体重").font(.headline)
-                        WeightSlider(weight: $currentWeight, initialWeight: baseWeight)
-                        if !isValid(currentWeight) {
-                            Text("体重必须在30到200公斤之间。")
-                                .foregroundColor(.red).font(.footnote)
+                VStack(spacing: 20) { // Increased spacing
+                    Picker("Metric", selection: $selectedMetric) {
+                        ForEach(MetricType.allCases, id: \.self) { type in
+                            Text(type.rawValue).tag(type)
+                        }
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    
+                    switch selectedMetric {
+                    case .weight:
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("体重").font(.headline)
+                            WeightSlider(weight: $currentWeight, initialWeight: baseWeight)
+                            if !isWeightValid(currentWeight) {
+                                Text("体重必须在30到200公斤之间。")
+                                    .foregroundColor(.red).font(.footnote)
+                            } else {
+                                Text("测量建议：晨起空腹，以保证数据一致性")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                            }
+                        }
+                    case .bodyFatPercentage:
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("体脂率").font(.headline)
+                            BodyFatSlider(percentage: $bodyFatPercentage, initialPercentage: baseBodyFat)
+                            if !isBodyFatValid(bodyFatPercentage) {
+                                Text("体脂率必须在3%到50%之间。")
+                                    .foregroundColor(.red).font(.footnote)
+                            } else {
+                                Text("读数建议：读数易受水分影响，关注长期趋势更佳")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                            }
+                        }
+                    case .waistCircumference:
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("腰围").font(.headline)
+                            WaistCircumferenceSlider(circumference: $waistCircumference, initialCircumference: baseWaistCircumference)
+                            if !isWaistValid(waistCircumference) {
+                                Text("腰围必须在50到150cm之间。")
+                                    .foregroundColor(.red).font(.footnote)
+                            } else {
+                                Text("测量标准：参考世界卫生组织(WHO) STEPS 方案")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                            }
                         }
                     }
 
@@ -35,11 +89,10 @@ struct InputSheetView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-//                            .background(Color(UIColor.systemGray6), in: RoundedRectangle(cornerRadius: 12))
                     }
 
                     .buttonStyle(.borderedProminent)
-                    .disabled(!isValid(currentWeight))
+                    .disabled(isSaveButtonDisabled())
                     .padding(.top)
                 }
                 .padding(.horizontal)
@@ -54,29 +107,67 @@ struct InputSheetView: View {
                 }
             }
         }
-        .onAppear { // 添加 onAppear
-            // 优先使用 HealthKit 的数据，其次是本地数据，最后是默认值
+        .onAppear { 
             currentWeight = baseWeight
+            bodyFatPercentage = baseBodyFat
+            waistCircumference = baseWaistCircumference
         }
-        .presentationDetents([.fraction(0.38)])
+        .presentationDetents([.fraction(0.45)]) // Adjusted height
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(32)
     }
 
-    private func isValid(_ w: Double?) -> Bool { // 修改 isValid 接受 Optional<Double>
-        guard let weightValue = w else { return false } // 如果是 nil，则认为无效（或者根据需求处理“关”状态）
+    private func isSaveButtonDisabled() -> Bool {
+        switch selectedMetric {
+        case .weight:
+            return !isWeightValid(currentWeight)
+        case .bodyFatPercentage:
+            return !isBodyFatValid(bodyFatPercentage)
+        case .waistCircumference:
+            return !isWaistValid(waistCircumference)
+        }
+    }
+
+    private func isWeightValid(_ w: Double?) -> Bool {
+        guard let weightValue = w else { return false } 
         return (30...200).contains(weightValue)
+    }
+    
+    private func isBodyFatValid(_ p: Double?) -> Bool {
+        guard let percentageValue = p else { return false } 
+        return (3...50).contains(percentageValue)
+    }
+    
+    private func isWaistValid(_ c: Double?) -> Bool {
+        guard let circumferenceValue = c else { return false } 
+        return (50...150).contains(circumferenceValue)
     }
 
     private func save() {
-        // 只有当 currentWeight 有值且有效时才保存
-        guard let weightToSave = currentWeight, isValid(weightToSave) else {
-            // 如果 currentWeight 为 nil (关) 或者无效，则不保存，直接 dismiss
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            dismiss()
-            return
+        switch selectedMetric {
+        case .weight:
+            guard let weightToSave = currentWeight, isWeightValid(weightToSave) else {
+                dismiss()
+                return
+            }
+            let newMetric = HealthMetric(date: date, value: weightToSave, type: .weight)
+            weightManager.addMetric(newMetric)
+        case .bodyFatPercentage:
+            guard let percentageToSave = bodyFatPercentage, isBodyFatValid(percentageToSave) else {
+                dismiss()
+                return
+            }
+            let newMetric = HealthMetric(date: date, value: percentageToSave, type: .bodyFatPercentage)
+            weightManager.addMetric(newMetric)
+        case .waistCircumference:
+            guard let circumferenceToSave = waistCircumference, isWaistValid(circumferenceToSave) else {
+                dismiss()
+                return
+            }
+            let newMetric = HealthMetric(date: date, value: circumferenceToSave, type: .waistCircumference)
+            weightManager.addMetric(newMetric)
         }
-        weightManager.add(weight: weightToSave, date: date)
+        
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         dismiss()
     }

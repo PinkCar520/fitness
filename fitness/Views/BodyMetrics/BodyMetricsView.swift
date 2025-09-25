@@ -9,7 +9,7 @@ struct BodyMetricsView: View {
 
     // MARK: - Computed Properties
     private var currentWeight: Double {
-        records.first?.value ?? 0
+        records.first(where: { $0.type == .weight })?.value ?? 0
     }
 
     private var bmi: Double {
@@ -26,8 +26,15 @@ struct BodyMetricsView: View {
         return result
     }
     
+    private var currentBodyFat: Double {
+        records.first(where: { $0.type == .bodyFatPercentage })?.value ?? 0
+    }
+    
+    private var currentWaistCircumference: Double {
+        records.first(where: { $0.type == .waistCircumference })?.value ?? 0
+    }
+    
     // Placeholder data for demonstration
-    let bodyFat: Double = 18.2 // Assuming this is a percentage
     let muscleMass: Double = 45.1
 
     var body: some View {
@@ -52,7 +59,8 @@ struct BodyMetricsView: View {
                             .fontWeight(.bold)
                             .padding(.horizontal)
 
-                        MetricCard(title: "体脂率", value: String(format: "%.1f", bodyFat), unit: "%", icon: "percentage", color: .orange)
+                        MetricCard(title: "体脂率", value: String(format: "%.1f", currentBodyFat), unit: "%", icon: "percentage", color: .orange)
+                        MetricCard(title: "腰围", value: String(format: "%.1f", currentWaistCircumference), unit: "cm", icon: "figure.and.child.holdinghands", color: .red) // Using a temporary icon
                         MetricCard(title: "肌肉量", value: String(format: "%.1f", muscleMass), unit: "公斤", icon: "figure.strengthtraining.traditional", color: .purple)
                     }
 
@@ -63,7 +71,7 @@ struct BodyMetricsView: View {
                             .fontWeight(.bold)
                             .padding(.horizontal)
 
-                        BodyCompositionChart(bmi: bmi, bodyFat: bodyFat)
+                        BodyCompositionChart(bmi: bmi, bodyFat: currentBodyFat)
                             .padding(.horizontal)
                     }
 

@@ -57,7 +57,7 @@ struct ProfilePopupView: View {
         }
         .frame(maxWidth: .infinity, alignment: .center)
         .padding(.vertical)
-        .onChange(of: selectedItem) { newItem in
+        .onChange(of: selectedItem) { oldValue, newItem in
             profileViewModel.setAvatar(from: newItem)
         }
     }
@@ -76,6 +76,7 @@ struct ProfilePopupView: View {
                 Section {
                     SettingsNavigationRow(title: "基本信息", systemImageName: "person.text.rectangle.fill", destination: BasicInfoSettingsView().environmentObject(profileViewModel))
                     SettingsNavigationRow(title: "健康与目标", systemImageName: "target", destination: HealthGoalsSettingsView().environmentObject(profileViewModel))
+                    SettingsNavigationRow(title: "健身档案", systemImageName: "figure.run.circle.fill", destination: FitnessProfileDetailView().environmentObject(profileViewModel))
                 }
                 .listRowSeparator(.hidden)
 

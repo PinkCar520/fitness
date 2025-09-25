@@ -17,13 +17,28 @@ struct DailyDistanceData: Identifiable {
 
 protocol HealthKitManagerProtocol: ObservableObject {
     func saveWeight(_ weight: Double, date: Date)
+    func saveBodyFatPercentage(_ percentage: Double, date: Date)
+    func saveWaistCircumference(_ circumference: Double, date: Date)
     // Add other methods that WeightManager directly calls on HealthKitManager if needed
+}
+
+enum HealthKitAuthorizationStatus {
+    case authorized
+    case denied
+    case notDetermined
+}
+
+enum HealthDataType {
+    case steps
+    case distance
 }
 
 final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
     private let healthStore = HKHealthStore()
     
     @Published var lastWeightSample: HKQuantitySample?
+    @Published var lastBodyFatSample: HKQuantitySample?
+    @Published var lastWaistCircumferenceSample: HKQuantitySample?
     @Published var lastSavedWeight: Double?
     @Published var stepCount: Double = 0
     @Published var distance: Double = 0
@@ -40,11 +55,16 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
         }
         print("xxx")
         let weightType = HKQuantityType.quantityType(forIdentifier: .bodyMass)!
+        let bodyFatPercentageType = HKQuantityType.quantityType(forIdentifier: .bodyFatPercentage)!
+        let waistCircumferenceType = HKQuantityType.quantityType(forIdentifier: .waistCircumference)!
         let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount)!
         let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning)!
         let activitySummaryType = HKObjectType.activitySummaryType()
-        let typesToRead: Set<HKObjectType> = [weightType, stepType, distanceType, activitySummaryType]
-        let typesToWrite: Set<HKSampleType> = [weightType]
+        let activeEnergyBurnedType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned)!
+        let workoutType = HKObjectType.workoutType()
+
+        let typesToRead: Set<HKObjectType> = [weightType, bodyFatPercentageType, waistCircumferenceType, stepType, distanceType, activitySummaryType, activeEnergyBurnedType, workoutType]
+        let typesToWrite: Set<HKSampleType> = [weightType, bodyFatPercentageType, waistCircumferenceType, workoutType]
 
         healthStore.requestAuthorization(toShare: typesToWrite, read: typesToRead) { success, error in
             if let error = error {
@@ -75,6 +95,40 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
         }
     }
     
+    // 保存体脂率
+    func saveBodyFatPercentage(_ percentage: Double, date: Date = Date()) {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .bodyFatPercentage) else { return }
+        let quantity = HKQuantity(unit: .percent(), doubleValue: percentage / 100.0) // HealthKit expects value between 0-1
+        let sample = HKQuantitySample(type: type, quantity: quantity, start: date, end: date)
+        
+        healthStore.save(sample) { success, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("HealthKit save body fat error: \(error)")
+                } else {
+                    print("Saved to HealthKit: \(percentage)%")
+                }
+            }
+        }
+    }
+    
+    // 保存腰围
+    func saveWaistCircumference(_ circumference: Double, date: Date = Date()) {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .waistCircumference) else { return }
+        let quantity = HKQuantity(unit: .meterUnit(with: .centi), doubleValue: circumference)
+        let sample = HKQuantitySample(type: type, quantity: quantity, start: date, end: date)
+        
+        healthStore.save(sample) { success, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("HealthKit save waist circumference error: \(error)")
+                } else {
+                    print("Saved to HealthKit: \(circumference) cm")
+                }
+            }
+        }
+    }
+    
     // 读取最近体重
     func readMostRecentWeight() {
         guard let type = HKQuantityType.quantityType(forIdentifier: .bodyMass) else { return }
@@ -83,6 +137,32 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
         let query = HKSampleQuery(sampleType: type, predicate: nil, limit: 1, sortDescriptors: [sortDescriptor]) { _, results, _ in
             DispatchQueue.main.async {
                 self.lastWeightSample = results?.first as? HKQuantitySample
+            }
+        }
+        healthStore.execute(query)
+    }
+
+    // 读取最近体脂率
+    func readMostRecentBodyFat() {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .bodyFatPercentage) else { return }
+        
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+        let query = HKSampleQuery(sampleType: type, predicate: nil, limit: 1, sortDescriptors: [sortDescriptor]) { _, results, _ in
+            DispatchQueue.main.async {
+                self.lastBodyFatSample = results?.first as? HKQuantitySample
+            }
+        }
+        healthStore.execute(query)
+    }
+
+    // 读取最近腰围
+    func readMostRecentWaistCircumference() {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .waistCircumference) else { return }
+        
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+        let query = HKSampleQuery(sampleType: type, predicate: nil, limit: 1, sortDescriptors: [sortDescriptor]) { _, results, _ in
+            DispatchQueue.main.async {
+                self.lastWaistCircumferenceSample = results?.first as? HKQuantitySample
             }
         }
         healthStore.execute(query)
@@ -395,6 +475,8 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
                         }
                         // After import (or failure), proceed with regular data fetching
                         self.readMostRecentWeight()
+                        self.readMostRecentBodyFat()
+                        self.readMostRecentWaistCircumference()
                         self.readStepCount()
                         self.readDistance()
                         self.readActivitySummary()
@@ -402,6 +484,8 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
                 } else {
                     // If import already performed, just do regular data fetching
                     self.readMostRecentWeight()
+                    self.readMostRecentBodyFat()
+                    self.readMostRecentWaistCircumference()
                     self.readStepCount()
                     self.readDistance()
                     self.readActivitySummary()
@@ -427,4 +511,16 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
         }
         healthStore.execute(query)
     }
+
+#if os(iOS) && !targetEnvironment(macCatalyst)
+    // 打开健康 App
+//    func openHealthApp() {
+//        if let url = URL(string: "x-health-app://"), UIApplication.shared.canOpenURL(url) {
+//            UIApplication.shared.open(url)
+//        } else if let url = URL(string: UIApplication.openSettingsURLString), UIApplication.shared.canOpenURL(url) {
+//            UIApplication.shared.open(url)
+//        }
+//    }
+#endif
+
 }

@@ -32,11 +32,23 @@ final class WeightManager: ObservableObject {
             return
         }
         let newMetric = HealthMetric(date: date, value: round(weight * 10)/10, type: .weight)
+        addMetric(newMetric)
+    }
+
+    @MainActor
+    func addMetric(_ metric: HealthMetric) {
         let context = modelContainer.mainContext
-        context.insert(newMetric)
+        context.insert(metric)
         
         // Persist to HealthKit and notify widgets
-        healthKitManager.saveWeight(weight, date: date)
+        switch metric.type {
+        case .weight:
+            healthKitManager.saveWeight(metric.value, date: metric.date)
+        case .bodyFatPercentage:
+            healthKitManager.saveBodyFatPercentage(metric.value, date: metric.date)
+        case .waistCircumference:
+            healthKitManager.saveWaistCircumference(metric.value, date: metric.date)
+        }
         WidgetCenter.shared.reloadAllTimelines()
     }
 

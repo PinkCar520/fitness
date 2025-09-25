@@ -4,8 +4,19 @@ import SwiftData
 struct ContentView: View {
     @EnvironmentObject var healthKitManager: HealthKitManager
     @EnvironmentObject var appearanceViewModel: AppearanceViewModel
+    @EnvironmentObject var profileViewModel: ProfileViewModel
+    @EnvironmentObject var achievementManager: AchievementManager
+    
     @State private var selectedIndex = 0 // Default to the first tab
     @State private var showInputSheet = false
+    @State private var showOnboarding: Bool
+
+    init() {
+        // Initialize showOnboarding based on the profile view model
+        // We need to access the wrappedValue of the EnvironmentObject to initialize a @State property in `init`.
+        // This is a common pattern for setting initial @State based on an EnvironmentObject.
+        _showOnboarding = State(initialValue: !ProfileViewModel().userProfile.hasCompletedOnboarding)
+    }
 
     var body: some View {
         TabView(selection: $selectedIndex) {
@@ -17,7 +28,7 @@ struct ContentView: View {
                 .tag(0)
 
             // Tab 2: Plan
-            PlanView()
+            PlanView(profileViewModel: profileViewModel)
                 .tabItem {
                     Image(systemName: "checklist")
                 }
@@ -38,6 +49,54 @@ struct ContentView: View {
         .sheet(isPresented: $showInputSheet) { 
             InputSheetView()
         }
+        .fullScreenCover(isPresented: $showOnboarding) {
+            OnboardingFlowView(showOnboarding: $showOnboarding)
+                .environmentObject(profileViewModel)
+        }
+        .overlay(alignment: .top) {
+            if achievementManager.showAchievementPopup, let achievement = achievementManager.unlockedAchievement {
+                AchievementPopupView(message: achievement) {
+                    achievementManager.dismissAchievementPopup()
+                }
+                .padding(.top)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .animation(.spring(), value: achievementManager.showAchievementPopup)
+            }
+        }
+    }
+}
+
+struct AchievementPopupView: View {
+    let message: String
+    let dismissAction: () -> Void
+
+    @State private var show = false
+
+    var body: some View {
+        VStack {
+            Text("🎉 成就解锁！")
+                .font(.headline)
+                .foregroundColor(.white)
+            Text(message)
+                .font(.subheadline)
+                .foregroundColor(.white)
+        }
+        .padding()
+        .background(Color.green.opacity(0.9))
+        .cornerRadius(15)
+        .shadow(radius: 10)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                withAnimation {
+                    dismissAction()
+                }
+            }
+        }
+        .onTapGesture {
+            withAnimation {
+                dismissAction()
+            }
+        }
     }
 }
 
@@ -49,11 +108,14 @@ struct ContentView_Previews: PreviewProvider {
         let healthKitManager = HealthKitManager()
         let weightManager = WeightManager(healthKitManager: healthKitManager, modelContainer: container)
 
+        let profileViewModel = ProfileViewModel()
+
         ContentView()
             .modelContainer(container) // Important for @Query
             .environmentObject(healthKitManager)
             .environmentObject(weightManager)
-            .environmentObject(ProfileViewModel())
+            .environmentObject(profileViewModel)
             .environmentObject(AppearanceViewModel())
+            .environmentObject(AchievementManager(profileViewModel: profileViewModel))
     }
 }

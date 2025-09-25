@@ -1,63 +1,98 @@
-//import SwiftUI
-//import SwiftData
-//
-//struct GoalProgressView: View {
-//    @Query(sort: \HealthMetric.date, order: .reverse) private var records: [HealthMetric]
-//    @AppStorage("targetWeight") private var targetWeight: Double = 68.0
-//
-//    var body: some View {
-//        HStack(spacing: 16) {
-//            VStack(alignment: .leading, spacing: 8) {
-//                Text("本周变化").font(.headline).foregroundStyle(.secondary)
-//                Text(weekChangeText)
-//                    .font(.system(size: 28, weight: .bold))
-//                    .foregroundStyle(weekChangeValue > 0 ? .red : (weekChangeValue < 0 ? .green : .primary))
-//            }
-//            .frame(maxWidth: .infinity, alignment: .leading)
-//
-//            VStack(alignment: .leading, spacing: 8) {
-//                Text("目标进度").font(.headline).foregroundStyle(.secondary)
-//                if let latest = records.first?.value {
-//                    Text(String(format: "%.1f/%.1fkg", latest, targetWeight))
-//                        .font(.system(size: 22, weight: .bold))
-//                    ProgressView(value: latest, total: max(targetWeight, latest))
-//                        .progressViewStyle(.linear)
-//                        .tint(.orange)
-//                } else {
-//                    Text("--/\(String(format: "%.1f", targetWeight))kg")
-//                }
-//            }
-//            .frame(maxWidth: .infinity, alignment: .leading)
-//        }
-//        .padding()
-//        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20))
-//    }
-//
-//    private var weekChangeValue: Double {
-//        guard records.count > 1 else { return 0 }
-//        
-//        let calendar = Calendar.current
-//        let now = Date()
-//        
-//        // Find the most recent record
-//        let latestRecord = records[0]
-//        
-//        // Find the date 7 days ago
-//        guard let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: now) else { return 0 }
-//        
-//        // Find the closest record from on or before 7 days ago
-//        let referenceRecord = records.first { $0.date <= sevenDaysAgo }
-//        
-//        guard let referenceWeight = referenceRecord?.value else { return 0 }
-//        
-//        return latestRecord.value - referenceWeight
-//    }
-//
-//    private var weekChangeText: String {
-//        let change = weekChangeValue
-//        if change == 0 && records.count <= 1 {
-//            return "-- kg"
-//        }
-//        return String(format: "%+.1fkg", change)
-//    }
-//}
+import SwiftUI
+import SwiftData
+
+struct GoalProgressView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \HealthMetric.date) private var records: [HealthMetric] // Sort ascending to easily get first record
+    @AppStorage("targetWeight") private var targetWeight: Double = 68.0
+
+    private var currentWeight: Double {
+        records.last?.value ?? 0.0
+    }
+
+    private var startingWeight: Double {
+        records.first?.value ?? 0.0
+    }
+
+    private var progress: Double {
+        guard startingWeight != targetWeight else { return 0.0 }
+        let totalRange = startingWeight - targetWeight
+        let currentProgress = startingWeight - currentWeight
+        return currentProgress / totalRange
+    }
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            Text("目标进度")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 5)
+
+            ZStack {
+                // Background semicircle
+                SemicircleShape()
+                    .stroke(Color.gray.opacity(0.3), lineWidth: 10)
+                    .frame(height: 150)
+
+                // Progress semicircle
+                SemicircleShape(progress: progress)
+                    .stroke(currentWeight > targetWeight ? Color.orange : Color.green, lineWidth: 10)
+                    .frame(height: 150)
+
+                // Current Weight in the middle
+                VStack {
+                    Text(String(format: "%.1f", currentWeight))
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                    Text("KG")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .offset(y: -30) // Adjust position to be central in the semicircle
+
+                // Starting Weight (bottom-left)
+                Text(String(format: "%.1f KG", startingWeight))
+                    .font(.caption)
+                    .offset(x: -70, y: 60) // Adjust position
+
+                // Target Weight (bottom-right)
+                Text(String(format: "%.1f KG", targetWeight))
+                    .font(.caption)
+                    .offset(x: 70, y: 60) // Adjust position
+            }
+            .padding(.horizontal)
+        }
+        .padding()
+        .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
+    }
+}
+
+struct SemicircleShape: Shape {
+    var progress: Double = 1.0 // 0.0 to 1.0
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let center = CGPoint(x: rect.midX, y: rect.maxY)
+        let radius = min(rect.width, rect.height * 2) / 2
+        let startAngle = Angle(degrees: 180)
+        let endAngle = Angle(degrees: 0)
+
+        path.addArc(center: center, radius: radius, startAngle: startAngle, endAngle: endAngle, clockwise: false)
+        return path
+    }
+
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+}
+
+struct GoalProgressView_Previews: PreviewProvider {
+    static var previews: some View {
+        GoalProgressView()
+            .modelContainer(for: HealthMetric.self, inMemory: true)
+            .frame(width: 350)
+            .previewLayout(.sizeThatFits)
+            .padding()
+    }
+}

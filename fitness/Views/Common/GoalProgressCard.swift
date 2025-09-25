@@ -68,9 +68,9 @@ struct GoalProgressCard: View {
                         .scaleEffect(x: 1, y: 2.5, anchor: .center)
 
                     HStack {
-                        Text("起点: \(startWeight, specifier: "%.1f") kg")
+                        Text("\(startWeight, specifier: "%.1f") kg")
                         Spacer()
-                        Text("目标: \(targetWeight, specifier: "%.1f") kg")
+                        Text("\(targetWeight, specifier: "%.1f") kg")
                     }
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -114,7 +114,7 @@ struct GoalProgressCard: View {
 
     private var latestDateText: String {
         if let record = weightMetrics.last {
-            return "上次记录: \(record.date.MMddHHmm)"
+            return "\(record.date.MMddHHmm)"
         }
         return "暂无记录"
     }

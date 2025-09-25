@@ -1,10 +1,12 @@
 import SwiftUI
+import SwiftData
 
 struct SummaryDashboardView: View {
     // Environment Objects
     @EnvironmentObject var weightManager: WeightManager
     @EnvironmentObject var profileViewModel: ProfileViewModel
     @EnvironmentObject var healthKitManager: HealthKitManager
+    @EnvironmentObject var recommendationManager: RecommendationManager
     
     // State
     @Binding var showInputSheet: Bool
@@ -46,6 +48,26 @@ struct SummaryDashboardView: View {
                 
                 ScrollView {
                     VStack(spacing: 16) {
+                        // Recommendation Section
+                        if !recommendationManager.recommendedContent.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("为你推荐")
+                                    .font(.headline)
+                                    .padding(.horizontal)
+                                ForEach(recommendationManager.recommendedContent, id: \.self) {
+                                    recommendation in
+                                    Text(recommendation)
+                                        .font(.subheadline)
+                                        .padding(.vertical, 8)
+                                        .padding(.horizontal)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(Color(UIColor.secondarySystemGroupedBackground))
+                                        .cornerRadius(10)
+                                }
+                            }
+                            .padding(.bottom, 8)
+                        }
+
                         // Dynamically generate cards
                         ForEach(dashboardViewModel.cards) { card in
                             if card.isVisible {
@@ -128,5 +150,22 @@ struct SummaryDashboardView: View {
                     .environmentObject(dashboardViewModel)
             }
         }
+    }
+}
+
+struct SummaryDashboardView_Previews: PreviewProvider {
+    static var previews: some View {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try! ModelContainer(for: HealthMetric.self, configurations: config)
+        
+        let healthKitManager = HealthKitManager()
+        let weightManager = WeightManager(healthKitManager: healthKitManager, modelContainer: container)
+
+        SummaryDashboardView(showInputSheet: .constant(false))
+            .modelContainer(container) // Important for @Query
+            .environmentObject(healthKitManager)
+            .environmentObject(weightManager)
+            .environmentObject(ProfileViewModel())
+            .environmentObject(RecommendationManager(profileViewModel: ProfileViewModel()))
     }
 }

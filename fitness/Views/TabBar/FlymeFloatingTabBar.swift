@@ -122,7 +122,13 @@ struct FlymeFloatingTabBar: View {
     }
 
     private var safeBottomInset: CGFloat {
-        UIApplication.shared.windows.first?.safeAreaInsets.bottom ?? 0
+        guard let screen = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
+            return 0
+        }
+        guard let bottom = screen.windows.first?.safeAreaInsets.bottom else {
+            return 0
+        }
+        return bottom
     }
 
     private func setupKeyboardObservers() {
