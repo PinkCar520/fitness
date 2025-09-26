@@ -1,24 +1,24 @@
+
 import SwiftUI
 
 struct WorkoutLocationView: View {
     @Binding var workoutLocation: WorkoutLocation?
 
     var body: some View {
-        VStack(spacing: 20) {
-            Text("您主要在哪里锻炼？")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .padding(.bottom, 40)
-
-            ForEach(WorkoutLocation.allCases) { location in
-                LocationCard(location: location, selectedLocation: $workoutLocation)
+        OnboardingStepView(
+            title: "您主要在哪里锻炼？",
+            subtitle: "我们会推荐适合您选择的地点的锻炼。"
+        ) {
+            VStack(spacing: 15) {
+                ForEach(WorkoutLocation.allCases) { location in
+                    LocationCard(location: location, selectedLocation: $workoutLocation)
+                }
             }
-            
-            Spacer()
+            .padding(.horizontal)
         }
-        .padding()
     }
 }
+
 
 struct LocationCard: View {
     let location: WorkoutLocation

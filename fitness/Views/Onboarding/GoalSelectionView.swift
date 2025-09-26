@@ -4,19 +4,17 @@ struct GoalSelectionView: View {
     @Binding var goal: FitnessGoal?
     
     var body: some View {
-        VStack(spacing: 20) {
-            Text("您的主要目标是？")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .padding(.bottom, 40)
-            
-            ForEach(FitnessGoal.allCases) { goalCase in
-                GoalCard(goal: goalCase, selectedGoal: $goal)
+        OnboardingStepView(
+            title: "您的主要目标是？",
+            subtitle: "选择一个目标，我们将为您量身定制计划。"
+        ) {
+            VStack(spacing: 15) {
+                ForEach(FitnessGoal.allCases) { goalCase in
+                    GoalCard(goal: goalCase, selectedGoal: $goal)
+                }
             }
-            
-            Spacer()
+            .padding(.horizontal)
         }
-        .padding()
     }
 }
 

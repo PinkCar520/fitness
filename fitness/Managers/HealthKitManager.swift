@@ -45,10 +45,12 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
     @Published var activitySummary: HKActivitySummary?
     @Published var weeklyStepData: [DailyStepData] = []
     @Published var weeklyDistanceData: [DailyDistanceData] = []
+        @Published var authorizationStatus: [HealthKitDataTypeOption: HKAuthorizationStatus] = [:]
+
 
     
     // 请求授权
-    func requestAuthorization(completion: @escaping (Bool) -> Void) {
+        func requestAuthorization(completion: @escaping (Bool) -> Void) {
         guard HKHealthStore.isHealthDataAvailable() else {
             completion(false)
             return
@@ -62,9 +64,11 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
         let activitySummaryType = HKObjectType.activitySummaryType()
         let activeEnergyBurnedType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned)!
         let workoutType = HKObjectType.workoutType()
+        let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate)!
+        let sleepAnalysisType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)!
 
-        let typesToRead: Set<HKObjectType> = [weightType, bodyFatPercentageType, waistCircumferenceType, stepType, distanceType, activitySummaryType, activeEnergyBurnedType, workoutType]
-        let typesToWrite: Set<HKSampleType> = [weightType, bodyFatPercentageType, waistCircumferenceType, workoutType]
+        let typesToRead: Set<HKObjectType> = [weightType, bodyFatPercentageType, waistCircumferenceType, stepType, distanceType, activitySummaryType, activeEnergyBurnedType, workoutType, heartRateType, sleepAnalysisType]
+        let typesToWrite: Set<HKSampleType> = [weightType, bodyFatPercentageType, waistCircumferenceType, workoutType, sleepAnalysisType]
 
         healthStore.requestAuthorization(toShare: typesToWrite, read: typesToRead) { success, error in
             if let error = error {
@@ -494,6 +498,29 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
         }
     }
 #endif
+
+    func getPublishedAuthorizationStatus(for dataType: HealthKitDataTypeOption) -> HKAuthorizationStatus {
+        return authorizationStatus[dataType] ?? .notDetermined
+    }
+
+    func updateAuthorizationStatuses() {
+        for dataType in HealthKitDataTypeOption.allCases {
+            if let hkObjectType = dataType.hkObjectType {
+                if let sampleType = hkObjectType as? HKSampleType {
+                    let status = self.healthStore.authorizationStatus(for: sampleType)
+                    print("HealthKitManager: Checking status for \(dataType.title) (\(sampleType.identifier)): \(status.rawValue)")
+                    DispatchQueue.main.async {
+                        self.authorizationStatus[dataType] = status
+                    }
+                } else {
+                    print("HealthKitManager: \(dataType.title) (\(hkObjectType.identifier)) is not an HKSampleType. Setting status to notDetermined.")
+                    DispatchQueue.main.async {
+                        self.authorizationStatus[dataType] = .notDetermined
+                    }
+                }
+            }
+        }
+    }
 
     // Fetches the most recent workout
     func fetchMostRecentWorkout(completion: @escaping (HKWorkout?) -> Void) {

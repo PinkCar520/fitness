@@ -4,19 +4,17 @@ struct ExperienceLevelView: View {
     @Binding var experienceLevel: ExperienceLevel?
 
     var body: some View {
-        VStack(spacing: 20) {
-            Text("您的健身经验？")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .padding(.bottom, 40)
-
-            ForEach(ExperienceLevel.allCases) { level in
-                ExperienceCard(level: level, selectedLevel: $experienceLevel)
+        OnboardingStepView(
+            title: "您的健身经验？",
+            subtitle: "这将帮助我们调整计划的难度。"
+        ) {
+            VStack(spacing: 15) {
+                ForEach(ExperienceLevel.allCases) { level in
+                    ExperienceCard(level: level, selectedLevel: $experienceLevel)
+                }
             }
-            
-            Spacer()
+            .padding(.horizontal)
         }
-        .padding()
     }
 }
 

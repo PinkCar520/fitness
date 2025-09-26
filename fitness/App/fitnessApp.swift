@@ -3,7 +3,7 @@ import SwiftUI
 import SwiftData
 
 @main
-struct firnessApp: App {
+struct fitnessApp: App {
     @StateObject private var healthKitManager: HealthKitManager
     @StateObject private var weightManager: WeightManager
     @StateObject private var profileViewModel = ProfileViewModel()

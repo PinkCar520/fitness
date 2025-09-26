@@ -37,16 +37,16 @@ struct OnboardingFlowView: View {
     private var feedbackTextView: some View {
         let text: String? = {
             switch selection {
-            case 0:
+            case 1:
                 guard let goal = onboardingData.goal else { return "请选择您的主要健身目标。" }
                 return "目标已设定：\(goal.rawValue)。我们将为您优先推荐相关的训练。"
-            case 1:
+            case 2:
                 guard let level = onboardingData.experienceLevel else { return "请告诉我们您的健身经验。" }
                 return "好的，您的经验水平是'\(level.rawValue)'。我们将据此调整计划难度。"
-            case 2:
+            case 3:
                 guard let location = onboardingData.workoutLocation else { return "请选择您的主要锻炼地点。" }
                 return "收到！所有计划都将是您在'\(location.rawValue)'就能完成的动作。"
-            case 3:
+            case 4:
                 guard let conditions = onboardingData.healthConditions else { return "请确认您的身体状况。" }
                 if conditions.isEmpty {
                     return "太棒了，身体状况良好！"
@@ -70,18 +70,23 @@ struct OnboardingFlowView: View {
 
     var body: some View {
         VStack {
-            // Progress Indicator
-            ProgressView(value: Double(selection), total: 3)
-                .padding()
+            if selection > 0 && selection < 5 {
+                ProgressView(value: Double(selection), total: 4)
+                    .padding()
+            }
 
-            feedbackTextView
-                .padding(.bottom)
+            if selection > 0 && selection < 5 {
+                feedbackTextView
+                    .padding(.bottom)
+            }
 
             TabView(selection: $selection) {
-                GoalSelectionView(goal: $onboardingData.goal).tag(0)
-                ExperienceLevelView(experienceLevel: $onboardingData.experienceLevel).tag(1)
-                WorkoutLocationView(workoutLocation: $onboardingData.workoutLocation).tag(2)
-                SafetyCheckView(healthConditions: $onboardingData.healthConditions).tag(3)
+                WelcomeView().tag(0)
+                GoalSelectionView(goal: $onboardingData.goal).tag(1)
+                ExperienceLevelView(experienceLevel: $onboardingData.experienceLevel).tag(2)
+                WorkoutLocationView(workoutLocation: $onboardingData.workoutLocation).tag(3)
+                SafetyCheckView(healthConditions: $onboardingData.healthConditions).tag(4)
+                CompletionView().tag(5)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .overlay(alignment: .bottom) {
@@ -94,25 +99,34 @@ struct OnboardingFlowView: View {
             Button("重试") { handleCompletion() }
             Button("取消", role: .cancel) { }
         } message: {
-            Text("请检查您的网络连接并重试。")
+            Text("请检查您的网络连接并重试。 নিতে")
         }
     }
     
     private var navigationButtons: some View {
         HStack {
-            Button("上一步") {
-                withAnimation { selection -= 1 }
+            if selection < 5 {
+                Button("上一步") {
+                    withAnimation { selection -= 1 }
+                }
+                .padding()
+                .opacity(selection > 0 ? 1.0 : 0.0)
             }
-            .padding()
-            .opacity(selection > 0 ? 1.0 : 0.0)
 
             Spacer()
             
             if isGeneratingPlan {
                 ProgressView()
-            } else {
-                Button(selection == 3 ? "完成并开始" : "下一步") {
+            } else if selection < 5 {
+                Button(buttonText) {
                     handleNavigation()
+                }
+                .buttonStyle(.borderedProminent)
+            } else {
+                Button("完成") {
+                    withAnimation {
+                        showOnboarding = false
+                    }
                 }
                 .buttonStyle(.borderedProminent)
             }
@@ -120,8 +134,19 @@ struct OnboardingFlowView: View {
         .padding()
     }
 
+    private var buttonText: String {
+        switch selection {
+        case 0:
+            return "开始"
+        case 4:
+            return "完成并生成计划"
+        default:
+            return "下一步"
+        }
+    }
+
     private func handleNavigation() {
-        if selection == 3 {
+        if selection == 4 {
             handleCompletion()
         } else {
             withAnimation { selection += 1 }
@@ -139,7 +164,7 @@ struct OnboardingFlowView: View {
                 profileViewModel.saveProfile()
                 healthKitManager.setupHealthKitData(weightManager: weightManager)
                 clearSavedProgress()
-                withAnimation { showOnboarding = false }
+                withAnimation { selection = 5 }
             } else { // Failure
                 showNetworkErrorAlert = true
             }

@@ -80,6 +80,7 @@
 			membershipExceptions = (
 				Managers/HealthKitManager.swift,
 				Managers/NotificationManager.swift,
+				Models/HealthKitDataTypeOption.swift,
 				Models/HealthMetric.swift,
 				ViewModels/WeightManager.swift,
 			);

@@ -9,38 +9,29 @@ struct SafetyCheckView: View {
     }
 
     var body: some View {
-        VStack(spacing: 20) {
-            Text("有无特殊身体状况？")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .padding(.bottom, 40)
-            
-            Text("为了您的安全，我们将根据您的选择，智能调整训练计划。")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-                .padding(.bottom, 20)
-
-            // Condition options
-            ForEach(HealthCondition.allCases) { condition in
-                ConditionRow(condition: condition, selectedConditions: Binding(
+        OnboardingStepView(
+            title: "有无特殊身体状况？",
+            subtitle: "为了您的安全，我们将根据您的选择，智能调整训练计划。"
+        ) {
+            VStack(spacing: 15) {
+                // Condition options
+                ForEach(HealthCondition.allCases) { condition in
+                    ConditionRow(condition: condition, selectedConditions: Binding(
+                        get: { healthConditions ?? [] },
+                        set: { healthConditions = $0 }
+                    ))
+                }
+                
+                Divider().padding(.vertical)
+                
+                // "None" option
+                NoneOptionRow(selectedConditions: Binding(
                     get: { healthConditions ?? [] },
                     set: { healthConditions = $0 }
                 ))
             }
-            
-            Divider().padding(.vertical)
-            
-            // "None" option
-            NoneOptionRow(selectedConditions: Binding(
-                get: { healthConditions ?? [] },
-                set: { healthConditions = $0 }
-            ))
-
-            Spacer()
+            .padding(.horizontal)
         }
-        .padding()
     }
 }
 
