@@ -34,13 +34,39 @@ struct BodyMetricsView: View {
         records.first(where: { $0.type == .waistCircumference })?.value ?? 0
     }
     
+    private var currentHeartRate: Double {
+        records.first(where: { $0.type == .heartRate })?.value ?? 0
+    }
+    
+    private var currentChestCircumference: Double {
+        records.first(where: { $0.type == .chestCircumference })?.value ?? 0
+    }
+    
+    private var currentBodyFatMass: Double {
+        records.first(where: { $0.type == .bodyFatMass })?.value ?? 0
+    }
+    private var currentSkeletalMuscleMass: Double {
+        records.first(where: { $0.type == .skeletalMuscleMass })?.value ?? 0
+    }
+    private var currentBodyWaterPercentage: Double {
+        records.first(where: { $0.type == .bodyWaterPercentage })?.value ?? 0
+    }
+    private var currentBasalMetabolicRate: Double {
+        records.first(where: { $0.type == .basalMetabolicRate })?.value ?? 0
+    }
+    private var currentWaistToHipRatio: Double {
+        records.first(where: { $0.type == .waistToHipRatio })?.value ?? 0
+    }
+    
     // Placeholder data for demonstration
     let muscleMass: Double = 45.1
 
     var body: some View {
+        let columns = [GridItem(.flexible()), GridItem(.flexible())]
+        
         NavigationView {
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: 10) {
                     // Current Metrics Section
                     VStack(alignment: .leading, spacing: 10) {
                         Text("当前指标")
@@ -48,8 +74,11 @@ struct BodyMetricsView: View {
                             .fontWeight(.bold)
                             .padding(.horizontal)
 
-                        MetricCard(title: "体重", value: String(format: "%.1f", currentWeight), unit: "公斤", icon: "scalemass.fill", color: .blue)
-                        MetricCard(title: "BMI", value: String(format: "%.1f", bmi), unit: "", icon: "figure.walk", color: .green)
+                        LazyVGrid(columns: columns, spacing: 10) {
+                            MetricCard(title: "体重", value: String(format: "%.1f", currentWeight), unit: "公斤", icon: "scalemass.fill", color: .blue)
+                            MetricCard(title: "BMI", value: String(format: "%.1f", bmi), unit: "", icon: "figure.walk", color: .green)
+                        }
+                        .padding(.horizontal)
                     }
 
                     // Other Metrics Section
@@ -59,9 +88,19 @@ struct BodyMetricsView: View {
                             .fontWeight(.bold)
                             .padding(.horizontal)
 
-                        MetricCard(title: "体脂率", value: String(format: "%.1f", currentBodyFat), unit: "%", icon: "percentage", color: .orange)
-                        MetricCard(title: "腰围", value: String(format: "%.1f", currentWaistCircumference), unit: "cm", icon: "figure.and.child.holdinghands", color: .red) // Using a temporary icon
-                        MetricCard(title: "肌肉量", value: String(format: "%.1f", muscleMass), unit: "公斤", icon: "figure.strengthtraining.traditional", color: .purple)
+                        LazyVGrid(columns: columns, spacing: 10) {
+                            MetricCard(title: "体脂率", value: String(format: "%.1f", currentBodyFat), unit: "%", icon: "flame.fill", color: .orange)
+                            MetricCard(title: "腰围", value: String(format: "%.1f", currentWaistCircumference), unit: "cm", icon: "figure.and.child.holdinghands", color: .red) // Using a temporary icon
+                            MetricCard(title: "胸围", value: String(format: "%.1f", currentChestCircumference), unit: "cm", icon: "figure.stand", color: .pink)
+                            MetricCard(title: "心率", value: String(format: "%.0f", currentHeartRate), unit: "bpm", icon: "heart.fill", color: .red)
+                            MetricCard(title: "肌肉量", value: String(format: "%.1f", muscleMass), unit: "公斤", icon: "figure.strengthtraining.traditional", color: .purple)
+                            MetricCard(title: "体脂肪量", value: String(format: "%.1f", currentBodyFatMass), unit: "kg", icon: "scalemass.fill", color: .orange)
+                            MetricCard(title: "骨骼肌量", value: String(format: "%.1f", currentSkeletalMuscleMass), unit: "kg", icon: "figure.strengthtraining.traditional", color: .purple)
+                            MetricCard(title: "身体水分率", value: String(format: "%.1f", currentBodyWaterPercentage), unit: "%", icon: "drop.fill", color: .blue)
+                            MetricCard(title: "基础代谢率", value: String(format: "%.0f", currentBasalMetabolicRate), unit: "kcal", icon: "flame.circle.fill", color: .red)
+                            MetricCard(title: "腰臀比", value: String(format: "%.2f", currentWaistToHipRatio), unit: "", icon: "circle.grid.cross", color: .green)
+                        }
+                        .padding(.horizontal)
                     }
 
                     // Body Composition Chart Section
@@ -108,31 +147,34 @@ struct MetricCard: View {
     let color: Color
 
     var body: some View {
-        HStack(spacing: 15) {
+        HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.title)
                 .foregroundColor(color)
-                .frame(width: 40)
+                .frame(width: 35)
 
             VStack(alignment: .leading) {
                 Text(title)
                     .font(.headline)
                     .foregroundColor(.secondary)
-                HStack(alignment: .lastTextBaseline) {
+                
+                Spacer()
+                
+                HStack(alignment: .lastTextBaseline, spacing: 4) {
                     Text(value)
-                        .font(.largeTitle)
+                        .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.primary)
                     Text(unit)
-                        .font(.title2)
+                        .font(.caption)
+                        .fontWeight(.medium)
                         .foregroundColor(.secondary)
                 }
             }
             Spacer()
         }
-        .padding()
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 15))
-        .padding(.horizontal)
+        .padding(EdgeInsets(top: 16, leading: 12, bottom: 12, trailing: 12))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
     }
 }
 

@@ -36,9 +36,16 @@ struct GoalCard: View {
                 Image(systemName: icon(for: goal))
                     .font(.title)
                     .frame(width: 40)
+                    .foregroundColor(
+                        goal == .healthImprovement ? Color(red: 1.0, green: 0.23, blue: 0.35) : // Health Improvement is always pink
+                        (goal == .fatLoss ? Color(red: 1.0, green: 0.55, blue: 0.0) : // Fat Loss is always orange
+                        (goal == .muscleGain ? Color(red: 0.0, green: 0.47, blue: 1.0) : // Muscle Gain is always deep blue
+                        (isSelected ? .accentColor : .primary)))
+                    )
                 Text(goal.rawValue)
                     .font(.headline)
                     .fontWeight(.semibold)
+                    .foregroundColor(isSelected ? .accentColor : .primary)
                 Spacer()
             }
             .padding()
@@ -48,7 +55,6 @@ struct GoalCard: View {
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
             )
-            .scaleEffect(isSelected ? 1.05 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())
     }

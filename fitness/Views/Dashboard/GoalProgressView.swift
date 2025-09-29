@@ -4,7 +4,11 @@ import SwiftData
 struct GoalProgressView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \HealthMetric.date) private var records: [HealthMetric] // Sort ascending to easily get first record
-    @AppStorage("targetWeight") private var targetWeight: Double = 68.0
+    @EnvironmentObject var profileViewModel: ProfileViewModel
+
+    private var targetWeight: Double {
+        profileViewModel.userProfile.targetWeight
+    }
 
     private var currentWeight: Double {
         records.last?.value ?? 0.0
@@ -91,6 +95,7 @@ struct GoalProgressView_Previews: PreviewProvider {
     static var previews: some View {
         GoalProgressView()
             .modelContainer(for: HealthMetric.self, inMemory: true)
+            .environmentObject(ProfileViewModel())
             .frame(width: 350)
             .previewLayout(.sizeThatFits)
             .padding()

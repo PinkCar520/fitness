@@ -31,4 +31,10 @@ extension Date {
     var MMddHHmm: String {
         DateFormatter.MMddHHmm.string(from: self)
     }
+
+    func startOfWeek(using calendar: Calendar = .current) -> Date {
+        var customCalendar = calendar
+        customCalendar.firstWeekday = 2 // Monday
+        return customCalendar.date(from: customCalendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: self))!
+    }
 }

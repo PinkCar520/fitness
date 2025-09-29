@@ -33,6 +33,11 @@ struct fitnessApp: App {
         _healthKitManager = StateObject(wrappedValue: healthKitManager)
         _weightManager = StateObject(wrappedValue: weightManager)
         
+        // Perform initial HealthKit setup and data import/fetch
+                Task {
+            await healthKitManager.setupHealthKitData(weightManager: weightManager)
+        }
+        
         let initialProfileViewModel = ProfileViewModel()
         _profileViewModel = StateObject(wrappedValue: initialProfileViewModel)
         _recommendationManager = StateObject(wrappedValue: RecommendationManager(profileViewModel: initialProfileViewModel))
@@ -46,18 +51,15 @@ struct fitnessApp: App {
                 .environmentObject(profileViewModel)
                 .environmentObject(appearanceViewModel)
                 .environmentObject(weightManager)
-                .onAppear {
-                    healthKitManager.setupHealthKitData(weightManager: weightManager)
-                }
                 .environmentObject(recommendationManager)
                 .environmentObject(achievementManager)
-                .onOpenURL { url in
-                    // Handle the deep link from the widget
-                    if url.scheme == "fitness" && url.host == "add-weight" {
-                        NotificationCenter.default.post(name: .showInputSheet, object: nil)
-                    }
-                }
-        }
+                            .onOpenURL { url in
+                                // Handle the deep link from the widget
+                                if url.scheme == "fitness" && url.host == "add-weight" {
+                                    NotificationCenter.default.post(name: .showInputSheet, object: nil)
+                                }
+                            }
+                            .tint(appearanceViewModel.accentColor.color)        }
                     .modelContainer(modelContainer) // Apply the SwiftData container to the whole app
     }
 }

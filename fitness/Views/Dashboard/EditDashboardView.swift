@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData // Add this
 
 struct EditDashboardView: View {
     @EnvironmentObject var viewModel: DashboardViewModel
@@ -59,7 +60,13 @@ struct EditDashboardView: View {
 
 struct EditDashboardView_Previews: PreviewProvider {
     static var previews: some View {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try! ModelContainer(for: HealthMetric.self, configurations: config)
+        let healthKitManager = HealthKitManager()
+        let weightManager = WeightManager(healthKitManager: healthKitManager, modelContainer: container)
+
         EditDashboardView()
-            .environmentObject(DashboardViewModel())
+            .environmentObject(DashboardViewModel(healthKitManager: healthKitManager, weightManager: weightManager))
+            .modelContainer(container) // Add modelContainer for SwiftData context
     }
 }

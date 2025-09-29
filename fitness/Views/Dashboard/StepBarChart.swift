@@ -13,7 +13,7 @@ struct StepBarChart: View {
                     VStack {
                         // 柱子
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(dayData.steps > 0 ? Color.purple.opacity(0.7) : Color.gray.opacity(0.3))
+                            .fill(dayData.steps > 0 ? Color.green.opacity(0.7) : Color.gray.opacity(0.3))
                             .frame(height: dayData.steps > 0 ? (dayData.steps / maxSteps) * geometry.size.height : 5)
                     }
                 }

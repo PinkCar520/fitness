@@ -48,6 +48,11 @@ final class WeightManager: ObservableObject {
             healthKitManager.saveBodyFatPercentage(metric.value, date: metric.date)
         case .waistCircumference:
             healthKitManager.saveWaistCircumference(metric.value, date: metric.date)
+        case .heartRate:
+            healthKitManager.saveHeartRate(metric.value, date: metric.date)
+        default:
+            // Not all types are saved to HealthKit
+            break
         }
         WidgetCenter.shared.reloadAllTimelines()
     }
@@ -58,7 +63,16 @@ final class WeightManager: ObservableObject {
     @MainActor
     func delete(_ metric: HealthMetric) {
         let context = modelContainer.mainContext
+        let dateToDelete = metric.date
         context.delete(metric)
+        
+        Task {
+            let success = await healthKitManager.deleteWeight(date: dateToDelete)
+            if !success {
+                print("Warning: Could not delete corresponding weight from HealthKit.")
+            }
+        }
+        
         WidgetCenter.shared.reloadAllTimelines()
     }
 

@@ -1,56 +1,68 @@
 
 import SwiftUI
+import HealthKit // Needed for DailyStepData
 
 struct StepsCard: View {
-    @EnvironmentObject var healthKitManager: HealthKitManager
+    let stepCount: Double
+    let weeklyStepData: [DailyStepData] // New property for chart data
 
     var body: some View {
         NavigationLink(destination: HealthDataDetailView(dataType: .steps)) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Text("步数")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
+                Text("\(Int(stepCount))")
+                    .font(.title)
+                    .contentTransition(.numericText(countsDown: false))
+//                    .fontWeight(.bold)
+                    .foregroundStyle(Color.primary.opacity(0.8))
                     Spacer()
-                    Image(systemName: "flame.fill")
-                        .foregroundStyle(.purple)
+
+                    ZStack {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 24, height: 24)
+                        Image(systemName: "shoeprints.fill")
+                            .font(.caption)
+                            .foregroundColor(.white)
+                    }
                 }
 
-                Text("\(Int(healthKitManager.stepCount))")
-                    .font(.title)
-                    .fontWeight(.bold)
 
-                Text("本周")
+
+                Text("步数")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                
-                StepBarChart(data: healthKitManager.weeklyStepData).frame(height:60)
+
+                StepBarChart(data: weeklyStepData).frame(height:60) // Use new property
                 // 柱状图
 
                 HStack(spacing: 4) {
                     Spacer()
-                    Image(systemName: "heart.fill")
-                        .font(.caption2)
-                    Text("来自“Apple健康”")
-                        .font(.caption2)
+                    Text("数据来源：Apple健康")
+                        .font(.system(size: 9))
                 }
                 .foregroundStyle(.secondary)
             }
             .padding()
             .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
+            .animation(.easeInOut, value: stepCount)
         }
         .buttonStyle(PlainButtonStyle()) // To remove default NavigationLink styling
-        .onAppear { // onAppear 应该在 VStack 之后
-            healthKitManager.readWeeklyStepCounts()
-        }
     }
 }
 
 struct StepsCard_Previews: PreviewProvider {
     static var previews: some View {
         NavigationView { // Add NavigationView for preview
-            StepsCard()
-                .environmentObject(HealthKitManager())
+            StepsCard(stepCount: 7500, weeklyStepData: [
+                DailyStepData(date: Calendar.current.date(byAdding: .day, value: -6, to: Date())!, steps: 3000),
+                DailyStepData(date: Calendar.current.date(byAdding: .day, value: -5, to: Date())!, steps: 5000),
+                DailyStepData(date: Calendar.current.date(byAdding: .day, value: -4, to: Date())!, steps: 2000),
+                DailyStepData(date: Calendar.current.date(byAdding: .day, value: -3, to: Date())!, steps: 8000),
+                DailyStepData(date: Calendar.current.date(byAdding: .day, value: -2, to: Date())!, steps: 6000),
+                DailyStepData(date: Calendar.current.date(byAdding: .day, value: -1, to: Date())!, steps: 9000),
+                DailyStepData(date: Date(), steps: 7500)
+            ])
         }
     }
 }

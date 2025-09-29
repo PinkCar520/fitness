@@ -3,40 +3,49 @@ import SwiftData
 
 struct SummaryDashboardView: View {
     // Environment Objects
-    @EnvironmentObject var weightManager: WeightManager
     @EnvironmentObject var profileViewModel: ProfileViewModel
-    @EnvironmentObject var healthKitManager: HealthKitManager
     @EnvironmentObject var recommendationManager: RecommendationManager
-    
+
     // State
     @Binding var showInputSheet: Bool
     @State private var showProfileSheet = false
     @State private var showEditSheet = false // For the new edit sheet
     @State private var overviewImage: UIImage?
     @State private var showShareSheet = false
-    
+
     // View Models
-    @StateObject private var dashboardViewModel = DashboardViewModel()
+    @StateObject private var dashboardViewModel: DashboardViewModel
+
+    // Dependencies (for DashboardViewModel)
+    private let healthKitManager: HealthKitManager
+    private let weightManager: WeightManager
+
+    init(showInputSheet: Binding<Bool>, healthKitManager: HealthKitManager, weightManager: WeightManager) {
+        self._showInputSheet = showInputSheet
+        self.healthKitManager = healthKitManager
+        self.weightManager = weightManager
+        self._dashboardViewModel = StateObject(wrappedValue: DashboardViewModel(healthKitManager: healthKitManager, weightManager: weightManager))
+    }
 
     // The dynamic content of the dashboard
     @ViewBuilder
     private func dashboardContent(card: DashboardCard) -> some View {
         switch card.id {
         case .fitnessRings:
-            FitnessRingCard()
+            FitnessRingCard(activitySummary: dashboardViewModel.activitySummary)
         case .goalProgress:
-            GoalProgressCard(showInputSheet: $showInputSheet)
+            GoalProgressCard(showInputSheet: $showInputSheet, latestWeightSample: dashboardViewModel.lastWeightSample)
         case .stepsAndDistance:
             HStack(spacing: 16) {
-                StepsCard()
-                DistanceCard()
+                StepsCard(stepCount: dashboardViewModel.stepCount, weeklyStepData: dashboardViewModel.weeklyStepData)
+                DistanceCard(distance: dashboardViewModel.distance, weeklyDistanceData: dashboardViewModel.weeklyDistanceData)
             }
         case .monthlyChallenge:
-            MonthlyChallengeCard()
+            MonthlyChallengeCard(monthlyChallengeCompletion: dashboardViewModel.monthlyChallengeCompletion)
         case .recentActivity:
-            RecentActivityCard()
+            RecentActivityCard(mostRecentWorkout: dashboardViewModel.mostRecentWorkout)
         case .historyList:
-            HistoryListView()
+            HistoryListView() // HistoryListView uses @Query directly, no change needed here for now
         }
     }
 
@@ -121,6 +130,9 @@ struct SummaryDashboardView: View {
                 }
             }
             .navigationTitle("概览")
+            .task { // Add .task here
+                await dashboardViewModel.loadNonReactiveData()
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showProfileSheet = true }) {
@@ -157,14 +169,14 @@ struct SummaryDashboardView_Previews: PreviewProvider {
     static var previews: some View {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try! ModelContainer(for: HealthMetric.self, configurations: config)
-        
+
         let healthKitManager = HealthKitManager()
         let weightManager = WeightManager(healthKitManager: healthKitManager, modelContainer: container)
 
-        SummaryDashboardView(showInputSheet: .constant(false))
+        SummaryDashboardView(showInputSheet: .constant(false), healthKitManager: healthKitManager, weightManager: weightManager)
             .modelContainer(container) // Important for @Query
-            .environmentObject(healthKitManager)
-            .environmentObject(weightManager)
+            // .environmentObject(healthKitManager) // No longer needed directly
+            // .environmentObject(weightManager) // No longer needed directly
             .environmentObject(ProfileViewModel())
             .environmentObject(RecommendationManager(profileViewModel: ProfileViewModel()))
     }

@@ -1,5 +1,8 @@
 import Foundation
 import SwiftUI
+import HealthKit // Add this
+import SwiftData // Add this
+import Combine
 
 // 1. Model for a single dashboard card
 struct DashboardCard: Identifiable, Codable, Hashable {
@@ -22,8 +25,76 @@ class DashboardViewModel: ObservableObject {
     @Published var cards: [DashboardCard] = []
     private let userDefaultsKey = "dashboard_card_order"
 
-    init() {
+    // Dependencies
+    private let healthKitManager: HealthKitManager
+    private let weightManager: WeightManager
+    private var cancellables = Set<AnyCancellable>()
+
+    // Dashboard Data
+    @Published var stepCount: Double = 0
+    @Published var distance: Double = 0
+    @Published var activitySummary: HKActivitySummary?
+    @Published var weeklyStepData: [DailyStepData] = []
+    @Published var weeklyDistanceData: [DailyDistanceData] = []
+    @Published var monthlyChallengeCompletion: [Int: Bool] = [:]
+    @Published var mostRecentWorkout: HKWorkout?
+    @Published var lastWeightSample: HKQuantitySample?
+    @Published var lastBodyFatSample: HKQuantitySample?
+    @Published var lastWaistCircumferenceSample: HKQuantitySample?
+
+
+    init(healthKitManager: HealthKitManager, weightManager: WeightManager) {
+        self.healthKitManager = healthKitManager
+        self.weightManager = weightManager
         loadCardOrder()
+        setupSubscriptions()
+        
+        // Trigger initial data load for non-reactive data
+        Task {
+            await loadNonReactiveData()
+        }
+    }
+    
+    private func setupSubscriptions() {
+        healthKitManager.$stepCount
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.stepCount, on: self)
+            .store(in: &cancellables)
+
+        healthKitManager.$distance
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.distance, on: self)
+            .store(in: &cancellables)
+            
+        healthKitManager.$activitySummary
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.activitySummary, on: self)
+            .store(in: &cancellables)
+
+        healthKitManager.$weeklyStepData
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.weeklyStepData, on: self)
+            .store(in: &cancellables)
+
+        healthKitManager.$weeklyDistanceData
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.weeklyDistanceData, on: self)
+            .store(in: &cancellables)
+
+        healthKitManager.$lastWeightSample
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.lastWeightSample, on: self)
+            .store(in: &cancellables)
+
+        healthKitManager.$lastBodyFatSample
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.lastBodyFatSample, on: self)
+            .store(in: &cancellables)
+
+        healthKitManager.$lastWaistCircumferenceSample
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.lastWaistCircumferenceSample, on: self)
+            .store(in: &cancellables)
     }
 
     // Computed properties to easily get filtered lists
@@ -110,5 +181,21 @@ class DashboardViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    // MARK: - Data Loading
+    @MainActor
+    func loadNonReactiveData() async {
+        // Fetch data that is not covered by publishers
+        
+        // This method still uses a completion handler
+        healthKitManager.fetchMonthlyActivitySummaries { [weak self] data in
+            DispatchQueue.main.async {
+                self?.monthlyChallengeCompletion = data
+            }
+        }
+
+        // Fetch most recent workout
+        self.mostRecentWorkout = await healthKitManager.fetchMostRecentWorkout()
     }
 }

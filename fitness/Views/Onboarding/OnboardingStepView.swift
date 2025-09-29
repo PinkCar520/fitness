@@ -5,13 +5,13 @@ struct OnboardingStepView<Content: View>: View {
     var title: String
     var subtitle: String
     let content: Content
-
+    
     init(title: String, subtitle: String, @ViewBuilder content: () -> Content) {
         self.title = title
         self.subtitle = subtitle
         self.content = content()
     }
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 30) {
             VStack(alignment: .leading, spacing: 8) {
@@ -23,7 +23,7 @@ struct OnboardingStepView<Content: View>: View {
                     .foregroundColor(.secondary)
             }
             .padding(.horizontal)
-
+            
             content
             
             Spacer()

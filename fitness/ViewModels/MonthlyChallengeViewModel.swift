@@ -25,8 +25,6 @@ class MonthlyChallengeViewModel: ObservableObject {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMMM"
         self.monthName = formatter.string(from: Date())
-        
-        fetchChallengeData()
     }
 
     func fetchChallengeData() {

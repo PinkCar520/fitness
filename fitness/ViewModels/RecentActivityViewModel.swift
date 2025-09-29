@@ -14,7 +14,6 @@ class RecentActivityViewModel: ObservableObject {
 
     init() {
         self.healthKitManager = HealthKitManager()
-        fetchRecentActivity()
     }
 
     func fetchRecentActivity() {
@@ -28,25 +27,23 @@ class RecentActivityViewModel: ObservableObject {
                 return
             }
 
-            self.healthKitManager.fetchMostRecentWorkout { workout in
-                DispatchQueue.main.async {
-                    if let workout = workout {
-                        self.activityName = workout.workoutActivityType.name
-                        self.duration = String(format: "%.0f min", workout.duration / 60)
-                        self.date = self.formatDate(workout.endDate)
-                        
-                        if let distanceQuantity = workout.totalDistance {
-                            let km = distanceQuantity.doubleValue(for: .meter()) / 1000
-                            self.distance = String(format: "%.2f km", km)
-                        } else {
-                            self.distance = "--"
-                        }
-                        self.workoutFound = true
+            Task { @MainActor in
+                if let workout = await self.healthKitManager.fetchMostRecentWorkout() {
+                    self.activityName = workout.workoutActivityType.name
+                    self.duration = String(format: "%.0f min", workout.duration / 60)
+                    self.date = self.formatDate(workout.endDate)
+                    
+                    if let distanceQuantity = workout.totalDistance {
+                        let km = distanceQuantity.doubleValue(for: .meter()) / 1000
+                        self.distance = String(format: "%.2f km", km)
                     } else {
-                        self.workoutFound = false
+                        self.distance = "--"
                     }
-                    self.isLoading = false
+                    self.workoutFound = true
+                } else {
+                    self.workoutFound = false
                 }
+                self.isLoading = false
             }
         }
     }

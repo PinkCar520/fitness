@@ -14,11 +14,11 @@ struct StatsView: View {
     @State private var showShareSheet = false
 
     enum TimeFrame: String, CaseIterable {
-        case sevenDays = "7天"
-        case thirtyDays = "30天"
-        case threeMonths = "90天"
+        case sevenDays = "周"
+        case thirtyDays = "月"
+        case threeMonths = "季"
         case halfYear = "半年"
-        case oneYear = "1年"
+        case oneYear = "年"
         
         var days: Int {
             switch self {
@@ -40,7 +40,6 @@ struct StatsView: View {
                     ChartSection(selectedTimeFrame: selectedTimeFrame)
                     workoutAnalysisSection
                     smartSuggestionsSection
-                    actionButtonsSection
                 }
                 .padding()
             }
@@ -114,20 +113,18 @@ struct StatsView: View {
     
     private var goalAchievementPercentage: String {
         let targetWeight = profileViewModel.userProfile.targetWeight
-        guard let latestWeight = records.first?.value else {
+        guard let currentWeight = records.first?.value else {
+            return "--"
+        }
+        guard let startWeight = records.last?.value else {
             return "--"
         }
         
-        var progress: Double = 0
-        if targetWeight > 0 {
-            if latestWeight <= targetWeight { // Weight loss goal achieved or surpassed
-                progress = 1.0
-            } else { // Weight loss goal in progress
-                progress = targetWeight / latestWeight
-            }
-        }
+        let progress = (startWeight > 0 && startWeight != targetWeight) ? (startWeight - currentWeight) / (startWeight - targetWeight) : 0
         
-        return String(format: "%.0f", progress * 100)
+        let clampedProgress = max(0, min(progress, 1))
+
+        return String(format: "%.0f", clampedProgress * 100)
     }
 
     private var coreMetricsGrid: some View {

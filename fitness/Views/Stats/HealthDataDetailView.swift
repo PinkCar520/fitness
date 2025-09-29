@@ -61,10 +61,12 @@ struct HealthDataDetailView: View {
         }
         .navigationTitle(dataType == .steps ? "步数详情" : "距离详情")
         .onAppear {
-            if dataType == .steps {
-                healthKitManager.readWeeklyStepCounts()
-            } else {
-                healthKitManager.readWeeklyDistance()
+            Task { @MainActor in
+                if dataType == .steps {
+                    healthKitManager.weeklyStepData = await healthKitManager.readWeeklyStepCounts()
+                } else {
+                    healthKitManager.weeklyDistanceData = await healthKitManager.readWeeklyDistance()
+                }
             }
         }
     }

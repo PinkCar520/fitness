@@ -31,7 +31,7 @@ struct InputSheetView: View {
             ScrollView {
                 VStack(spacing: 20) { // Increased spacing
                     Picker("Metric", selection: $selectedMetric) {
-                        ForEach(MetricType.allCases, id: \.self) { type in
+                        ForEach(MetricType.allCases.filter { [.weight, .bodyFatPercentage, .waistCircumference].contains($0) }, id: \.self) { type in
                             Text(type.rawValue).tag(type)
                         }
                     }
@@ -80,6 +80,8 @@ struct InputSheetView: View {
                                     .frame(maxWidth: .infinity, alignment: .trailing)
                             }
                         }
+                    default:
+                        EmptyView()
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -125,6 +127,8 @@ struct InputSheetView: View {
             return !isBodyFatValid(bodyFatPercentage)
         case .waistCircumference:
             return !isWaistValid(waistCircumference)
+        default:
+            return true
         }
     }
 
@@ -144,28 +148,27 @@ struct InputSheetView: View {
     }
 
     private func save() {
+        var metricToSave: HealthMetric? = nil
+        
         switch selectedMetric {
         case .weight:
-            guard let weightToSave = currentWeight, isWeightValid(weightToSave) else {
-                dismiss()
-                return
+            if let value = currentWeight, isWeightValid(value) {
+                metricToSave = HealthMetric(date: date, value: value, type: .weight)
             }
-            let newMetric = HealthMetric(date: date, value: weightToSave, type: .weight)
-            weightManager.addMetric(newMetric)
         case .bodyFatPercentage:
-            guard let percentageToSave = bodyFatPercentage, isBodyFatValid(percentageToSave) else {
-                dismiss()
-                return
+            if let value = bodyFatPercentage, isBodyFatValid(value) {
+                metricToSave = HealthMetric(date: date, value: value, type: .bodyFatPercentage)
             }
-            let newMetric = HealthMetric(date: date, value: percentageToSave, type: .bodyFatPercentage)
-            weightManager.addMetric(newMetric)
         case .waistCircumference:
-            guard let circumferenceToSave = waistCircumference, isWaistValid(circumferenceToSave) else {
-                dismiss()
-                return
+            if let value = waistCircumference, isWaistValid(value) {
+                metricToSave = HealthMetric(date: date, value: value, type: .waistCircumference)
             }
-            let newMetric = HealthMetric(date: date, value: circumferenceToSave, type: .waistCircumference)
-            weightManager.addMetric(newMetric)
+        default:
+            break
+        }
+        
+        if let metric = metricToSave {
+            weightManager.addMetric(metric)
         }
         
         UIImpactFeedbackGenerator(style: .light).impactOccurred()

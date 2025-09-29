@@ -18,6 +18,7 @@ struct OnboardingFlowView: View {
     private let onboardingDataKey = "onboardingInProgressData"
     private let onboardingStepKey = "onboardingInProgressStep"
 
+
     init(showOnboarding: Binding<Bool>) {
         _showOnboarding = showOnboarding
 
@@ -33,121 +34,33 @@ struct OnboardingFlowView: View {
         }
     }
     
-    @ViewBuilder
-    private var feedbackTextView: some View {
-        let text: String? = {
-            switch selection {
-            case 1:
-                guard let goal = onboardingData.goal else { return "请选择您的主要健身目标。" }
-                return "目标已设定：\(goal.rawValue)。我们将为您优先推荐相关的训练。"
-            case 2:
-                guard let level = onboardingData.experienceLevel else { return "请告诉我们您的健身经验。" }
-                return "好的，您的经验水平是'\(level.rawValue)'。我们将据此调整计划难度。"
-            case 3:
-                guard let location = onboardingData.workoutLocation else { return "请选择您的主要锻炼地点。" }
-                return "收到！所有计划都将是您在'\(location.rawValue)'就能完成的动作。"
-            case 4:
-                guard let conditions = onboardingData.healthConditions else { return "请确认您的身体状况。" }
-                if conditions.isEmpty {
-                    return "太棒了，身体状况良好！"
-                }
-                let conditionNames = conditions.map { $0.rawValue }.joined(separator: "、")
-                return "感谢告知。我们会特别注意保护您的'\(conditionNames)'。"
-            default:
-                return nil
-            }
-        }()
-
-        if let text = text {
-            Text(text)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .frame(height: 40, alignment: .top)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-        }
-    }
-
-    var body: some View {
-        VStack {
-            if selection > 0 && selection < 5 {
-                ProgressView(value: Double(selection), total: 4)
-                    .padding()
-            }
-
-            if selection > 0 && selection < 5 {
-                feedbackTextView
-                    .padding(.bottom)
-            }
-
-            TabView(selection: $selection) {
-                WelcomeView().tag(0)
-                GoalSelectionView(goal: $onboardingData.goal).tag(1)
-                ExperienceLevelView(experienceLevel: $onboardingData.experienceLevel).tag(2)
-                WorkoutLocationView(workoutLocation: $onboardingData.workoutLocation).tag(3)
-                SafetyCheckView(healthConditions: $onboardingData.healthConditions).tag(4)
-                CompletionView().tag(5)
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .overlay(alignment: .bottom) {
-                navigationButtons
-            }
-        }
-        .onChange(of: onboardingData) { saveProgress() }
-        .onChange(of: selection) { saveProgress() }
-        .alert("生成计划失败", isPresented: $showNetworkErrorAlert) {
-            Button("重试") { handleCompletion() }
-            Button("取消", role: .cancel) { }
-        } message: {
-            Text("请检查您的网络连接并重试。 নিতে")
-        }
-    }
-    
-    private var navigationButtons: some View {
-        HStack {
-            if selection < 5 {
-                Button("上一步") {
-                    withAnimation { selection -= 1 }
-                }
-                .padding()
-                .opacity(selection > 0 ? 1.0 : 0.0)
-            }
-
-            Spacer()
-            
-            if isGeneratingPlan {
-                ProgressView()
-            } else if selection < 5 {
-                Button(buttonText) {
-                    handleNavigation()
-                }
-                .buttonStyle(.borderedProminent)
-            } else {
-                Button("完成") {
-                    withAnimation {
-                        showOnboarding = false
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-            }
-        }
-        .padding()
-    }
-
     private var buttonText: String {
         switch selection {
         case 0:
             return "开始"
         case 4:
             return "完成并生成计划"
+        case 5: // Completion view
+            return "完成"
         default:
             return "下一步"
         }
     }
 
     private func handleNavigation() {
-        if selection == 4 {
+        if selection == 0 {
+            healthKitManager.requestAuthorization { _ in
+                // Always proceed to the next step, regardless of authorization status
+                DispatchQueue.main.async {
+                    withAnimation { selection += 1 }
+                }
+            }
+        } else if selection == 4 {
             handleCompletion()
+        } else if selection == 5 {
+            withAnimation {
+                showOnboarding = false
+            }
         } else {
             withAnimation { selection += 1 }
         }
@@ -162,7 +75,9 @@ struct OnboardingFlowView: View {
                 onboardingData.hasCompletedOnboarding = true
                 profileViewModel.userProfile = onboardingData
                 profileViewModel.saveProfile()
-                healthKitManager.setupHealthKitData(weightManager: weightManager)
+                                Task {
+                    await healthKitManager.setupHealthKitData(weightManager: weightManager)
+                }
                 clearSavedProgress()
                 withAnimation { selection = 5 }
             } else { // Failure
@@ -182,6 +97,81 @@ struct OnboardingFlowView: View {
     private func clearSavedProgress() {
         UserDefaults.standard.removeObject(forKey: onboardingDataKey)
         UserDefaults.standard.removeObject(forKey: onboardingStepKey)
+    }
+
+    var body: some View {
+        VStack {
+            Group {
+                TabView(selection: $selection) {
+                    WelcomeView().tag(0)
+                    GoalSelectionView(goal: $onboardingData.goal).tag(1)
+                    ExperienceLevelView(experienceLevel: $onboardingData.experienceLevel).tag(2)
+                    WorkoutLocationView(workoutLocation: $onboardingData.workoutLocation).tag(3)
+                    SafetyCheckView(healthConditions: $onboardingData.healthConditions).tag(4)
+                    CompletionView().tag(5)
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .overlay(alignment: .bottom) {
+                    VStack {
+                        if selection == 0 { // Only show privacy text on WelcomeView
+                            VStack(spacing: 5) {
+                                Text("点击“开始”即表示您同意我们的")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                HStack(spacing: 5) {
+                                    Link("服务条款", destination: URL(string: "https://www.example.com/terms")!)
+                                        .font(.caption)
+                                    Text("和")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Link("隐私政策", destination: URL(string: "https://www.example.com/privacy")!)
+                                        .font(.caption)
+                                    Text("且授权")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Button(action: { openUrl(urlString: "x-apple-health://") }) {
+                                        Text("Apple健康")
+                                            .font(.caption)
+                                    }
+                                    Text("数据")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .padding(.bottom, 10)
+                        }
+
+                        if selection > 0 && selection < 5 { // ProgressView moved to bottom
+                            ProgressView(value: Double(selection), total: 4)
+                                .padding(.horizontal)
+                                .padding(.bottom, 10)
+                        }
+                        if isGeneratingPlan {
+                            ProgressView()
+                                .padding(.bottom, 20)
+                        } else {
+                            Button(buttonText) {
+                                handleNavigation()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                            .frame(maxWidth: .infinity) // Text buttons fill width
+                            .padding(.horizontal)
+                            .padding(.bottom, 10)
+
+                        }
+                    }
+                }
+            }
+            .onChange(of: onboardingData) { saveProgress() }
+            .onChange(of: selection) { saveProgress() }
+            .alert("生成计划失败", isPresented: $showNetworkErrorAlert) {
+                Button("重试") { handleCompletion() }
+                Button("取消", role: .cancel) { }
+            } message: {
+                Text("请检查您的网络连接并重试。")
+            }
+        }
     }
 }
 

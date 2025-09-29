@@ -1,9 +1,56 @@
-
 import SwiftUI
 import HealthKit
 
+struct RingValueRow: View {
+    var color: Color
+    var currentValue: Int
+    var goalValue: Int
+    var unit: String
+
+    var body: some View {
+        HStack {
+            Circle().fill(color).frame(width: 10, height: 10)
+            HStack(spacing: 0) {
+                Text("\(currentValue)")
+                    .contentTransition(.numericText(countsDown: false))
+                Text(" / \(goalValue) \(unit)")
+            }
+        }
+    }
+}
+
 struct FitnessRingCard: View {
-    @EnvironmentObject var healthKitManager: HealthKitManager
+    let activitySummary: HKActivitySummary?
+
+    private var moveGoal: Double {
+        activitySummary?.activeEnergyBurnedGoal.doubleValue(for: .kilocalorie()) ?? 0
+    }
+    private var moveValue: Double {
+        activitySummary?.activeEnergyBurned.doubleValue(for: .kilocalorie()) ?? 0
+    }
+    private var moveProgress: Double {
+        (activitySummary != nil && moveGoal > 0) ? moveValue / moveGoal : 0
+    }
+
+    private var exerciseGoal: Double {
+        activitySummary?.appleExerciseTimeGoal.doubleValue(for: .minute()) ?? 0
+    }
+    private var exerciseValue: Double {
+        activitySummary?.appleExerciseTime.doubleValue(for: .minute()) ?? 0
+    }
+    private var exerciseProgress: Double {
+        (activitySummary != nil && exerciseGoal > 0) ? exerciseValue / exerciseGoal : 0
+    }
+
+    private var standGoal: Double {
+        activitySummary?.appleStandHoursGoal.doubleValue(for: .count()) ?? 0
+    }
+    private var standValue: Double {
+        activitySummary?.appleStandHours.doubleValue(for: .count()) ?? 0
+    }
+    private var standProgress: Double {
+        (activitySummary != nil && standGoal > 0) ? standValue / standGoal : 0
+    }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -16,53 +63,29 @@ struct FitnessRingCard: View {
 
             HStack(spacing: 24) {
                 ZStack {
-                    if let summary = healthKitManager.activitySummary {
-                        let moveGoal = summary.activeEnergyBurnedGoal.doubleValue(for: .kilocalorie())
-                        let moveProgress = moveGoal > 0 ? summary.activeEnergyBurned.doubleValue(for: .kilocalorie()) / moveGoal : 0
-
-                        let exerciseGoal = summary.appleExerciseTimeGoal.doubleValue(for: .minute())
-                        let exerciseProgress = exerciseGoal > 0 ? summary.appleExerciseTime.doubleValue(for: .minute()) / exerciseGoal : 0
-
-                        let standGoal = summary.appleStandHoursGoal.doubleValue(for: .count())
-                        let standProgress = standGoal > 0 ? summary.appleStandHours.doubleValue(for: .count()) / standGoal : 0
-
-                        ActivityRingView(progress: moveProgress, color: .red, ringSize: 120)
-                        ActivityRingView(progress: exerciseProgress, color: .green, ringSize: 90)
-                        ActivityRingView(progress: standProgress, color: .blue, ringSize: 60)
-                    } else {
-                        Text("No Data")
-                    }
+                    ActivityRingView(progress: moveProgress, color: .red, ringSize: 120)
+                    ActivityRingView(progress: exerciseProgress, color: .green, ringSize: 90)
+                    ActivityRingView(progress: standProgress, color: .blue, ringSize: 60)
                 }
                 .frame(width: 120, height: 120)
 
                 VStack(alignment: .leading, spacing: 8) {
-                    if let summary = healthKitManager.activitySummary {
-                        HStack {
-                            Circle().fill(.red).frame(width: 10, height: 10)
-                            Text("\(Int(summary.activeEnergyBurned.doubleValue(for: .kilocalorie()))) / \(Int(summary.activeEnergyBurnedGoal.doubleValue(for: .kilocalorie()))) Kcal")
-                        }
-                        HStack {
-                            Circle().fill(.green).frame(width: 10, height: 10)
-                            Text("\(Int(summary.appleExerciseTime.doubleValue(for: .minute()))) / \(Int(summary.appleExerciseTimeGoal.doubleValue(for: .minute()))) Min")
-                        }
-                        HStack {
-                            Circle().fill(.blue).frame(width: 10, height: 10)
-                            Text("\(Int(summary.appleStandHours.doubleValue(for: .count()))) / \(Int(summary.appleStandHoursGoal.doubleValue(for: .count()))) Hour")
-                        }
-                    } else {
-                        Text("No Data")
-                    }
+                    RingValueRow(color: .red, currentValue: Int(moveValue), goalValue: Int(moveGoal), unit: "Kcal")
+                    RingValueRow(color: .green, currentValue: Int(exerciseValue), goalValue: Int(exerciseGoal), unit: "Min")
+                    RingValueRow(color: .blue, currentValue: Int(standValue), goalValue: Int(standGoal), unit: "Hour")
                 }
             }
         }
         .padding()
         .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
+        .animation(.easeInOut, value: moveValue)
+        .animation(.easeInOut, value: exerciseValue)
+        .animation(.easeInOut, value: standValue)
     }
 }
 
 struct FitnessRingCard_Previews: PreviewProvider {
     static var previews: some View {
-        FitnessRingCard()
-            .environmentObject(HealthKitManager())
+        FitnessRingCard(activitySummary: nil)
     }
 }

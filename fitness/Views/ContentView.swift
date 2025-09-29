@@ -3,6 +3,7 @@ import SwiftData
 
 struct ContentView: View {
     @EnvironmentObject var healthKitManager: HealthKitManager
+    @EnvironmentObject var weightManager: WeightManager // Add this
     @EnvironmentObject var appearanceViewModel: AppearanceViewModel
     @EnvironmentObject var profileViewModel: ProfileViewModel
     @EnvironmentObject var achievementManager: AchievementManager
@@ -19,49 +20,54 @@ struct ContentView: View {
     }
 
     var body: some View {
-        TabView(selection: $selectedIndex) {
-            // Tab 1: Overview
-            SummaryDashboardView(showInputSheet: $showInputSheet)
-                .tabItem {
-                    Image(systemName: "square.grid.2x2.fill")
-                }
-                .tag(0)
+        ZStack {
+            if !showOnboarding {
+                TabView(selection: $selectedIndex) {
+                    // Tab 1: Overview
+                    SummaryDashboardView(showInputSheet: $showInputSheet, healthKitManager: healthKitManager, weightManager: weightManager)
+                        .tabItem {
+                            Image(systemName: "square.grid.2x2.fill")
+                        }
+                        .tag(0)
 
-            // Tab 2: Plan
-            PlanView(profileViewModel: profileViewModel)
-                .tabItem {
-                    Image(systemName: "checklist")
-                }
-                .tag(1)
+                    // Tab 2: Plan
+                    PlanView(profileViewModel: profileViewModel)
+                        .tabItem {
+                            Image(systemName: "checklist")
+                        }
+                        .tag(1)
 
-            // Tab 3: Stats
-            StatsView()
-                .tabItem {
-                    Image(systemName: "chart.pie.fill")
+                    // Tab 3: Stats
+                    StatsView()
+                        .tabItem {
+                            Image(systemName: "chart.pie.fill")
+                        }
+                        .tag(2)
                 }
-                .tag(2)
-        }
-        .accentColor(appearanceViewModel.accentColor.color)
-        .onReceive(NotificationCenter.default.publisher(for: .showInputSheet)) { _ in
-            // Show the input sheet when the notification is received from the widget
-            showInputSheet = true
-        }
-        .sheet(isPresented: $showInputSheet) { 
-            InputSheetView()
+                .id(appearanceViewModel.theme) // Add this line
+                .accentColor(appearanceViewModel.accentColor.color)
+                .onReceive(NotificationCenter.default.publisher(for: .showInputSheet)) { _ in
+                    // Show the input sheet when the notification is received from the widget
+                    showInputSheet = true
+                }
+                .sheet(isPresented: $showInputSheet) { 
+                    InputSheetView()
+                }
+                .overlay(alignment: .top) {
+                    if achievementManager.showAchievementPopup, let achievement = achievementManager.unlockedAchievement {
+                        AchievementPopupView(message: achievement) {
+                            achievementManager.dismissAchievementPopup()
+                        }
+                        .padding(.top)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .animation(.spring(), value: achievementManager.showAchievementPopup)
+                    }
+                }
+            }
         }
         .fullScreenCover(isPresented: $showOnboarding) {
             OnboardingFlowView(showOnboarding: $showOnboarding)
                 .environmentObject(profileViewModel)
-        }
-        .overlay(alignment: .top) {
-            if achievementManager.showAchievementPopup, let achievement = achievementManager.unlockedAchievement {
-                AchievementPopupView(message: achievement) {
-                    achievementManager.dismissAchievementPopup()
-                }
-                .padding(.top)
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .animation(.spring(), value: achievementManager.showAchievementPopup)
-            }
         }
     }
 }

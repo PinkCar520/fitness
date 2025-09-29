@@ -6,18 +6,31 @@ enum MetricType: String, Codable, CaseIterable {
     case weight = "体重"
     case bodyFatPercentage = "体脂率"
     case waistCircumference = "腰围"
+    case heartRate = "心率"
+    case chestCircumference = "胸围"
+    case bodyFatMass = "体脂肪量"
+    case skeletalMuscleMass = "骨骼肌量"
+    case bodyWaterPercentage = "身体水分率"
+    case basalMetabolicRate = "基础代谢率"
+    case waistToHipRatio = "腰臀比"
     // Future types can be added here, e.g.:
     // case height = "身高"
     // case bodyMassIndex = "BMI"
     
     var unit: String {
         switch self {
-        case .weight:
+        case .weight, .bodyFatMass, .skeletalMuscleMass:
             return "kg"
-        case .bodyFatPercentage:
+        case .bodyFatPercentage, .bodyWaterPercentage:
             return "%"
-        case .waistCircumference:
+        case .waistCircumference, .chestCircumference:
             return "cm"
+        case .heartRate:
+            return "bpm"
+        case .basalMetabolicRate:
+            return "kcal"
+        case .waistToHipRatio:
+            return ""
         }
     }
 }

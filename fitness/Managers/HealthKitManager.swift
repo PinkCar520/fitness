@@ -19,6 +19,8 @@ protocol HealthKitManagerProtocol: ObservableObject {
     func saveWeight(_ weight: Double, date: Date)
     func saveBodyFatPercentage(_ percentage: Double, date: Date)
     func saveWaistCircumference(_ circumference: Double, date: Date)
+    func saveHeartRate(_ rate: Double, date: Date)
+    func deleteWeight(date: Date) async -> Bool
     // Add other methods that WeightManager directly calls on HealthKitManager if needed
 }
 
@@ -68,7 +70,7 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
         let sleepAnalysisType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)!
 
         let typesToRead: Set<HKObjectType> = [weightType, bodyFatPercentageType, waistCircumferenceType, stepType, distanceType, activitySummaryType, activeEnergyBurnedType, workoutType, heartRateType, sleepAnalysisType]
-        let typesToWrite: Set<HKSampleType> = [weightType, bodyFatPercentageType, waistCircumferenceType, workoutType, sleepAnalysisType]
+        let typesToWrite: Set<HKSampleType> = [weightType, bodyFatPercentageType, waistCircumferenceType, workoutType, sleepAnalysisType, heartRateType]
 
         healthStore.requestAuthorization(toShare: typesToWrite, read: typesToRead) { success, error in
             if let error = error {
@@ -133,43 +135,66 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
         }
     }
     
-    // 读取最近体重
-    func readMostRecentWeight() {
-        guard let type = HKQuantityType.quantityType(forIdentifier: .bodyMass) else { return }
+    // 保存心率
+    func saveHeartRate(_ rate: Double, date: Date = Date()) {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .heartRate) else { return }
+        let quantity = HKQuantity(unit: .count().unitDivided(by: .minute()), doubleValue: rate)
+        let sample = HKQuantitySample(type: type, quantity: quantity, start: date, end: date)
         
-        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
-        let query = HKSampleQuery(sampleType: type, predicate: nil, limit: 1, sortDescriptors: [sortDescriptor]) { _, results, _ in
+        healthStore.save(sample) { success, error in
             DispatchQueue.main.async {
-                self.lastWeightSample = results?.first as? HKQuantitySample
+                if let error = error {
+                    print("HealthKit save heart rate error: \(error)")
+                } else {
+                    print("Saved to HealthKit: \(rate) bpm")
+                }
             }
         }
-        healthStore.execute(query)
+    }
+    
+    // 读取最近体重
+    func readMostRecentWeight() async -> HKQuantitySample? {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .bodyMass) else { return nil }
+
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+        let predicate = HKQuery.predicateForSamples(withStart: .distantPast, end: Date(), options: .strictEndDate)
+
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: 1, sortDescriptors: [sortDescriptor]) { _, results, _ in
+                continuation.resume(returning: results?.first as? HKQuantitySample)
+            }
+            healthStore.execute(query)
+        }
     }
 
     // 读取最近体脂率
-    func readMostRecentBodyFat() {
-        guard let type = HKQuantityType.quantityType(forIdentifier: .bodyFatPercentage) else { return }
-        
+    func readMostRecentBodyFat() async -> HKQuantitySample? {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .bodyFatPercentage) else { return nil }
+
         let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
-        let query = HKSampleQuery(sampleType: type, predicate: nil, limit: 1, sortDescriptors: [sortDescriptor]) { _, results, _ in
-            DispatchQueue.main.async {
-                self.lastBodyFatSample = results?.first as? HKQuantitySample
+        let predicate = HKQuery.predicateForSamples(withStart: .distantPast, end: Date(), options: .strictEndDate)
+
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: 1, sortDescriptors: [sortDescriptor]) { _, results, _ in
+                continuation.resume(returning: results?.first as? HKQuantitySample)
             }
+            healthStore.execute(query)
         }
-        healthStore.execute(query)
     }
 
     // 读取最近腰围
-    func readMostRecentWaistCircumference() {
-        guard let type = HKQuantityType.quantityType(forIdentifier: .waistCircumference) else { return }
-        
+    func readMostRecentWaistCircumference() async -> HKQuantitySample? {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .waistCircumference) else { return nil }
+
         let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
-        let query = HKSampleQuery(sampleType: type, predicate: nil, limit: 1, sortDescriptors: [sortDescriptor]) { _, results, _ in
-            DispatchQueue.main.async {
-                self.lastWaistCircumferenceSample = results?.first as? HKQuantitySample
+        let predicate = HKQuery.predicateForSamples(withStart: .distantPast, end: Date(), options: .strictEndDate)
+
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: 1, sortDescriptors: [sortDescriptor]) { _, results, _ in
+                continuation.resume(returning: results?.first as? HKQuantitySample)
             }
+            healthStore.execute(query)
         }
-        healthStore.execute(query)
     }
 
     // 读取最近体重 for widget
@@ -223,7 +248,10 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
                 return
             }
             
-            self?.readMostRecentWeight()
+            Task { @MainActor in
+                guard let self = self else { return }
+                self.lastWeightSample = await self.readMostRecentWeight()
+            }
             completionHandler()
         }
         
@@ -236,123 +264,123 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
     }
 
     // 读取当天步数
-    func readStepCount() {
-        guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return }
+    func readStepCount() async -> Double {
+        guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return 0 }
 
         let now = Date()
         let startOfDay = Calendar.current.startOfDay(for: now)
         let predicate = HKQuery.predicateForSamples(withStart: startOfDay, end: now, options: .strictStartDate)
 
-        let query = HKStatisticsQuery(quantityType: stepType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
-            DispatchQueue.main.async {
+        return await withCheckedContinuation { continuation in
+            let query = HKStatisticsQuery(quantityType: stepType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
                 guard let result = result, let sum = result.sumQuantity() else {
-                    self.stepCount = 0
+                    continuation.resume(returning: 0)
                     return
                 }
-                self.stepCount = sum.doubleValue(for: .count())
+                continuation.resume(returning: sum.doubleValue(for: .count()))
             }
+            healthStore.execute(query)
         }
-        healthStore.execute(query)
     }
 
     // 读取过去7天的每日步数
-    func readWeeklyStepCounts() {
-        guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return } // 修正为 .stepCount
+    func readWeeklyStepCounts() async -> [DailyStepData] {
+        guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return [] }
 
         let calendar = Calendar.current
         var dailyStepData: [DailyStepData] = []
+        let dispatchGroup = DispatchGroup() // Use DispatchGroup to wait for all queries
 
-        // 获取过去7天的日期
         for i in 0..<7 {
-            guard let date = calendar.date(byAdding: .day, value: -i, to: Date()) else { continue }
+            dispatchGroup.enter()
+            guard let date = calendar.date(byAdding: .day, value: -i, to: Date()) else {
+                dispatchGroup.leave()
+                continue
+            }
             let startOfDay = calendar.startOfDay(for: date)
             let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)! // 结束日期是下一天的开始
 
             let predicate = HKQuery.predicateForSamples(withStart: startOfDay, end: endOfDay, options: .strictStartDate)
 
             let query = HKStatisticsQuery(quantityType: stepType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
+                let steps = result?.sumQuantity()?.doubleValue(for: .count()) ?? 0
+                // Ensure thread safety when appending to dailyStepData
                 DispatchQueue.main.async {
-                    guard let result = result, let sum = result.sumQuantity() else {
-                        dailyStepData.append(DailyStepData(date: startOfDay, steps: 0))
-                        // 确保所有数据都收集到后才更新 weeklyStepData
-                        if dailyStepData.count == 7 { // 确保收集到7天数据
-                            self.weeklyStepData = dailyStepData.sorted { $0.date < $1.date }
-                        }
-                        return
-                    }
-                    let steps = sum.doubleValue(for: .count())
                     dailyStepData.append(DailyStepData(date: startOfDay, steps: steps))
-                    
-                    // 确保所有数据都收集到后才更新 weeklyStepData
-                    if dailyStepData.count == 7 { // 确保收集到7天数据
-                        self.weeklyStepData = dailyStepData.sorted { $0.date < $1.date }
-                    }
+                    dispatchGroup.leave()
                 }
             }
             healthStore.execute(query)
         }
+
+        // Wait for all queries to complete
+        return await withCheckedContinuation { continuation in
+            dispatchGroup.notify(queue: .main) {
+                continuation.resume(returning: dailyStepData.sorted { $0.date < $1.date })
+            }
+        }
     }
 
     // 读取过去7天的每日距离
-    func readWeeklyDistance() {
-        guard let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) else { return }
+    func readWeeklyDistance() async -> [DailyDistanceData] {
+        guard let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) else { return [] }
 
         let calendar = Calendar.current
         var dailyDistanceData: [DailyDistanceData] = []
+        let dispatchGroup = DispatchGroup() // Use DispatchGroup to wait for all queries
 
-        // 获取过去7天的日期
         for i in 0..<7 {
-            guard let date = calendar.date(byAdding: .day, value: -i, to: Date()) else { continue }
+            dispatchGroup.enter()
+            guard let date = calendar.date(byAdding: .day, value: -i, to: Date()) else {
+                dispatchGroup.leave()
+                continue
+            }
             let startOfDay = calendar.startOfDay(for: date)
             let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)! // 结束日期是下一天的开始
 
             let predicate = HKQuery.predicateForSamples(withStart: startOfDay, end: endOfDay, options: .strictStartDate)
 
             let query = HKStatisticsQuery(quantityType: distanceType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
+                let distance = result?.sumQuantity()?.doubleValue(for: .meter()) ?? 0
+                // Ensure thread safety when appending to dailyDistanceData
                 DispatchQueue.main.async {
-                    guard let result = result, let sum = result.sumQuantity() else {
-                        dailyDistanceData.append(DailyDistanceData(date: startOfDay, distance: 0))
-                        // 确保所有数据都收集到后才更新 weeklyDistanceData
-                        if dailyDistanceData.count == 7 { // 确保收集到7天数据
-                            self.weeklyDistanceData = dailyDistanceData.sorted { $0.date < $1.date }
-                        }
-                        return
-                    }
-                    let distance = sum.doubleValue(for: .meter())
                     dailyDistanceData.append(DailyDistanceData(date: startOfDay, distance: distance))
-                    
-                    // 确保所有数据都收集到后才更新 weeklyDistanceData
-                    if dailyDistanceData.count == 7 { // 确保收集到7天数据
-                        self.weeklyDistanceData = dailyDistanceData.sorted { $0.date < $1.date }
-                    }
+                    dispatchGroup.leave()
                 }
             }
             healthStore.execute(query)
         }
+
+        // Wait for all queries to complete
+        return await withCheckedContinuation { continuation in
+            dispatchGroup.notify(queue: .main) {
+                continuation.resume(returning: dailyDistanceData.sorted { $0.date < $1.date })
+            }
+        }
     }
 
     // 读取当天距离
-    func readDistance() {
-        guard let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) else { return }
+    func readDistance() async -> Double {
+        guard let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) else { return 0 }
 
         let now = Date()
         let startOfDay = Calendar.current.startOfDay(for: now)
         let predicate = HKQuery.predicateForSamples(withStart: startOfDay, end: now, options: .strictStartDate)
 
-        let query = HKStatisticsQuery(quantityType: distanceType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
-            DispatchQueue.main.async {
+        return await withCheckedContinuation { continuation in
+            let query = HKStatisticsQuery(quantityType: distanceType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
                 guard let result = result, let sum = result.sumQuantity() else {
-                    self.distance = 0
+                    continuation.resume(returning: 0)
                     return
                 }
-                self.distance = sum.doubleValue(for: .meter())
+                continuation.resume(returning: sum.doubleValue(for: .meter()))
             }
+            healthStore.execute(query)
         }
-        healthStore.execute(query)
     }
 
     // 读取当天活动总结
-    func readActivitySummary() {
+    func readActivitySummary() async -> HKActivitySummary? {
         let calendar = Calendar.current
         let now = Date()
         var components = calendar.dateComponents([.year, .month, .day], from: now)
@@ -360,12 +388,12 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
         
         let predicate = HKQuery.predicateForActivitySummary(with: components)
         
-        let query = HKActivitySummaryQuery(predicate: predicate) { _, summaries, _ in
-            DispatchQueue.main.async {
-                self.activitySummary = summaries?.first
+        return await withCheckedContinuation { continuation in
+            let query = HKActivitySummaryQuery(predicate: predicate) { _, summaries, _ in
+                continuation.resume(returning: summaries?.first)
             }
+            healthStore.execute(query)
         }
-        healthStore.execute(query)
     }
 
     // New function to fetch monthly activity summaries
@@ -460,9 +488,10 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
 
     #if !os(watchOS)
     // New method to encapsulate HealthKit setup and initial data import
-    func setupHealthKitData(weightManager: WeightManager) {
+    func setupHealthKitData(weightManager: WeightManager) async {
         requestAuthorization { success in
             if success {
+                self.startWeightObserver()
                 let hasPerformedInitialHealthKitImport = UserDefaults.standard.bool(forKey: "hasPerformedInitialHealthKitImport")
 
                 if !hasPerformedInitialHealthKitImport {
@@ -478,21 +507,29 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
                             UserDefaults.standard.set(true, forKey: "hasPerformedInitialHealthKitImport")
                         }
                         // After import (or failure), proceed with regular data fetching
-                        self.readMostRecentWeight()
-                        self.readMostRecentBodyFat()
-                        self.readMostRecentWaistCircumference()
-                        self.readStepCount()
-                        self.readDistance()
-                        self.readActivitySummary()
+                        Task { @MainActor in
+                            self.lastWeightSample = await self.readMostRecentWeight()
+                            self.lastBodyFatSample = await self.readMostRecentBodyFat()
+                            self.lastWaistCircumferenceSample = await self.readMostRecentWaistCircumference()
+                            self.stepCount = await self.readStepCount()
+                            self.distance = await self.readDistance()
+                            self.activitySummary = await self.readActivitySummary()
+                            self.weeklyStepData = await self.readWeeklyStepCounts()
+                            self.weeklyDistanceData = await self.readWeeklyDistance()
+                        }
                     }
                 } else {
                     // If import already performed, just do regular data fetching
-                    self.readMostRecentWeight()
-                    self.readMostRecentBodyFat()
-                    self.readMostRecentWaistCircumference()
-                    self.readStepCount()
-                    self.readDistance()
-                    self.readActivitySummary()
+                    Task { @MainActor in
+                        self.lastWeightSample = await self.readMostRecentWeight()
+                        self.lastBodyFatSample = await self.readMostRecentBodyFat()
+                        self.lastWaistCircumferenceSample = await self.readMostRecentWaistCircumference()
+                        self.stepCount = await self.readStepCount()
+                        self.distance = await self.readDistance()
+                        self.activitySummary = await self.readActivitySummary()
+                        self.weeklyStepData = await self.readWeeklyStepCounts()
+                        self.weeklyDistanceData = await self.readWeeklyDistance()
+                    }
                 }
             }
         }
@@ -523,20 +560,52 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
     }
 
     // Fetches the most recent workout
-    func fetchMostRecentWorkout(completion: @escaping (HKWorkout?) -> Void) {
+    func fetchMostRecentWorkout() async -> HKWorkout? {
         let workoutType = HKObjectType.workoutType()
         let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
-        
-        let query = HKSampleQuery(sampleType: workoutType, predicate: nil, limit: 1, sortDescriptors: [sortDescriptor]) { _, samples, error in
-            DispatchQueue.main.async {
+        let predicate = HKQuery.predicateForSamples(withStart: .distantPast, end: Date(), options: .strictEndDate)
+
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: workoutType, predicate: predicate, limit: 1, sortDescriptors: [sortDescriptor]) { _, samples, error in
                 guard error == nil, let mostRecentWorkout = samples?.first as? HKWorkout else {
-                    completion(nil)
+                    continuation.resume(returning: nil)
                     return
                 }
-                completion(mostRecentWorkout)
+                continuation.resume(returning: mostRecentWorkout)
             }
+            healthStore.execute(query)
         }
-        healthStore.execute(query)
+    }
+
+    func deleteWeight(date: Date) async -> Bool {
+        guard let weightType = HKQuantityType.quantityType(forIdentifier: .bodyMass) else {
+            return false
+        }
+
+        // Use a very small interval around the date to account for potential floating point inaccuracies.
+        let predicate = HKQuery.predicateForSamples(withStart: date.addingTimeInterval(-1), end: date.addingTimeInterval(1), options: [])
+
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: weightType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { [self] _, samples, error in
+                guard let samplesToDelete = samples, error == nil else {
+                    continuation.resume(returning: false)
+                    return
+                }
+
+                if samplesToDelete.isEmpty {
+                    continuation.resume(returning: true) // Nothing to delete
+                    return
+                }
+                
+                self.healthStore.delete(samplesToDelete) { success, error in
+                    if let error = error {
+                        print("Error deleting from HealthKit: \(error.localizedDescription)")
+                    }
+                    continuation.resume(returning: success)
+                }
+            }
+            healthStore.execute(query)
+        }
     }
 
 #if os(iOS) && !targetEnvironment(macCatalyst)
