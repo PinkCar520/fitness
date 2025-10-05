@@ -54,13 +54,6 @@ struct FitnessRingCard: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            HStack {
-                Text("健身圆环")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
-
             HStack(spacing: 24) {
                 ZStack {
                     ActivityRingView(progress: moveProgress, color: .red, ringSize: 120)
@@ -76,11 +69,15 @@ struct FitnessRingCard: View {
                 }
             }
         }
-        .padding()
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.vertical, 20).padding(.horizontal)
         .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
         .animation(.easeInOut, value: moveValue)
         .animation(.easeInOut, value: exerciseValue)
         .animation(.easeInOut, value: standValue)
+        .hapticOnChange(of: moveValue)
+        .hapticOnChange(of: exerciseValue)
+        .hapticOnChange(of: standValue)
     }
 }
 

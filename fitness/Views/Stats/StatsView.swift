@@ -37,7 +37,7 @@ struct StatsView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     timeFrameSwitcher
                     coreMetricsGrid
-                    ChartSection(selectedTimeFrame: selectedTimeFrame)
+                    ChartSection(selectedTimeFrame: selectedTimeFrame, targetWeight: profileViewModel.userProfile.targetWeight)
                     workoutAnalysisSection
                     smartSuggestionsSection
                 }
@@ -57,22 +57,12 @@ struct StatsView: View {
     }
 
     private var timeFrameSwitcher: some View {
-        HStack {
+        Picker("Time Frame", selection: $selectedTimeFrame) {
             ForEach(TimeFrame.allCases, id: \.self) { timeFrame in
-                Button(action: {
-                    selectedTimeFrame = timeFrame
-                }) { 
-                    Text(timeFrame.rawValue)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .frame(maxWidth: .infinity)
-                        .padding(12)
-                        .background(selectedTimeFrame == timeFrame ? Color.blue : Color.gray.opacity(0.2))
-                        .foregroundColor(selectedTimeFrame == timeFrame ? .white : .primary)
-                        .cornerRadius(10)
-                }
+                Text(timeFrame.rawValue).tag(timeFrame)
             }
         }
+        .pickerStyle(.segmented)
     }
 
     private var weightChange: Double? {
@@ -128,11 +118,17 @@ struct StatsView: View {
     }
 
     private var coreMetricsGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-            StatsMetricCard(title: "体重变化", value: weightChangeValue, unit: "kg", icon: "scalemass.fill", color: weightChangeColor)
-            StatsMetricCard(title: "目标达成", value: goalAchievementPercentage, unit: "%", icon: "checkmark.circle.fill", color: .blue)
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                StatsMetricCard(title: "体重变化", value: weightChangeValue, unit: "kg", icon: "scalemass.fill", color: weightChangeColor)
+                    .animation(.easeInOut, value: weightChangeValue)
+                StatsMetricCard(title: "目标达成", value: goalAchievementPercentage, unit: "%", icon: "checkmark.circle.fill", color: .blue)
+                    .animation(.easeInOut, value: goalAchievementPercentage)
+            }
             StatsMetricCard(title: "总卡路里", value: String(format: "%.0f", totalCalories), unit: "kcal", icon: "flame.fill", color: .purple)
+                .animation(.easeInOut, value: totalCalories)
             StatsMetricCard(title: "运动天数", value: "\(workoutDays)", unit: "天", icon: "figure.walk", color: .orange)
+                .animation(.easeInOut, value: workoutDays)
         }
     }
 

@@ -34,7 +34,7 @@ struct GoalProgressCard: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack(alignment: .firstTextBaseline, spacing: 0) {
                                     Text(weightParts.first ?? "")
-                                        .font(.system(size: 36, weight: .bold))
+                                        .font(.system(size: 48, weight: .bold))
                                         .foregroundStyle(Color.primary.opacity(0.8))
                                     if weightParts.count > 1 {
                                         Text(".\(weightParts[1])")
@@ -104,13 +104,19 @@ struct GoalProgressCard: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .background(Color.clear)
                         } else if progressValue > 0 {
-                            // 进度未达 100%，显示百分比
-                            Text("\(Int(progressValue * 100))%")
-                                .font(.system(size: 28))
-                                .fontWeight(.bold)
-                                .contentTransition(.numericText(countsDown: false))
-                                .foregroundColor(.accentColor)
-                                .frame(width: 100, height: 100)
+                            HStack(spacing: 0) {
+                                // 进度未达 100%，显示百分比
+                                Text("\(Int(progressValue * 100))")
+                                    .font(.system(size: 48))
+                                    .fontWeight(.bold)
+                                    .contentTransition(.numericText(countsDown: false))
+                                    .foregroundColor(.accentColor)
+                                Text("%")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                    .offset(y:10)
+                            }
+                            .offset(y:20)
                         } else {
                             // 进度为 0%，显示“继续加油”+火焰图标
                             VStack(spacing: 4) {
@@ -152,6 +158,7 @@ struct GoalProgressCard: View {
             .background(Color(UIColor.secondarySystemGroupedBackground))
             .cornerRadius(20)
             .animation(.easeInOut, value: latestWeightValueDouble)
+            .hapticOnChange(of: latestWeightValueDouble)
         }
         .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showingBodyMetricsSheet) {

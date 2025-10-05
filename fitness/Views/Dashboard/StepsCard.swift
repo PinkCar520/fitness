@@ -46,6 +46,7 @@ struct StepsCard: View {
             .padding()
             .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
             .animation(.easeInOut, value: stepCount)
+            
         }
         .buttonStyle(PlainButtonStyle()) // To remove default NavigationLink styling
     }

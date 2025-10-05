@@ -3,6 +3,11 @@ import SwiftUI
 struct PlanView: View {
     var profileViewModel: ProfileViewModel
     @StateObject private var planViewModel: PlanViewModel
+    @State private var selectedDate: Date = Date() {
+        didSet {
+            planViewModel.selectedDate = selectedDate
+        }
+    }
 
     init(profileViewModel: ProfileViewModel) {
         self.profileViewModel = profileViewModel
@@ -13,6 +18,9 @@ struct PlanView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    CalendarView(selectedDate: $selectedDate)
+                        .padding(.horizontal)
+
                     workoutPlanSection
                     mealPlanSection
                 }

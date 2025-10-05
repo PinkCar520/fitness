@@ -157,11 +157,11 @@ struct SummaryDashboardView: View {
                     ShareSheet(items: [image])
                 }
             }
-            .sheet(isPresented: $showEditSheet) { // Sheet for editing cards
-                EditDashboardView()
-                    .environmentObject(dashboardViewModel)
-            }
-        }
+                            .sheet(isPresented: $showEditSheet) {
+                                EditDashboardView()
+                                    .environmentObject(dashboardViewModel) // Inject DashboardViewModel
+                                    .presentationDetents([.medium, .large])
+                            }        }
     }
 }
 

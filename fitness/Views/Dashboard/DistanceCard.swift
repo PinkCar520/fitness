@@ -45,6 +45,7 @@ struct DistanceCard: View {
             .padding()
             .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
             .animation(.easeInOut, value: distance)
+            
         }
         .buttonStyle(PlainButtonStyle()) // To remove default NavigationLink styling
     }

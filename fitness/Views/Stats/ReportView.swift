@@ -89,9 +89,11 @@ struct ReportView: View {
     }
 
     private var coreMetricsGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-            StatsMetricCard(title: "体重变化", value: weightChangeValue, unit: "kg", icon: "scalemass.fill", color: weightChangeColor)
-            StatsMetricCard(title: "目标达成", value: goalAchievementPercentage, unit: "%", icon: "checkmark.circle.fill", color: .blue)
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                StatsMetricCard(title: "体重变化", value: weightChangeValue, unit: "kg", icon: "scalemass.fill", color: weightChangeColor)
+                StatsMetricCard(title: "目标达成", value: goalAchievementPercentage, unit: "%", icon: "checkmark.circle.fill", color: .blue)
+            }
             StatsMetricCard(title: "总卡路里", value: String(format: "%.0f", totalCalories), unit: "kcal", icon: "flame.fill", color: .purple)
             StatsMetricCard(title: "运动天数", value: "\(workoutDays)", unit: "天", icon: "figure.walk", color: .orange)
         }
@@ -147,8 +149,9 @@ struct StatsMetricCard: View {
                         .foregroundColor(.primary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
+                        .contentTransition(.numericText(countsDown: false))
                     Text(unit)
-                        .font(.headline)
+                        .font(.callout)
                         .foregroundColor(.secondary)
                 }
             }
