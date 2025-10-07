@@ -1,4 +1,3 @@
-
 import SwiftUI
 
 struct CalendarView: View {
@@ -62,35 +61,36 @@ struct CalendarView: View {
             .padding(.horizontal)
             .padding(.bottom, 5)
 
-            // Days grid (now only one week)
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 10) {
-                ForEach(daysInWeek(), id: \.self) { date in
-                    // Mock activity types for demonstration
-                    let mockActivityTypes: [ActivityType] = {
-                        if calendar.isDate(date, inSameDayAs: Date()) {
-                            return [.workout, .meal]
-                        } else if calendar.component(.day, from: date) % 3 == 0 {
-                            return [.sleep]
-                        } else if calendar.component(.day, from: date) % 5 == 0 {
-                            return [.water, .steps]
-                        } else {
-                            return []
-                        }
-                    }()
+                // Days grid (now only one week)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 10) {
+                    ForEach(daysInWeek(), id: \.self) { date in
+                        // Mock workout details for demonstration
+                        let mockWorkoutDetails: [WorkoutDetail] = {
+                            var details: [WorkoutDetail] = []
+                            if calendar.isDate(date, inSameDayAs: Date()) {
+                                details.append(WorkoutDetail(type: .workout, time: .morning, intensity: .high))
+                                details.append(WorkoutDetail(type: .meal, time: .none, intensity: .none))
+                            } else if calendar.component(.day, from: date) % 3 == 0 {
+                                details.append(WorkoutDetail(type: .sleep, time: .none, intensity: .none))
+                                details.append(WorkoutDetail(type: .workout, time: .evening, intensity: .low))
+                            } else if calendar.component(.day, from: date) % 5 == 0 {
+                                details.append(WorkoutDetail(type: .water, time: .none, intensity: .none))
+                                details.append(WorkoutDetail(type: .steps, time: .none, intensity: .none))
+                                details.append(WorkoutDetail(type: .workout, time: .morning, intensity: .medium))
+                            } else if calendar.component(.day, from: date) % 7 == 0 {
+                                details.append(WorkoutDetail(type: .workout, time: .evening, intensity: .high))
+                            }
+                            return details
+                        }()
 
-                    DayView(date: date, selectedDate: $selectedDate, emeraldGreen: emeraldGreen, energyOrange: energyOrange, systemBlue: systemBlue, isWeekend: calendar.isDateInWeekend(date), activityTypes: mockActivityTypes)
+                        DayView(date: date, selectedDate: $selectedDate, emeraldGreen: emeraldGreen, energyOrange: energyOrange, systemBlue: systemBlue, isWeekend: calendar.isDateInWeekend(date), workoutDetails: mockWorkoutDetails, isRecordBreaking: calendar.component(.day, from: date) == 15 ? true : false, isConsecutiveWorkout: calendar.component(.day, from: date) == 16 ? true : false)
+                    }
                 }
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 15)
+                .padding(.horizontal)
+                .padding(.bottom, 15)
         }
-        .background(
-            ZStack {
-                Color.white.opacity(0.9) // bg-white/90
-                // For backdrop-blur-xl, we typically rely on the system's material effects
-                // or use a custom blur effect. For now, a translucent white is a good start.
-            }
-        )
+        .frame(maxWidth: .infinity)
+        .background(Color.white) // White card background
         .cornerRadius(20) // rounded-2xl
         .overlay(
             RoundedRectangle(cornerRadius: 20)
@@ -155,6 +155,26 @@ struct CalendarView: View {
     }
 }
 
+enum WorkoutTimeOfDay: String, CaseIterable {
+    case morning
+    case evening
+    case none
+}
+
+enum WorkoutIntensity: String, CaseIterable {
+    case high
+    case medium
+    case low
+    case none
+}
+
+struct WorkoutDetail: Identifiable, Hashable {
+    let id = UUID()
+    let type: ActivityType
+    let time: WorkoutTimeOfDay
+    let intensity: WorkoutIntensity
+}
+
 enum ActivityType: String, CaseIterable {
     case workout
     case meal
@@ -192,6 +212,74 @@ enum ActivityType: String, CaseIterable {
     }
 }
 
+struct ProgressSegment: Identifiable {
+    let id = UUID()
+    let progress: Double // 0.0 to 1.0
+    let color: Color
+}
+
+struct SegmentedProgressRingView: View {
+    let segments: [ProgressSegment]
+    let lineWidth: CGFloat = 3
+
+    var body: some View {
+        ZStack {
+            // Background ring
+            Circle()
+                .stroke(Color.gray.opacity(0.3), lineWidth: lineWidth)
+
+            // Segments
+            ForEach(segments) { segment in
+                let start = segments.prefix(while: { $0.id != segment.id }).reduce(0) { $0 + $1.progress }
+                let end = start + segment.progress
+                
+                Circle()
+                    .trim(from: CGFloat(start), to: CGFloat(min(end, 1.0)))
+                    .stroke(segment.color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .rotationEffect(Angle(degrees: -90))
+            }
+        }
+        .frame(width: 20, height: 20)
+    }
+}
+
+struct TooltipView: View {
+    let segments: [ProgressSegment]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("每日进度")
+                .font(.caption.bold())
+                .foregroundColor(.secondary)
+                .padding(.bottom, 2)
+
+            ForEach(segments) { segment in
+                HStack {
+                    Circle().fill(segment.color).frame(width: 8, height: 8)
+                    Text(activityName(for: segment.color))
+                    Spacer()
+                    Text(String(format: "%.0f%%", segment.progress * 100))
+                }
+                .font(.caption)
+            }
+        }
+        .padding(10)
+        .background(Color(UIColor.systemBackground))
+        .cornerRadius(10)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        .frame(width: 120)
+    }
+
+    private func activityName(for color: Color) -> String {
+        switch color {
+        case .green: return "餐饮"
+        case .blue: return "喝水"
+        case .indigo: return "睡眠"
+        default: return "活动"
+        }
+    }
+}
+
 struct DayView: View {
     let date: Date
     @Binding var selectedDate: Date
@@ -199,23 +287,28 @@ struct DayView: View {
     let energyOrange: Color
     let systemBlue: Color
     let isWeekend: Bool
-    var activityTypes: [ActivityType] = [] // Changed to array of ActivityType
-    @GestureState private var isDetectingLongPress = false // For scale effect
+    var workoutDetails: [WorkoutDetail] = []
+    let isRecordBreaking: Bool
+    let isConsecutiveWorkout: Bool // New parameter
+    
+    @State private var showTooltip = false
 
-    private let calendar = Calendar.current // Added local calendar instance
+    private let calendar = Calendar.current
 
     var body: some View {
+        let segments = mockSegments(for: date)
+
         VStack(spacing: 4) {
             Text(String(calendar.component(.day, from: date)))
-                .font(.system(size: 17, weight: .bold)) // Larger font size, bold weight
-                .kerning(-0.2) // Tight letter spacing
-                .foregroundColor(isSelected ? .white : (isWeekend ? Color.gray.opacity(0.6) : Color(red: 0.2, green: 0.2, blue: 0.2))) // White if selected, lighter gray for weekend, dark gray otherwise
-                .frame(width: 48, height: 48) // Increased size for better tap area
+                .font(.system(size: 17, weight: .bold))
+                .kerning(-0.2)
+                .foregroundColor(isSelected ? .white : (isWeekend ? Color.gray.opacity(0.6) : Color(red: 0.2, green: 0.2, blue: 0.2)))
+                .frame(width: 48, height: 48)
                 .background(
                     ZStack {
                         if isSelected {
                             LinearGradient(
-                                gradient: Gradient(colors: [systemBlue, Color(red: 100/255, green: 100/255, blue: 255/255)]), // Example gradient from blue to a lighter blue/purple
+                                gradient: Gradient(colors: [systemBlue, Color(red: 100/255, green: 100/255, blue: 255/255)]),
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -224,31 +317,89 @@ struct DayView: View {
                         }
                     }
                 )
-                .clipShape(Circle()) // Circular background
-                .shadow(color: isSelected ? systemBlue.opacity(0.3) : .clear, radius: isSelected ? 5 : 0, x: 0, y: isSelected ? 3 : 0) // Shadow for selected date
-                .scaleEffect(isDetectingLongPress ? 0.95 : 1.0) // Scale effect on tap
+                .clipShape(Circle())
+                .shadow(color: isSelected ? systemBlue.opacity(0.3) : .clear, radius: isSelected ? 5 : 0, x: 0, y: isSelected ? 3 : 0)
 
-            // Activity Status Indicators (multiple dots)
-            HStack(spacing: 2) {
-                ForEach(activityTypes, id: \.self) { type in
-                    Circle().fill(type.color).frame(width: 5, height: 5)
+            // Status Icons
+            HStack(spacing: 4) {
+                if workoutDetails.contains(where: { $0.intensity == .high }) {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.orange)
+                }
+
+                if isRecordBreaking {
+                    Image(systemName: "trophy.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.yellow)
+                }
+
+                if isConsecutiveWorkout {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.red)
                 }
             }
+            .frame(height: 10)
+
+            // Main Activity Type Icon & Ring
+            if workoutDetails.contains(where: { $0.type == .workout }) {
+                Image(systemName: ActivityType.workout.icon)
+                    .font(.system(size: 12))
+                    .foregroundColor(isFutureDate ? ActivityType.workout.color.opacity(0.4) : ActivityType.workout.color)
+            } else {
+                // Placeholder to keep spacing consistent for non-workout days
+                Spacer().frame(height: 12)
+            }
+            
+            SegmentedProgressRingView(segments: segments)
         }
-        .animation(.spring(), value: isDetectingLongPress) // Animation for scale effect
-        .gesture(
-            LongPressGesture(minimumDuration: 0.01) // Use LongPressGesture for immediate feedback
-                .updating($isDetectingLongPress) { currentState, gestureState, transaction in
-                    gestureState = currentState
+        .contentShape(Rectangle()) // Make the whole area tappable
+        .onTapGesture {
+            selectedDate = date
+        }
+        .onLongPressGesture(minimumDuration: 0.5) {
+            showTooltip = true
+        }
+        .overlay(
+            ZStack {
+                if showTooltip {
+                    // Dismiss on tap outside
+                    Color.black.opacity(0.001)
+                        .onTapGesture {
+                            showTooltip = false
+                        }
+
+                    TooltipView(segments: segments)
+                        .offset(y: -95)
+                        .transition(.opacity.combined(with: .scale))
                 }
-                .onEnded { _ in // Add onEnded to update selectedDate
-                    selectedDate = date
-                }
+            }
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: showTooltip)
         )
     }
 
     private var isSelected: Bool {
         calendar.isDate(date, inSameDayAs: selectedDate)
+    }
+
+    private var isFutureDate: Bool {
+        calendar.compare(date, to: Date(), toGranularity: .day) == .orderedDescending
+    }
+
+    private func mockSegments(for date: Date) -> [ProgressSegment] {
+        let day = Double(calendar.component(.day, from: date))
+        
+        // Create progress that cycles through the month to demonstrate 0-100% capability
+        let mealProgress = (day.truncatingRemainder(dividingBy: 5)) / 8.0 // Max 0.5
+        let waterProgress = (day.truncatingRemainder(dividingBy: 4)) / 8.0 // Max 0.375
+        let sleepProgress = (day.truncatingRemainder(dividingBy: 6)) / 10.0 // Max 0.5
+        
+        return [
+            ProgressSegment(progress: mealProgress, color: .green),
+            ProgressSegment(progress: waterProgress, color: .blue),
+            ProgressSegment(progress: sleepProgress, color: .indigo)
+        ]
     }
 }
 

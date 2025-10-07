@@ -1,6 +1,15 @@
 import Foundation
 
-// MARK: - Enums for UserProfile
+// MARK: - Onboarding & Profile Enums
+
+enum FitnessGoal: String, Codable, CaseIterable, Identifiable {
+    case fatLoss = "减脂塑形"
+    case muscleGain = "增肌与力量"
+    case healthImprovement = "提升健康与活力"
+    var id: Self { self }
+}
+
+// MARK: - Onboarding & Profile Enums
 
 enum Gender: String, Codable, CaseIterable, Identifiable {
     case male = "男"
@@ -18,15 +27,6 @@ enum WeightUnit: String, Codable, CaseIterable, Identifiable {
 enum HeightUnit: String, Codable, CaseIterable, Identifiable {
     case cm = "厘米 (cm)"
     case inch = "英寸 (inch)"
-    var id: Self { self }
-}
-
-// MARK: - Onboarding & Profile Enums
-
-enum FitnessGoal: String, Codable, CaseIterable, Identifiable {
-    case fatLoss = "减脂塑形"
-    case muscleGain = "增肌与力量"
-    case healthImprovement = "提升健康与活力"
     var id: Self { self }
 }
 

@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var healthKitManager: HealthKitManager
     @EnvironmentObject var weightManager: WeightManager // Add this
     @EnvironmentObject var appearanceViewModel: AppearanceViewModel
@@ -31,7 +32,7 @@ struct ContentView: View {
                         .tag(0)
 
                     // Tab 2: Plan
-                    PlanView(profileViewModel: profileViewModel)
+                    PlanView(profileViewModel: profileViewModel, modelContext: modelContext)
                         .tabItem {
                             Image(systemName: "checklist")
                         }

@@ -1,38 +1,56 @@
 import SwiftUI
+import SwiftData
 
 struct PlanView: View {
-    var profileViewModel: ProfileViewModel
-    @StateObject private var planViewModel: PlanViewModel
-    @State private var selectedDate: Date = Date() {
-        didSet {
-            planViewModel.selectedDate = selectedDate
+        @StateObject private var planViewModel: PlanViewModel
+        @State private var selectedDate: Date = Date()
+        @State private var showPlanSetup = false
+        @State private var showPlanHistory = false
+    
+        init(profileViewModel: ProfileViewModel, modelContext: ModelContext) {
+            _planViewModel = StateObject(wrappedValue: PlanViewModel(profileViewModel: profileViewModel, modelContext: modelContext))
         }
-    }
-
-    init(profileViewModel: ProfileViewModel) {
-        self.profileViewModel = profileViewModel
-        _planViewModel = StateObject(wrappedValue: PlanViewModel(profileViewModel: profileViewModel))
-    }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    CalendarView(selectedDate: $selectedDate)
-                        .padding(.horizontal)
-
-                    workoutPlanSection
-                    mealPlanSection
+    
+        var body: some View {
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        CalendarView(selectedDate: $selectedDate)
+                            .padding(.horizontal)
+                            .onChange(of: selectedDate) { oldValue, newValue in
+                                planViewModel.selectedDate = newValue
+                            }
+    
+                        workoutPlanSection
+                        mealPlanSection
+                    }
+                    .padding()
                 }
-                .padding()
+                .navigationTitle("计划")
+                .toolbar { 
+                    ToolbarItemGroup(placement: .navigationBarTrailing) {
+                        Button("历史计划") {
+                            showPlanHistory = true
+                        }
+                        
+                        Button("制定新计划") {
+                            showPlanSetup = true
+                        }
+                    }
+                }
+            .sheet(isPresented: $showPlanSetup) {
+                PlanSetupView { goal, duration in
+                    planViewModel.generatePlan(goal: goal, duration: duration)
+                }
             }
-            .navigationTitle("计划")
+            .sheet(isPresented: $showPlanHistory) { // Present the sheet
+                PlanHistoryView()
+            }
+            }
         }
-    }
-
     private var workoutPlanSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("本周锻炼").font(.title2).bold()
+            Text("今日锻炼").font(.title2).bold()
             VStack(spacing: 12) {
                 ForEach(planViewModel.workouts) { workout in
                     HStack {
@@ -60,7 +78,7 @@ struct PlanView: View {
 
     private var mealPlanSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("本周饮食").font(.title2).bold()
+            Text("今日饮食").font(.title2).bold()
             VStack(spacing: 12) {
                 ForEach(planViewModel.meals) { meal in
                     HStack {
@@ -89,7 +107,15 @@ struct PlanView: View {
 
 struct PlanView_Previews: PreviewProvider {
     static var previews: some View {
-        PlanView(profileViewModel: ProfileViewModel())
-            .environmentObject(ProfileViewModel())
+        // Create an in-memory ModelContainer for previews
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try! ModelContainer(for: Plan.self, configurations: config)
+        
+        // Add some mock data if needed for the preview
+        let profileViewModel = ProfileViewModel()
+
+        return PlanView(profileViewModel: profileViewModel, modelContext: container.mainContext)
+            .modelContainer(container) // Provide the container to the environment
+            .environmentObject(profileViewModel)
     }
 }

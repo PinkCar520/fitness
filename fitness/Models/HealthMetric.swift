@@ -36,7 +36,7 @@ enum MetricType: String, Codable, CaseIterable {
 }
 
 @Model
-final class HealthMetric {
+final class HealthMetric: Equatable, Hashable {
     var date: Date
     var value: Double
     var type: MetricType
@@ -45,5 +45,15 @@ final class HealthMetric {
         self.date = date
         self.value = value
         self.type = type
+    }
+
+    static func == (lhs: HealthMetric, rhs: HealthMetric) -> Bool {
+        lhs.date == rhs.date && lhs.value == rhs.value && lhs.type == rhs.type
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(date)
+        hasher.combine(value)
+        hasher.combine(type)
     }
 }

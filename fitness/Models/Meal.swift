@@ -1,6 +1,6 @@
 import Foundation
 
-enum MealType: String, CaseIterable, Identifiable {
+enum MealType: String, Codable, CaseIterable, Identifiable {
     case breakfast = "早餐"
     case lunch = "午餐"
     case dinner = "晚餐"
@@ -9,7 +9,7 @@ enum MealType: String, CaseIterable, Identifiable {
     var id: String { self.rawValue }
 }
 
-struct Meal: Identifiable {
+struct Meal: Identifiable, Codable {
     let id = UUID()
     var name: String
     var calories: Int
