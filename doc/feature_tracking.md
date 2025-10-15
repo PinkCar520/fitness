@@ -1,51 +1,72 @@
-# 需求功能跟踪记录
+# 健身应用功能分析
 
-## 2025-10-05: 统计页面功能增强
+本文档根据项目结构对健身应用的功能进行分析。
 
-本次更新针对“统计”页面进行了一系列的优化和功能增强。
+## 1. 核心架构
 
-### 1. 年度体重趋势图
-- **功能**: 在统计页的图表部分，新增了按“年”筛选的视图。
-- **实现**: 当用户选择“年”时，图表会展示过去12个月的体重趋势。数据点是每个月的平均体重，这提供了一个更宏观、更平滑的年度趋势概览。
+- **UI 框架：** SwiftUI
+- **架构：** 项目遵循模型-视图-视图模型（MVVM）架构，这通过 `Models`、`Views` 和 `ViewModels` 目录的分离可以看出。
+- **数据持久化：** 应用使用 SwiftData 进行本地数据存储，其中 `HealthMetric` 是一个核心的 `@Model`。
+- **依赖管理：** 使用 Swift 包管理器（Swift Package Manager）来管理外部库。
 
-### 2. 核心指标卡片布局优化
-- **问题**: 当“总卡路里”数值过大时，在原有的2x2网格布局中显示不全。
-- **优化**: 调整了卡片布局。第一行并排显示“体重变化”和“目标达成”，第二行和第三行分别独立显示“总卡路里”和“运动天数”。这为后两者提供了充足的显示空间。
+## 2. 主要功能
 
-### 3. UI/UX 细节打磨
-- **动画**: 为四个核心指标卡片的数值增加了数字滚动动画，当数据更新时，数值会平滑过渡，与应用内其他卡片动画效果保持一致。
-- **图表标签**: 优化了年度视图下X轴的月份标签，从“X月”改为仅显示数字“X”，避免了因标签过长导致的显示不全问题。
-- **字体调整**: 适当调小了指标卡片中单位（如kg, %, kcal）的字体，优化了视觉层次。
+### 2.1. 新用户引导 (`Onboarding`)
+- 为新用户提供多步骤的引导流程 (`OnboardingFlowView`)。
+- 步骤包括：欢迎屏幕、安全检查、目标选择、经验水平和锻炼地点。
 
----
+### 2.2. 仪表盘 (`Dashboard`)
+- 应用的中心枢纽 (`SummaryDashboardView`)。
+- **健身圆环 (`ActivityRingView`)：** 每日健身目标的视觉表示。
+- **指标卡片 (`Metrics Cards`)：** 显示步数、距离、当前体重/目标进度等关键指标 (`StepsCard`, `DistanceCard`, `CurrentCardView`, `GoalProgressView`)。
+- **图表 (`Charts`)：** 用于可视化步数和距离历史的条形图 (`StepBarChart`, `DistanceBarChart`)。
+- **最近活动 (`Recent Activity`)：** 最近的锻炼或数据条目列表 (`RecentActivityCard`, `HistoryListView`)。
+- **挑战 (`Challenges`)：** 每月挑战卡片 (`MonthlyChallengeCard`)。
+- **自定义 (`Customization`)：** 用户可以编辑仪表盘布局 (`EditDashboardView`)。
 
-## 2025-10-05: 健身计划管理系统与用户档案增强
+### 2.3. 用户个人资料 (`Profile`)
+- 一个全面的用户个人资料部分 (`ProfileView`)。
+- **设置 (`Settings`)：**
+    - 基本信息 (`BasicInfoSettingsView`)
+    - 外观/主题 (`AppearanceSettingsView`)
+    - 健康目标 (`HealthGoalsSettingsView`)
+    - 通知 (`NotificationSettingsView`)
+    - 数据与隐私 (`DataPrivacySettingsView`)
+- **数据可视化 (`Data Visualization`)：**
+    - 身体数据 (`BodyDataView`)
+    - 营养 (`NutritionView`)
+    - 训练偏好 (`TrainingPreferenceView`)
+    - 器材列表 (`EquipmentListView`)
 
-本次更新引入了健壮的健身计划管理系统，并显著扩展了用户档案功能，为更个性化的用户体验奠定了基础。
+### 2.4. 锻炼与计划管理 (`Plan`)
+- 用户可以创建、查看和管理锻炼计划 (`PlanView`)。
+- **计划详情 (`Plan Details`)：** 计划和每日锻炼的详细视图 (`PlanDetailView`, `DayDetailCardView`)。
+- **计划设置 (`Plan Setup`)：** 用于创建新锻炼计划的流程 (`PlanSetupView`)。
+- **历史记录 (`History`)：** 查看过去的锻炼计划 (`PlanHistoryView`)。
 
-### 1. 健身计划管理系统
-- **功能**: 引入 `Plan` 和 `DailyTask` 模型，支持创建、管理和归档健身计划。
-- **实现**:
-    - `PlanViewModel` 负责计划的生成、加载和基于日期的过滤。
-    - `PlanView` 作为核心标签页集成，包含自定义日历、每日锻炼/膳食计划展示、计划设置和历史计划视图。
-    - 提供 `CalendarView` 和 `MonthView` 用于直观的日期选择和导航。
-    - 包含 `PlanSetupView`、`PlanDetailView` 和 `PlanHistoryView`，用于完整的计划生命周期管理。
+### 2.5. 数据输入与跟踪 (`Data Input & Tracking`)
+- **手动输入表单 (`Manual Input Sheet`)：** 用于输入各种健康指标的专用表单 (`InputSheetView`)。
+- **专用滑块 (`Specialized Sliders`)：** 用于输入体重、体脂和腰围的自定义滑块。
+- **身体指标 (`Body Metrics`)：** 用于跟踪身体指标的专用视图 (`BodyMetricsView`)。
 
-### 2. 用户档案增强
-- **功能**: 扩展 `UserProfile` 模型，新增了大量属性（例如，体型、基准、详细偏好、健康状况），以捕获更丰富的用户数据。
-- **实现**:
-    - 更新了相关枚举（`FitnessGoal`、`Gender`、`WeightUnit` 等），并新增了 `BodyType`、`HealthCondition`、`Interest`、`Equipment`、`Motivator`、`Challenge`、`DietaryHabit`、`WaterIntake`、`SleepQuality` 等。
+### 2.6. 统计与报告 (`Statistics and Reporting`)
+- **统计视图 (`Stats View`)：** 用于查看健康统计数据的专用部分 (`StatsView`)。
+- **报告 (`Reports`)：** 详细的报告，可能包含图表和摘要 (`ReportView`)。
+- **日历视图 (`Calendar View`)：** 用于随时间可视化数据的日历 (`CalendarView`, `MonthView`)。
 
-### 3. 健康指标与活动扩展
-- **功能**: 扩展 `HealthMetric` 模型，新增了多种 `MetricType` 值（例如，胸围、体脂肪量、基础代谢率），以支持更广泛的健康跟踪。
-- **实现**:
-    - 增强了 `Meal` 和 `Workout` 模型，使其遵循 `Identifiable` 协议。
+### 2.7. 系统集成 (`System Integration`)
+- **HealthKit：** 与苹果的 HealthKit 集成，以读取和写入健康数据 (`HealthKitManager`)。
+- **通知 (`Notifications`)：** 用于提醒或成就的本地通知 (`NotificationManager`)。
+- **触觉反馈 (`Haptics`)：** 用户交互时的自定义触觉反馈 (`View+Haptic`)。
 
-### 4. 成就系统集成
-- **功能**: 将 `AchievementPopupView` 集成到 `ContentView` 中，表明引入了应用内成就系统。
+### 2.8. 小组件扩展 (`Widget Extension`)
+- 一个主屏幕小组件，用于显示与体重相关的信息 (`WeightWidgets`)。
+- 无需打开应用即可快速浏览数据。
 
-### 5. 引导流程与 UI 优化
-- **功能**: 优化了 `ContentView` 的引导流程逻辑和基于主题的 `TabView` 重建。
-
-### 6. 文档
-- **功能**: 添加了 `doc/plan.md`，详细说明了动态周期性计划系统的产品需求。
+## 3. 数据模型 (`Models/`)
+- `HealthMetric`: 用于存储时间序列健康数据（如体重、步数）的核心模型。
+- `UserProfile`: 存储用户特定信息和偏好。
+- `Plan`: 代表一个锻炼计划。
+- `Workout`: 代表单个锻炼会话。
+- `Meal`: 可能用于营养跟踪。
+![alt text](image-4.png)

@@ -1,0 +1,39 @@
+feat(navigation): Implement new V3.0 app navigation and core page rebuilds
+
+This commit implements the new V30 navigation architecture as defined in the PRD,
+focusing on clear separation of concerns and improved user experience.
+
+Key changes include:
+- **Navigation Structure:**
+  - Implemented 5-tab bottom navigation Overview, Plan, Body Profile, Stats, Friends.
+  - Added top-right settings entry in Overview.
+  - Updated Body Profile tab icon to 'heart.text.square.fill'.
+- **Settings Feature - Part 1:**
+  - Created new SettingsView container, accessible modally from Overview.
+  - Migrated existing settings sub-views into SettingsView.
+  - Extracted SettingsNavigationRow to common component.
+  - Cleaned up obsolete ProfilePopupView, ProfileView, HealthGoalsSettingsView, TrainingPreferenceView.
+- **Body Profile Page - Part 3:**
+  - Rebuilt BodyProfileView from scratch.
+  - Extracted MetricCard to common component.
+  - Extracted and generalized ChartSection into GenericLineChartView.
+  - Implemented dashboard, interactive chart with metric switching weight/body fat, and FAB for data entry.
+  - Added placeholder for 'Visual Records' feature.
+- **Stats Page - Part 4:**
+  - Rebuilt StatsView from scratch.
+  - Implemented time frame picker, MetricCard KPIs workout days, calories.
+  - Implemented workout frequency bar chart.
+  - Cleaned up obsolete ChartSection.
+- **Data Model & Dependency Fixes:**
+  - Converted Workout and Meal to SwiftData @Model classes.
+  - Refactored Plan model DailyTask to use direct SwiftData relationships.
+  - Updated PlanViewModel to work with new SwiftData relationships removed JSON encoding/decoding.
+  - Created WeeklyWorkoutActivity model to resolve WorkoutFrequency naming conflict.
+  - Removed obsolete enum WorkoutFrequency and property from UserProfile.swift.
+- **Documentation:**
+  - Added prd_v3_navigation_refactor.md PRD for V3.0 navigation.
+  - Added prd_v3_breakdown_20251015.md Detailed breakdown of V3.0 features.
+  - Added review_record_settings_migration_20251015.md Review record for settings migration.
+  - Added prd_v3.1_plan_20251015.md Product plan for V3.1.
+
+This commit addresses the core architectural changes for V3.0, laying a solid foundation for future development.

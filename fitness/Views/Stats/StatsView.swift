@@ -1,196 +1,90 @@
 import SwiftUI
 import SwiftData
+import Charts
 
 struct StatsView: View {
-    @EnvironmentObject var profileViewModel: ProfileViewModel
-    @EnvironmentObject var healthKitManager: HealthKitManager
-    
-    @Query(sort: \HealthMetric.date, order: .reverse) private var records: [HealthMetric]
-    
-    @State private var selectedTimeFrame: TimeFrame = .sevenDays
-    @State private var totalCalories: Double = 0
-    @State private var workoutDays: Int = 0
-    @State private var reportImage: UIImage?
-    @State private var showShareSheet = false
-
-    enum TimeFrame: String, CaseIterable {
+    // Time Frame Selection
+    enum TimeFrame: String, CaseIterable, Identifiable {
         case sevenDays = "周"
         case thirtyDays = "月"
-        case threeMonths = "季"
-        case halfYear = "半年"
-        case oneYear = "年"
+        case ninetyDays = "季"
+        var id: String { self.rawValue }
         
         var days: Int {
             switch self {
             case .sevenDays: return 7
             case .thirtyDays: return 30
-            case .threeMonths: return 90
-            case .halfYear: return 180
-            case .oneYear: return 365
+            case .ninetyDays: return 90
             }
         }
+    }
+    @State private var selectedTimeFrame: TimeFrame = .thirtyDays
+
+    // Environment & Data Sources
+    @EnvironmentObject var healthKitManager: HealthKitManager
+    @Query(sort: \Workout.date, order: .reverse) private var workouts: [Workout]
+
+    // State for fetched data
+    @State private var totalCalories: Double = 0
+    @State private var workoutDays: Int = 0
+
+    // Computed property for workout frequency chart
+    private var workoutFrequencyData: [WeeklyWorkoutActivity] {
+        let calendar = Calendar.current
+        let endDate = Date()
+        guard let startDate = calendar.date(byAdding: .day, value: -selectedTimeFrame.days, to: endDate) else {
+            return []
+        }
+
+        let relevantWorkouts = workouts.filter { $0.date >= startDate && $0.date <= endDate }
+        
+        // Group by week start date
+        let groupedByWeek = Dictionary(grouping: relevantWorkouts) { workout -> Date in
+            calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: workout.date))!
+        }
+
+        return groupedByWeek.map { (weekStartDate, workoutsInWeek) -> WeeklyWorkoutActivity in
+            return WeeklyWorkoutActivity(weekOf: weekStartDate, count: workoutsInWeek.count)
+        }.sorted(by: { $0.weekOf < $1.weekOf })
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    timeFrameSwitcher
-                    coreMetricsGrid
-                    ChartSection(selectedTimeFrame: selectedTimeFrame, targetWeight: profileViewModel.userProfile.targetWeight)
-                    workoutAnalysisSection
-                    smartSuggestionsSection
+                    // Time Frame Picker
+                    Picker("Time Frame", selection: $selectedTimeFrame) {
+                        ForEach(TimeFrame.allCases) { timeFrame in
+                            Text(timeFrame.rawValue).tag(timeFrame)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    // Core Metrics Grid
+                    VStack(alignment: .leading) {
+                        Text("核心指标")
+                            .font(.title3).bold()
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                            MetricCard(title: "运动天数", value: "\(workoutDays)", unit: "天", icon: "figure.walk", color: .orange)
+                            MetricCard(title: "总消耗", value: String(format: "%.0f", totalCalories), unit: "千卡", icon: "flame.fill", color: .red)
+                        }
+                    }
+
+                    // Workout Frequency Chart
+                    WorkoutFrequencyChartView(data: workoutFrequencyData)
+
                 }
                 .padding()
             }
             .navigationTitle("统计")
-            .onAppear(perform: fetchStats)
-            .onChange(of: selectedTimeFrame) {
-                fetchStats()
-            }
-        }
-        .sheet(isPresented: $showShareSheet) {
-            if let reportImage = self.reportImage {
-                ShareSheet(items: [reportImage])
+            .onAppear(perform: fetchData)
+            .onChange(of: selectedTimeFrame) { 
+                fetchData()
             }
         }
     }
 
-    private var timeFrameSwitcher: some View {
-        Picker("Time Frame", selection: $selectedTimeFrame) {
-            ForEach(TimeFrame.allCases, id: \.self) { timeFrame in
-                Text(timeFrame.rawValue).tag(timeFrame)
-            }
-        }
-        .pickerStyle(.segmented)
-    }
-
-    private var weightChange: Double? {
-        guard records.count > 1 else { return nil }
-        
-        let days = selectedTimeFrame.days
-        guard days > 0 else { return 0 }
-        
-        let calendar = Calendar.current
-        let now = Date()
-        
-        let latestRecord = records[0]
-        
-        guard let referenceDate = calendar.date(byAdding: .day, value: -days, to: now) else { return nil }
-        
-        let referenceRecord = records.first { $0.date <= referenceDate }
-        
-        guard let referenceWeight = referenceRecord?.value else { return nil }
-        
-        return latestRecord.value - referenceWeight
-    }
-
-    private var weightChangeValue: String {
-        if let change = weightChange {
-            return String(format: "%+.1f", change)
-        } else {
-            return "--"
-        }
-    }
-
-    private var weightChangeColor: Color {
-        if let change = weightChange {
-            return change > 0 ? .red : .green
-        } else {
-            return .primary
-        }
-    }
-    
-    private var goalAchievementPercentage: String {
-        let targetWeight = profileViewModel.userProfile.targetWeight
-        guard let currentWeight = records.first?.value else {
-            return "--"
-        }
-        guard let startWeight = records.last?.value else {
-            return "--"
-        }
-        
-        let progress = (startWeight > 0 && startWeight != targetWeight) ? (startWeight - currentWeight) / (startWeight - targetWeight) : 0
-        
-        let clampedProgress = max(0, min(progress, 1))
-
-        return String(format: "%.0f", clampedProgress * 100)
-    }
-
-    private var coreMetricsGrid: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                StatsMetricCard(title: "体重变化", value: weightChangeValue, unit: "kg", icon: "scalemass.fill", color: weightChangeColor)
-                    .animation(.easeInOut, value: weightChangeValue)
-                StatsMetricCard(title: "目标达成", value: goalAchievementPercentage, unit: "%", icon: "checkmark.circle.fill", color: .blue)
-                    .animation(.easeInOut, value: goalAchievementPercentage)
-            }
-            StatsMetricCard(title: "总卡路里", value: String(format: "%.0f", totalCalories), unit: "kcal", icon: "flame.fill", color: .purple)
-                .animation(.easeInOut, value: totalCalories)
-            StatsMetricCard(title: "运动天数", value: "\(workoutDays)", unit: "天", icon: "figure.walk", color: .orange)
-                .animation(.easeInOut, value: workoutDays)
-        }
-    }
-
-    private var workoutAnalysisSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("运动分析").font(.title3).bold()
-            VStack(alignment: .leading, spacing: 12) {
-                if let pushups = profileViewModel.userProfile.benchmarks?.pushups {
-                    WorkoutProgress(type: "俯卧撑基准", percentage: Double(pushups) / 100.0, color: .red) // Assuming 100 is a max benchmark for visualization
-                }
-                WorkoutProgress(type: "跑步", percentage: 0.67, color: .green)
-                WorkoutProgress(type: "游泳", percentage: 0.50, color: .cyan)
-            }
-            .padding()
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(12)
-        }
-    }
-
-    private var smartSuggestionsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("智能建议").font(.title3).bold()
-            VStack(alignment: .leading, spacing: 12) {
-                if let bodyType = profileViewModel.userProfile.bodyType?.current {
-                    switch bodyType {
-                    case .slim:
-                        SuggestionCard(text: "建议增加健康卡路里摄入", color: .blue)
-                    case .heavy:
-                        SuggestionCard(text: "建议关注减脂和有氧训练", color: .orange)
-                    default:
-                        SuggestionCard(text: "保持均衡训练，持续进步", color: .green)
-                    }
-                } else {
-                    SuggestionCard(text: "本周运动频率提升20%", color: .blue)
-                    SuggestionCard(text: "建议增加力量训练", color: .yellow)
-                }
-            }
-        }
-    }
-
-    private var actionButtonsSection: some View {
-        Button(action: {
-            let reportView = ReportView(
-                profileViewModel: profileViewModel,
-                selectedTimeFrame: selectedTimeFrame,
-                totalCalories: totalCalories,
-                workoutDays: workoutDays
-            )
-            self.reportImage = reportView.snapshot()
-            self.showShareSheet = true
-        }) { 
-            Label("分享报告", systemImage: "square.and.arrow.up")
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .cornerRadius(12)
-        }
-    }
-    
-    private func fetchStats() {
+    private func fetchData() {
         healthKitManager.fetchTotalActiveEnergy(for: selectedTimeFrame.days) { calories in
             self.totalCalories = calories
         }
@@ -200,15 +94,58 @@ struct StatsView: View {
     }
 }
 
+
+// Bar chart view for workout frequency
+struct WorkoutFrequencyChartView: View {
+    let data: [WeeklyWorkoutActivity]
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            Text("每周锻炼频率")
+                .font(.title3).bold()
+            
+            Chart(data) { item in
+                BarMark(
+                    x: .value("Week", item.weekOf, unit: .weekOfYear),
+                    y: .value("Count", item.count)
+                )
+                .foregroundStyle(Color.green.gradient)
+                .cornerRadius(6)
+            }
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .weekOfYear)) { value in
+                    AxisGridLine()
+                    AxisTick()
+                    AxisValueLabel(format: .dateTime.week(.defaultDigits))
+                }
+            }
+            .chartYAxis {
+                AxisMarks(values: .automatic(desiredCount: 5))
+            }
+            .frame(height: 180)
+        }
+        .padding()
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(12)
+    }
+}
+
 struct StatsView_Previews: PreviewProvider {
     static var previews: some View {
-        // This preview will need a model container to work correctly.
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try! ModelContainer(for: HealthMetric.self, configurations: config)
+        let container = try! ModelContainer(for: Workout.self, configurations: config)
         
+        // Add sample workout data
+        for i in 0..<90 {
+            if i % 3 == 0 { // Add a workout every 3 days
+                let date = Calendar.current.date(byAdding: .day, value: -i, to: Date())!
+                let workout = Workout(name: "Sample Workout", durationInMinutes: 30, caloriesBurned: 200, date: date)
+                container.mainContext.insert(workout)
+            }
+        }
+
         return StatsView()
             .modelContainer(container)
-            .environmentObject(ProfileViewModel())
             .environmentObject(HealthKitManager())
     }
 }

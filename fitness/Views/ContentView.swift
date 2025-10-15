@@ -34,16 +34,30 @@ struct ContentView: View {
                     // Tab 2: Plan
                     PlanView(profileViewModel: profileViewModel, modelContext: modelContext)
                         .tabItem {
-                            Image(systemName: "checklist")
+                            Image(systemName: "figure.run")
                         }
                         .tag(1)
 
-                    // Tab 3: Stats
+                    // Tab 3: Body Profile
+                    BodyProfileView()
+                        .tabItem {
+                            Image(systemName: "heart.text.square.fill")
+                        }
+                        .tag(2)
+
+                    // Tab 4: Stats
                     StatsView()
                         .tabItem {
                             Image(systemName: "chart.pie.fill")
                         }
-                        .tag(2)
+                        .tag(3)
+
+                    // Tab 5: Friends
+                    FriendsView()
+                        .tabItem {
+                            Image(systemName: "person.2.fill")
+                        }
+                        .tag(4)
                 }
                 .id(appearanceViewModel.theme) // Add this line
                 .accentColor(appearanceViewModel.accentColor.color)

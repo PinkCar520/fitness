@@ -50,12 +50,6 @@ enum HealthCondition: String, Codable, CaseIterable, Identifiable {
     var id: Self { self }
 }
 
-enum WorkoutFrequency: String, Codable, CaseIterable, Identifiable {
-    case oneToTwo = "每周1-2天"
-    case threeToFour = "每周3-4天"
-    case fiveOrMore = "每周5天或以上"
-    var id: Self { self }
-}
 
 enum Interest: String, Codable, CaseIterable, Identifiable {
     case hiit = "高强度间歇训练 (HIIT)"
@@ -145,7 +139,6 @@ struct UserProfile: Codable, Identifiable, Equatable {
     var height: Double // in cm by default
     var targetWeight: Double // in kg by default
     var targetDate: Date?
-    var workoutFrequency: WorkoutFrequency?
     var weightUnit: WeightUnit
     var heightUnit: HeightUnit
     
@@ -178,7 +171,6 @@ struct UserProfile: Codable, Identifiable, Equatable {
          dateOfBirth: Date = Calendar.current.date(byAdding: .year, value: -25, to: Date())!,
          height: Double = 170.0,
          targetWeight: Double = 60.0,
-         workoutFrequency: WorkoutFrequency? = .threeToFour,
          weightUnit: WeightUnit = .kg,
          heightUnit: HeightUnit = .cm,
          targetDate: Date? = nil,
@@ -206,7 +198,6 @@ struct UserProfile: Codable, Identifiable, Equatable {
         self.dateOfBirth = dateOfBirth
         self.height = height
         self.targetWeight = targetWeight
-        self.workoutFrequency = workoutFrequency
         self.weightUnit = weightUnit
         self.heightUnit = heightUnit
         self.targetDate = targetDate

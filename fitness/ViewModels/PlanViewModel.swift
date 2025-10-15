@@ -36,20 +36,13 @@ class PlanViewModel: ObservableObject {
             return
         }
         
+        // Directly access workouts and meals from DailyTask relationships
         var workouts: [Workout] = []
         var meals: [Meal] = []
         
-        let decoder = JSONDecoder()
-        
         for task in activePlan.dailyTasks {
-            if let workoutData = task.workoutsData,
-               let dailyWorkouts = try? decoder.decode([Workout].self, from: workoutData) {
-                workouts.append(contentsOf: dailyWorkouts)
-            }
-            if let mealsData = task.mealsData,
-               let dailyMeals = try? decoder.decode([Meal].self, from: mealsData) {
-                meals.append(contentsOf: dailyMeals)
-            }
+            workouts.append(contentsOf: task.workouts)
+            meals.append(contentsOf: task.meals)
         }
         _allWorkouts = workouts
         _allMeals = meals
@@ -57,7 +50,7 @@ class PlanViewModel: ObservableObject {
         filterPlansForSelectedDate()
     }
 
-    func generatePlan(goal: FitnessGoal, duration: Int) {
+    func generatePlan(config: PlanConfiguration) {
         archiveOldPlan()
 
         var generatedWorkouts: [Workout] = []
@@ -65,42 +58,74 @@ class PlanViewModel: ObservableObject {
         let startDate = Date()
         let calendar = Calendar.current
 
-        for dayOffset in 0..<duration {
+        // Convert Set<Weekday> to a Set<Int> that matches Calendar's weekday component (Sunday=1, Monday=2, etc.)
+        let trainingWeekdayInts = Set(config.trainingDays.map { weekday -> Int in
+            switch weekday {
+            case .sunday: return 1
+            case .monday: return 2
+            case .tuesday: return 3
+            case .wednesday: return 4
+            case .thursday: return 5
+            case .friday: return 6
+            case .saturday: return 7
+            }
+        })
+
+        for dayOffset in 0..<config.planDuration {
             guard let date = calendar.date(byAdding: .day, value: dayOffset, to: startDate) else { continue }
             let weekday = calendar.component(.weekday, from: date)
 
-            switch goal {
-            case .fatLoss:
-                if weekday == 2 || weekday == 4 || weekday == 6 {
-                    generatedWorkouts.append(Workout(name: "减脂有氧", durationInMinutes: 45, caloriesBurned: 350, date: date))
+            // Schedule workout if the current day is a selected training day
+            if trainingWeekdayInts.contains(weekday) {
+                var workoutName = "综合训练"
+                var baseCalories = 400
+
+                switch config.goal {
+                case .fatLoss:
+                    workoutName = "减脂有氧"
+                    baseCalories = 350
+                case .muscleGain:
+                    workoutName = "力量增肌"
+                    baseCalories = 450
+                case .healthImprovement:
+                    workoutName = "健康综合"
+                    baseCalories = 300
                 }
-            case .muscleGain:
-                if weekday == 2 { generatedWorkouts.append(Workout(name: "胸部 & 三头肌", durationInMinutes: 60, caloriesBurned: 450, date: date)) }
-                if weekday == 3 { generatedWorkouts.append(Workout(name: "背部 & 二头肌", durationInMinutes: 60, caloriesBurned: 450, date: date)) }
-                if weekday == 5 { generatedWorkouts.append(Workout(name: "腿部 & 肩部", durationInMinutes: 70, caloriesBurned: 550, date: date)) }
-                if weekday == 6 { generatedWorkouts.append(Workout(name: "核心 & 全身", durationInMinutes: 50, caloriesBurned: 400, date: date)) }
-            case .healthImprovement:
-                if weekday == 3 || weekday == 5 || weekday == 7 {
-                    generatedWorkouts.append(Workout(name: "全身综合训练", durationInMinutes: 50, caloriesBurned: 400, date: date))
-                }
+
+                // Adjust calories based on duration
+                let finalCalories = Int(Double(baseCalories) * (Double(config.workoutDurationPerSession) / 45.0))
+
+                let workout = Workout(name: workoutName, durationInMinutes: config.workoutDurationPerSession, caloriesBurned: finalCalories, date: date)
+                generatedWorkouts.append(workout)
+                modelContext.insert(workout) // Insert workout into context
             }
-            generatedMeals.append(Meal(name: "健康早餐", calories: 400, date: date, mealType: .breakfast))
-            generatedMeals.append(Meal(name: "均衡午餐", calories: 600, date: date, mealType: .lunch))
-            generatedMeals.append(Meal(name: "清淡晚餐", calories: 500, date: date, mealType: .dinner))
+
+            // Add meals for every day
+            let meal1 = Meal(name: "健康早餐", calories: 400, date: date, mealType: .breakfast)
+            let meal2 = Meal(name: "均衡午餐", calories: 600, date: date, mealType: .lunch)
+            let meal3 = Meal(name: "清淡晚餐", calories: 500, date: date, mealType: .dinner)
+            generatedMeals.append(meal1)
+            generatedMeals.append(meal2)
+            generatedMeals.append(meal3)
+            modelContext.insert(meal1) // Insert meals into context
+            modelContext.insert(meal2)
+            modelContext.insert(meal3)
         }
         
         var dailyTasks: [DailyTask] = []
-        for dayOffset in 0..<duration {
+        for dayOffset in 0..<config.planDuration {
             guard let date = calendar.date(byAdding: .day, value: dayOffset, to: startDate) else { continue }
             let workoutsForDay = generatedWorkouts.filter { calendar.isDate($0.date, inSameDayAs: date) }
             let mealsForDay = generatedMeals.filter { calendar.isDate($0.date, inSameDayAs: date) }
             
             if !workoutsForDay.isEmpty || !mealsForDay.isEmpty {
-                dailyTasks.append(DailyTask(date: date, workouts: workoutsForDay, meals: mealsForDay))
+                let dailyTask = DailyTask(date: date, workouts: workoutsForDay, meals: mealsForDay)
+                dailyTasks.append(dailyTask)
+                modelContext.insert(dailyTask) // Insert dailyTask into context
             }
         }
         
-        let newPlan = Plan(name: "\(duration)天\(goal.rawValue)计划", goal: goal, startDate: startDate, duration: duration, tasks: dailyTasks, status: "active")
+        let newPlan = Plan(name: "\(config.planDuration)天\(config.goal.rawValue)计划", goal: config.goal, startDate: startDate, duration: config.planDuration, tasks: dailyTasks, status: "active")
         
         modelContext.insert(newPlan)
         
@@ -126,4 +151,3 @@ class PlanViewModel: ObservableObject {
         meals = _allMeals.filter { calendar.isDate($0.date, inSameDayAs: selectedDate) }
     }
 }
-

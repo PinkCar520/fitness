@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 enum MealType: String, Codable, CaseIterable, Identifiable {
     case breakfast = "早餐"
@@ -9,10 +10,17 @@ enum MealType: String, Codable, CaseIterable, Identifiable {
     var id: String { self.rawValue }
 }
 
-struct Meal: Identifiable, Codable {
-    let id = UUID()
+@Model
+final class Meal {
     var name: String
     var calories: Int
     var date: Date
     var mealType: MealType
+
+    init(name: String, calories: Int, date: Date, mealType: MealType) {
+        self.name = name
+        self.calories = calories
+        self.date = date
+        self.mealType = mealType
+    }
 }

@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct CalendarView: View {
-    @Binding var selectedDate: Date
+    @Binding var selectedDate: Date?
+    
     @State private var currentWeekStartDate: Date = Date()
 
     private let calendar = Calendar.current
@@ -27,11 +28,12 @@ struct CalendarView: View {
         VStack(spacing: 0) { // Set spacing to 0 for tighter control
             // Top Full Date and Today Button
             HStack {
-                Text(fullDateFormatter.string(from: selectedDate))
+                Text(selectedDate != nil ? fullDateFormatter.string(from: selectedDate!) : "请选择日期")
                     .font(.system(size: 24, weight: .bold)) // Larger, bolder font
                     .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2)) // Dark gray #333
                     .kerning(-0.5) // Tight letter spacing
                 Spacer()
+
                 Button(action: { 
                     selectedDate = Date()
                     currentWeekStartDate = Date()
@@ -44,6 +46,7 @@ struct CalendarView: View {
                         .background(systemBlue.opacity(0.1))
                         .cornerRadius(8)
                 }
+                .padding(.leading, 8)
             }
             .padding(.horizontal)
             .padding(.top, 15)
@@ -83,20 +86,30 @@ struct CalendarView: View {
                             return details
                         }()
 
-                        DayView(date: date, selectedDate: $selectedDate, emeraldGreen: emeraldGreen, energyOrange: energyOrange, systemBlue: systemBlue, isWeekend: calendar.isDateInWeekend(date), workoutDetails: mockWorkoutDetails, isRecordBreaking: calendar.component(.day, from: date) == 15 ? true : false, isConsecutiveWorkout: calendar.component(.day, from: date) == 16 ? true : false)
+                        DayView(date: date, 
+                                selectedDate: $selectedDate, 
+                                emeraldGreen: emeraldGreen, 
+                                energyOrange: energyOrange, 
+                                systemBlue: systemBlue, 
+                                isWeekend: calendar.isDateInWeekend(date), 
+                                workoutDetails: mockWorkoutDetails, 
+                                isRecordBreaking: calendar.component(.day, from: date) == 15 ? true : false, 
+                                isConsecutiveWorkout: calendar.component(.day, from: date) == 16 ? true : false)
                     }
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 15)
         }
         .frame(maxWidth: .infinity)
-        .background(Color.white) // White card background
-        .cornerRadius(20) // rounded-2xl
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        )
         .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.gray.opacity(0.1), lineWidth: 1) // border border-gray-100/50
+                .stroke(Color.gray.opacity(0.1), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2) // shadow-sm
         .gesture(
             DragGesture()
                 .onEnded { gesture in
@@ -126,7 +139,7 @@ struct CalendarView: View {
         if let newWeek = calendar.date(byAdding: .day, value: amount * 7, to: currentWeekStartDate) {
             currentWeekStartDate = newWeek
             // Also update selectedDate to be within the new week if it's outside
-            if !calendar.isDate(selectedDate, equalTo: currentWeekStartDate, toGranularity: .weekOfYear) {
+            if let currentSelectedDate = selectedDate, !calendar.isDate(currentSelectedDate, equalTo: currentWeekStartDate, toGranularity: .weekOfYear) {
                 selectedDate = newWeek // Select the first day of the new week
             }
         }
@@ -220,7 +233,12 @@ struct ProgressSegment: Identifiable {
 
 struct SegmentedProgressRingView: View {
     let segments: [ProgressSegment]
-    let lineWidth: CGFloat = 3
+    let lineWidth: CGFloat
+
+    init(segments: [ProgressSegment], lineWidth: CGFloat = 3) {
+        self.segments = segments
+        self.lineWidth = lineWidth
+    }
 
     var body: some View {
         ZStack {
@@ -239,12 +257,13 @@ struct SegmentedProgressRingView: View {
                     .rotationEffect(Angle(degrees: -90))
             }
         }
-        .frame(width: 20, height: 20)
     }
 }
 
 struct TooltipView: View {
     let segments: [ProgressSegment]
+    private let triangleHeight: CGFloat = 8
+    private let triangleWidth: CGFloat = 16
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -264,46 +283,98 @@ struct TooltipView: View {
             }
         }
         .padding(10)
-        .background(Color(UIColor.systemBackground))
-        .cornerRadius(10)
-        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-        .frame(width: 120)
+        .frame(width: 110)
+        .padding(.bottom, triangleHeight) // Add padding to make space for the triangle
+        .background(
+            TooltipBubble(cornerRadius: 10, triangleHeight: triangleHeight, triangleWidth: triangleWidth)
+                .fill(Color(UIColor.systemBackground))
+                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        )
     }
 
     private func activityName(for color: Color) -> String {
         switch color {
-        case .green: return "餐饮"
-        case .blue: return "喝水"
+        case .green: return "饮食"
+        case .red: return "锻炼"
         case .indigo: return "睡眠"
+        case .purple: return "心理"
         default: return "活动"
         }
     }
 }
 
+struct TooltipBubble: Shape {
+    let cornerRadius: CGFloat
+    let triangleHeight: CGFloat
+    let triangleWidth: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let bodyRect = CGRect(x: 0, y: 0, width: rect.width, height: rect.height - triangleHeight)
+
+        var path = Path()
+        // Start at top-left after corner
+        path.move(to: CGPoint(x: bodyRect.minX + cornerRadius, y: bodyRect.minY))
+        // Top edge
+        path.addLine(to: CGPoint(x: bodyRect.maxX - cornerRadius, y: bodyRect.minY))
+        // Top-right corner
+        path.addArc(center: CGPoint(x: bodyRect.maxX - cornerRadius, y: bodyRect.minY + cornerRadius), radius: cornerRadius, startAngle: Angle(degrees: -90), endAngle: Angle(degrees: 0), clockwise: false)
+        // Right edge
+        path.addLine(to: CGPoint(x: bodyRect.maxX, y: bodyRect.maxY - cornerRadius))
+        // Bottom-right corner
+        path.addArc(center: CGPoint(x: bodyRect.maxX - cornerRadius, y: bodyRect.maxY - cornerRadius), radius: cornerRadius, startAngle: Angle(degrees: 0), endAngle: Angle(degrees: 90), clockwise: false)
+        
+        // Bottom edge until triangle
+        path.addLine(to: CGPoint(x: rect.midX + triangleWidth / 2, y: bodyRect.maxY))
+        // Triangle
+        path.addLine(to: CGPoint(x: rect.midX, y: rect.height)) // The point
+        path.addLine(to: CGPoint(x: rect.midX - triangleWidth / 2, y: bodyRect.maxY))
+
+        // Bottom edge after triangle
+        path.addLine(to: CGPoint(x: bodyRect.minX + cornerRadius, y: bodyRect.maxY))
+        // Bottom-left corner
+        path.addArc(center: CGPoint(x: bodyRect.minX + cornerRadius, y: bodyRect.maxY - cornerRadius), radius: cornerRadius, startAngle: Angle(degrees: 90), endAngle: Angle(degrees: 180), clockwise: false)
+        // Left edge
+        path.addLine(to: CGPoint(x: bodyRect.minX, y: bodyRect.minY + cornerRadius))
+        // Top-left corner
+        path.addArc(center: CGPoint(x: bodyRect.minX + cornerRadius, y: bodyRect.minY + cornerRadius), radius: cornerRadius, startAngle: Angle(degrees: 180), endAngle: Angle(degrees: 270), clockwise: false)
+        
+        path.closeSubpath()
+        return path
+    }
+}
+
 struct DayView: View {
     let date: Date
-    @Binding var selectedDate: Date
+    @Binding var selectedDate: Date?
     let emeraldGreen: Color
     let energyOrange: Color
     let systemBlue: Color
     let isWeekend: Bool
     var workoutDetails: [WorkoutDetail] = []
     let isRecordBreaking: Bool
-    let isConsecutiveWorkout: Bool // New parameter
-    
-    @State private var showTooltip = false
+    let isConsecutiveWorkout: Bool
 
     private let calendar = Calendar.current
+
+    private var isSelected: Bool {
+        guard let selected = selectedDate else { return false }
+        return calendar.isDate(date, inSameDayAs: selected)
+    }
+
+    private var isTooltipVisible: Bool {
+        isSelected
+    }
 
     var body: some View {
         let segments = mockSegments(for: date)
 
-        VStack(spacing: 4) {
+        ZStack {
+            // Date number and selection background
             Text(String(calendar.component(.day, from: date)))
-                .font(.system(size: 17, weight: .bold))
+                .font(.system(size: 15, weight: .bold)) // Smaller font
                 .kerning(-0.2)
                 .foregroundColor(isSelected ? .white : (isWeekend ? Color.gray.opacity(0.6) : Color(red: 0.2, green: 0.2, blue: 0.2)))
-                .frame(width: 48, height: 48)
+                .frame(width: 32, height: 32) // Smaller number background
                 .background(
                     ZStack {
                         if isSelected {
@@ -320,67 +391,30 @@ struct DayView: View {
                 .clipShape(Circle())
                 .shadow(color: isSelected ? systemBlue.opacity(0.3) : .clear, radius: isSelected ? 5 : 0, x: 0, y: isSelected ? 3 : 0)
 
-            // Status Icons
-            HStack(spacing: 4) {
-                if workoutDetails.contains(where: { $0.intensity == .high }) {
-                    Image(systemName: "bolt.fill")
-                        .font(.system(size: 10))
-                        .foregroundColor(.orange)
-                }
+            // Progress Ring surrounding the date
+            SegmentedProgressRingView(segments: segments, lineWidth: 2) // Thinner ring
+                .frame(width: 38, height: 38) // Smaller ring
 
-                if isRecordBreaking {
-                    Image(systemName: "trophy.fill")
-                        .font(.system(size: 10))
-                        .foregroundColor(.yellow)
-                }
-
-                if isConsecutiveWorkout {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 10))
-                        .foregroundColor(.red)
-                }
-            }
-            .frame(height: 10)
-
-            // Main Activity Type Icon & Ring
-            if workoutDetails.contains(where: { $0.type == .workout }) {
-                Image(systemName: ActivityType.workout.icon)
-                    .font(.system(size: 12))
-                    .foregroundColor(isFutureDate ? ActivityType.workout.color.opacity(0.4) : ActivityType.workout.color)
-            } else {
-                // Placeholder to keep spacing consistent for non-workout days
-                Spacer().frame(height: 12)
-            }
-            
-            SegmentedProgressRingView(segments: segments)
         }
+        .frame(width: 40, height: 40) // Smaller overall frame
         .contentShape(Rectangle()) // Make the whole area tappable
         .onTapGesture {
-            selectedDate = date
-        }
-        .onLongPressGesture(minimumDuration: 0.5) {
-            showTooltip = true
+            if self.isSelected {
+                self.selectedDate = nil
+            } else {
+                self.selectedDate = date
+            }
         }
         .overlay(
             ZStack {
-                if showTooltip {
-                    // Dismiss on tap outside
-                    Color.black.opacity(0.001)
-                        .onTapGesture {
-                            showTooltip = false
-                        }
-
+                if isTooltipVisible {
                     TooltipView(segments: segments)
-                        .offset(y: -95)
+                        .offset(y: -85) // Adjust offset for smaller size
                         .transition(.opacity.combined(with: .scale))
                 }
             }
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: showTooltip)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isTooltipVisible)
         )
-    }
-
-    private var isSelected: Bool {
-        calendar.isDate(date, inSameDayAs: selectedDate)
     }
 
     private var isFutureDate: Bool {
@@ -390,15 +424,17 @@ struct DayView: View {
     private func mockSegments(for date: Date) -> [ProgressSegment] {
         let day = Double(calendar.component(.day, from: date))
         
-        // Create progress that cycles through the month to demonstrate 0-100% capability
-        let mealProgress = (day.truncatingRemainder(dividingBy: 5)) / 8.0 // Max 0.5
-        let waterProgress = (day.truncatingRemainder(dividingBy: 4)) / 8.0 // Max 0.375
-        let sleepProgress = (day.truncatingRemainder(dividingBy: 6)) / 10.0 // Max 0.5
-        
+        // Create progress that cycles through the month, reflecting new proportions
+        let mealProgress = (day.truncatingRemainder(dividingBy: 5)) / 16.66 // Max ~0.3 (30%)
+        let workoutProgress = (day.truncatingRemainder(dividingBy: 7)) / 23.33 // Max ~0.3 (30%)
+        let sleepProgress = (day.truncatingRemainder(dividingBy: 6)) / 30.0  // Max ~0.2 (20%)
+        let meditationProgress = (day.truncatingRemainder(dividingBy: 4)) / 20.0 // Max ~0.2 (20%)
+
         return [
             ProgressSegment(progress: mealProgress, color: .green),
-            ProgressSegment(progress: waterProgress, color: .blue),
-            ProgressSegment(progress: sleepProgress, color: .indigo)
+            ProgressSegment(progress: workoutProgress, color: .red),
+            ProgressSegment(progress: sleepProgress, color: .indigo),
+            ProgressSegment(progress: meditationProgress, color: .purple)
         ]
     }
 }
@@ -410,7 +446,7 @@ extension Calendar {
 }
 
 struct CalendarView_Previews: PreviewProvider {
-    @State static var selectedDate = Date()
+    @State static var selectedDate: Date? = Date()
     static var previews: some View {
         let calendar = Calendar.current // Local calendar instance
         CalendarView(selectedDate: $selectedDate)

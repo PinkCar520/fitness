@@ -3,7 +3,7 @@ import SwiftData
 
 struct PlanView: View {
         @StateObject private var planViewModel: PlanViewModel
-        @State private var selectedDate: Date = Date()
+        @State private var selectedDate: Date? = Date()
         @State private var showPlanSetup = false
         @State private var showPlanHistory = false
     
@@ -16,9 +16,8 @@ struct PlanView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
                         CalendarView(selectedDate: $selectedDate)
-                            .padding(.horizontal)
                             .onChange(of: selectedDate) { oldValue, newValue in
-                                planViewModel.selectedDate = newValue
+                                planViewModel.selectedDate = newValue ?? Date()
                             }
     
                         workoutPlanSection
@@ -26,22 +25,29 @@ struct PlanView: View {
                     }
                     .padding()
                 }
-                .navigationTitle("计划")
+//                .navigationTitle("计划")
                 .toolbar { 
                     ToolbarItemGroup(placement: .navigationBarTrailing) {
-                        Button("历史计划") {
+                        Button {
                             showPlanHistory = true
+                        } label: {
+                            Image(systemName: "clock.arrow.circlepath")
                         }
                         
-                        Button("制定新计划") {
+                        Button {
                             showPlanSetup = true
+                        } label: {
+                            Image(systemName: "plus")
                         }
                     }
                 }
+//                .navigationTitle("计划")
+
             .sheet(isPresented: $showPlanSetup) {
-                PlanSetupView { goal, duration in
-                    planViewModel.generatePlan(goal: goal, duration: duration)
+                PlanSetupView { config in
+                    planViewModel.generatePlan(config: config)
                 }
+                .presentationDetents([.fraction(0.85), .large])
             }
             .sheet(isPresented: $showPlanHistory) { // Present the sheet
                 PlanHistoryView()

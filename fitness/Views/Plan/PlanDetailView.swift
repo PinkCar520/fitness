@@ -38,28 +38,24 @@ struct PlanDetailView: View {
                             .background(Color.accentColor.opacity(0.2))
                             .cornerRadius(8)
                         
-                        if let workouts = try? JSONDecoder().decode([Workout].self, from: dailyTask.workoutsData ?? Data()) {
-                            ForEach(workouts) { workout in
-                                HStack {
-                                    Image(systemName: "figure.run")
-                                    Text(workout.name)
-                                    Spacer()
-                                    Text("\(workout.durationInMinutes) 分钟")
-                                }
-                                .font(.subheadline)
+                        ForEach(dailyTask.workouts) { workout in
+                            HStack {
+                                Image(systemName: "figure.run")
+                                Text(workout.name)
+                                Spacer()
+                                Text("\(workout.durationInMinutes) 分钟")
                             }
+                            .font(.subheadline)
                         }
                         
-                        if let meals = try? JSONDecoder().decode([Meal].self, from: dailyTask.mealsData ?? Data()) {
-                            ForEach(meals) { meal in
-                                HStack {
-                                    Image(systemName: "fork.knife")
-                                    Text(meal.name)
-                                    Spacer()
-                                    Text("\(meal.calories) 卡路里")
-                                }
-                                .font(.subheadline)
+                        ForEach(dailyTask.meals) { meal in
+                            HStack {
+                                Image(systemName: "fork.knife")
+                                Text(meal.name)
+                                Spacer()
+                                Text("\(meal.calories) 卡路里")
                             }
+                            .font(.subheadline)
                         }
                     }
                     .padding()

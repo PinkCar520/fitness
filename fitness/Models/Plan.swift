@@ -32,19 +32,12 @@ final class Plan {
 final class DailyTask {
     var date: Date
     
-    // Store full Workout/Meal objects as JSON data
-    var workoutsData: Data?
-    var mealsData: Data? // Store an array of meals for the day
+    @Relationship(deleteRule: .cascade) var workouts: [Workout] = []
+    @Relationship(deleteRule: .cascade) var meals: [Meal] = []
     
     init(date: Date, workouts: [Workout] = [], meals: [Meal] = []) {
         self.date = date
-        
-        if !workouts.isEmpty {
-            self.workoutsData = try? JSONEncoder().encode(workouts)
-        }
-        
-        if !meals.isEmpty {
-            self.mealsData = try? JSONEncoder().encode(meals)
-        }
+        self.workouts = workouts
+        self.meals = meals
     }
 }

@@ -21,8 +21,6 @@ struct ReportView: View {
                 .padding(.bottom)
 
             coreMetricsGrid
-            
-            ChartSection(selectedTimeFrame: selectedTimeFrame)
 
             workoutAnalysisSection
             

@@ -8,7 +8,7 @@ struct SummaryDashboardView: View {
 
     // State
     @Binding var showInputSheet: Bool
-    @State private var showProfileSheet = false
+    @State private var showSettingsSheet = false
     @State private var showEditSheet = false // For the new edit sheet
     @State private var overviewImage: UIImage?
     @State private var showShareSheet = false
@@ -135,7 +135,7 @@ struct SummaryDashboardView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showProfileSheet = true }) {
+                    Button(action: { showSettingsSheet = true }) {
                         if let avatarPath = profileViewModel.userProfile.avatarPath, !avatarPath.isEmpty {
                             Image(uiImage: profileViewModel.displayAvatar)
                                 .resizable()
@@ -149,8 +149,8 @@ struct SummaryDashboardView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showProfileSheet) {
-                ProfilePopupView()
+            .sheet(isPresented: $showSettingsSheet) {
+                SettingsView()
             }
             .sheet(isPresented: $showShareSheet) {
                 if let image = overviewImage {
