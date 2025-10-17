@@ -10,7 +10,9 @@ class PlanViewModel: ObservableObject {
     }
     @Published var workouts: [Workout] = []
     @Published var meals: [Meal] = []
+    @Published var currentDailyTask: DailyTask? = nil
 
+    private var activePlan: Plan?
     private var _allWorkouts: [Workout] = []
     private var _allMeals: [Meal] = []
     
@@ -21,18 +23,24 @@ class PlanViewModel: ObservableObject {
         self.profileViewModel = profileViewModel
         self.modelContext = modelContext
         
+        refreshData()
+    }
+
+    private func refreshData() {
         loadActivePlan()
+        filterPlansForSelectedDate()
     }
 
     private func loadActivePlan() {
         let predicate = #Predicate<Plan> { $0.status == "active" }
         let descriptor = FetchDescriptor(predicate: predicate, sortBy: [SortDescriptor(\.startDate, order: .reverse)])
         
-        guard let activePlan = try? modelContext.fetch(descriptor).first else {
+        self.activePlan = try? modelContext.fetch(descriptor).first
+        
+        guard let activePlan = self.activePlan else {
             // No active plan, clear current data
             self._allWorkouts = []
             self._allMeals = []
-            self.filterPlansForSelectedDate()
             return
         }
         
@@ -95,7 +103,17 @@ class PlanViewModel: ObservableObject {
                 // Adjust calories based on duration
                 let finalCalories = Int(Double(baseCalories) * (Double(config.workoutDurationPerSession) / 45.0))
 
-                let workout = Workout(name: workoutName, durationInMinutes: config.workoutDurationPerSession, caloriesBurned: finalCalories, date: date)
+                let workoutType: WorkoutType
+                switch config.goal {
+                case .fatLoss:
+                    workoutType = .cardio
+                case .muscleGain:
+                    workoutType = .strength
+                case .healthImprovement:
+                    workoutType = .other
+                }
+
+                let workout = Workout(name: workoutName, durationInMinutes: config.workoutDurationPerSession, caloriesBurned: finalCalories, date: date, type: workoutType)
                 generatedWorkouts.append(workout)
                 modelContext.insert(workout) // Insert workout into context
             }
@@ -129,9 +147,13 @@ class PlanViewModel: ObservableObject {
         
         modelContext.insert(newPlan)
         
-        _allWorkouts = generatedWorkouts
-        _allMeals = generatedMeals
-        filterPlansForSelectedDate()
+        do {
+            try modelContext.save()
+        } catch {
+            print("Failed to save new plan: \(error.localizedDescription)")
+        }
+        
+        refreshData()
     }
 
     private func archiveOldPlan() {
@@ -149,5 +171,11 @@ class PlanViewModel: ObservableObject {
         let calendar = Calendar.current
         workouts = _allWorkouts.filter { calendar.isDate($0.date, inSameDayAs: selectedDate) }
         meals = _allMeals.filter { calendar.isDate($0.date, inSameDayAs: selectedDate) }
+        
+        if let activePlan = activePlan {
+            self.currentDailyTask = activePlan.dailyTasks.first { calendar.isDate($0.date, inSameDayAs: selectedDate) }
+        } else {
+            self.currentDailyTask = nil
+        }
     }
 }

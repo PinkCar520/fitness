@@ -139,7 +139,7 @@ struct StatsView_Previews: PreviewProvider {
         for i in 0..<90 {
             if i % 3 == 0 { // Add a workout every 3 days
                 let date = Calendar.current.date(byAdding: .day, value: -i, to: Date())!
-                let workout = Workout(name: "Sample Workout", durationInMinutes: 30, caloriesBurned: 200, date: date)
+                let workout = Workout(name: "Sample Workout", durationInMinutes: 30, caloriesBurned: 200, date: date, type: .other)
                 container.mainContext.insert(workout)
             }
         }

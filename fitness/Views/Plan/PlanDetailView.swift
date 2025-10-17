@@ -77,11 +77,11 @@ struct PlanDetailView_Previews: PreviewProvider {
         
         let mockPlan = Plan(name: "30天减脂计划", goal: .fatLoss, startDate: Date(), duration: 30, tasks: [], status: "active")
         
-        let workout1 = Workout(name: "胸部训练", durationInMinutes: 60, caloriesBurned: 400, date: Date())
+        let workout1 = Workout(name: "胸部训练", durationInMinutes: 60, caloriesBurned: 400, date: Date(), type: .strength)
         let meal1 = Meal(name: "鸡胸肉沙拉", calories: 350, date: Date(), mealType: .lunch) // Use .lunch
         let dailyTask1 = DailyTask(date: Date(), workouts: [workout1], meals: [meal1])
         
-        let workout2 = Workout(name: "腿部训练", durationInMinutes: 75, caloriesBurned: 500, date: Calendar.current.date(byAdding: .day, value: 1, to: Date())!) // Use .day
+        let workout2 = Workout(name: "腿部训练", durationInMinutes: 75, caloriesBurned: 500, date: Calendar.current.date(byAdding: .day, value: 1, to: Date())!, type: .strength)
         let meal2 = Meal(name: "三文鱼蔬菜", calories: 450, date: Calendar.current.date(byAdding: .day, value: 1, to: Date())!, mealType: .dinner) // Use .dinner
         let dailyTask2 = DailyTask(date: Calendar.current.date(byAdding: .day, value: 1, to: Date())!, workouts: [workout2], meals: [meal2])
         

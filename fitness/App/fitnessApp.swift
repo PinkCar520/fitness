@@ -17,7 +17,7 @@ struct fitnessApp: App {
         // 1. Create the ModelContainer first, as other services may depend on it.
         let container: ModelContainer
         do {
-            let schema = Schema([HealthMetric.self])
+            let schema = Schema([Plan.self, DailyTask.self, Workout.self, Meal.self, HealthMetric.self])
             let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
             container = try ModelContainer(for: schema, configurations: [modelConfiguration])
         } catch {
