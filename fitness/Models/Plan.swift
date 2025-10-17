@@ -29,13 +29,15 @@ final class Plan {
 }
 
 @Model
-final class DailyTask {
+final class DailyTask: Identifiable {
+    @Attribute(.unique) var id: UUID
     var date: Date
     
     @Relationship(deleteRule: .cascade) var workouts: [Workout] = []
     @Relationship(deleteRule: .cascade) var meals: [Meal] = []
     
-    init(date: Date, workouts: [Workout] = [], meals: [Meal] = []) {
+    init(id: UUID = UUID(), date: Date, workouts: [Workout] = [], meals: [Meal] = []) {
+        self.id = id
         self.date = date
         self.workouts = workouts
         self.meals = meals

@@ -6,7 +6,6 @@ struct PlanView: View {
         @State private var selectedDate: Date? = Date()
             @State private var showPlanSetup = false
             @State private var showPlanHistory = false
-            @State private var showLiveWorkout = false
             @State private var selectedWorkout: Workout? = nil
     @State private var selectedTask: DailyTask? = nil
     @Environment(\.modelContext) private var modelContext
@@ -55,13 +54,8 @@ struct PlanView: View {
             .sheet(isPresented: $showPlanHistory) { // Present the sheet
                 PlanHistoryView()
             }
-            .fullScreenCover(isPresented: $showLiveWorkout) {
-                if let task = selectedTask {
-                    LiveWorkoutView(dailyTask: task, modelContext: modelContext)
-                } else {
-                    // Optional: A fallback view or just an empty view if this case should not happen
-                    Text("错误：没有选择锻炼任务。")
-                }
+            .fullScreenCover(item: $selectedTask) { task in
+                LiveWorkoutView(dailyTask: task, modelContext: modelContext)
             }
             }
         }
@@ -72,7 +66,6 @@ struct PlanView: View {
                 Spacer()
                 Button("开始今日训练") {
                     self.selectedTask = planViewModel.currentDailyTask
-                    self.showLiveWorkout = true
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(planViewModel.currentDailyTask == nil || planViewModel.workouts.isEmpty)

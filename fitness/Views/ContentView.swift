@@ -59,7 +59,7 @@ struct ContentView: View {
                         }
                         .tag(4)
                 }
-                .id(appearanceViewModel.theme) // Add this line
+
                 .accentColor(appearanceViewModel.accentColor.color)
                 .onReceive(NotificationCenter.default.publisher(for: .showInputSheet)) { _ in
                     // Show the input sheet when the notification is received from the widget
