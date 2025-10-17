@@ -113,7 +113,17 @@ class PlanViewModel: ObservableObject {
                     workoutType = .other
                 }
 
-                let workout = Workout(name: workoutName, durationInMinutes: config.workoutDurationPerSession, caloriesBurned: finalCalories, date: date, type: workoutType)
+                var workoutSets: [WorkoutSet] = []
+                if workoutType == .strength {
+                    workoutSets = [
+                        WorkoutSet(reps: 12, weight: 0, isCompleted: false),
+                        WorkoutSet(reps: 12, weight: 0, isCompleted: false),
+                        WorkoutSet(reps: 10, weight: 0, isCompleted: false),
+                        WorkoutSet(reps: 8, weight: 0, isCompleted: false)
+                    ]
+                }
+
+                let workout = Workout(name: workoutName, durationInMinutes: config.workoutDurationPerSession, caloriesBurned: finalCalories, date: date, type: workoutType, sets: workoutSets)
                 generatedWorkouts.append(workout)
                 modelContext.insert(workout) // Insert workout into context
             }
