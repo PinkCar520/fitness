@@ -63,9 +63,19 @@ struct LiveWorkoutView: View {
                         .padding()
                         Spacer()
                     } else {
-                        // Placeholder for Other workout types
-                        Spacer()
-                        Text("其他类型暂未实现")
+                        // UI for Other workout types
+                        VStack(alignment: .leading) {
+                            Text("锻炼笔记:")
+                                .font(.headline)
+                                .padding(.horizontal)
+                            TextEditor(text: $sessionManager.currentNotes)
+                                .frame(height: 150)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.gray, lineWidth: 1)
+                                )
+                                .padding(.horizontal)
+                        }
                         Spacer()
                     }
                     

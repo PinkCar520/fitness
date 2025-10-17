@@ -6,6 +6,7 @@ struct ExerciseProgress {
     var sets: [WorkoutSet]?
     var distance: Double?
     var duration: Double?
+    var notes: String?
 }
 
 @MainActor
@@ -32,6 +33,7 @@ class WorkoutSessionManager: ObservableObject {
     @Published var actualSets: [WorkoutSet] = []
     @Published var currentDistance: Double = 0.0
     @Published var currentDuration: Double = 0.0
+    @Published var currentNotes: String = ""
     
     private var sessionProgress: [Int: ExerciseProgress] = [:]    
     private var modelContext: ModelContext
@@ -71,6 +73,7 @@ class WorkoutSessionManager: ObservableObject {
         } else {
             self.actualSets = []
         }
+        self.currentNotes = "" // Reset notes for the new exercise
     }
     
     func endWorkout() -> [Workout] {
@@ -81,7 +84,7 @@ class WorkoutSessionManager: ObservableObject {
         var completedWorkouts: [Workout] = []
         
         // Save the final state of the current exercise
-        let finalProgress = ExerciseProgress(sets: actualSets, distance: currentDistance, duration: currentDuration)
+        let finalProgress = ExerciseProgress(sets: actualSets, distance: currentDistance, duration: currentDuration, notes: currentNotes)
         sessionProgress[currentExerciseIndex] = finalProgress
         
         // Iterate over all the progress and save each workout
@@ -97,7 +100,8 @@ class WorkoutSessionManager: ObservableObject {
                 type: originalWorkout.type,
                 distance: progress.distance,
                 duration: progress.duration,
-                sets: progress.sets
+                sets: progress.sets,
+                notes: progress.notes
             )
             modelContext.insert(newWorkout)
             completedWorkouts.append(newWorkout)
@@ -115,7 +119,7 @@ class WorkoutSessionManager: ObservableObject {
     
     func nextExercise() {
         // Save the progress of the current exercise before moving to the next one
-        let progress = ExerciseProgress(sets: actualSets, distance: currentDistance, duration: currentDuration)
+        let progress = ExerciseProgress(sets: actualSets, distance: currentDistance, duration: currentDuration, notes: currentNotes)
         sessionProgress[currentExerciseIndex] = progress
         
         if currentExerciseIndex < dailyTask.workouts.count - 1 {

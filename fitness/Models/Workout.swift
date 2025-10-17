@@ -31,6 +31,7 @@ final class Workout {
     var distance: Double? // For Cardio
     var duration: Double? // For Cardio (more precise than durationInMinutes)
     var sets: [WorkoutSet]? // For Strength
+    var notes: String? // For Other/General
 
     // Updated initializer
     init(name: String,
@@ -40,7 +41,8 @@ final class Workout {
          type: WorkoutType,
          distance: Double? = nil,
          duration: Double? = nil,
-         sets: [WorkoutSet]? = nil) {
+         sets: [WorkoutSet]? = nil,
+         notes: String? = nil) {
         self.name = name
         self.durationInMinutes = durationInMinutes
         self.caloriesBurned = caloriesBurned
@@ -49,5 +51,6 @@ final class Workout {
         self.distance = distance
         self.duration = duration
         self.sets = sets
+        self.notes = notes
     }
 }
