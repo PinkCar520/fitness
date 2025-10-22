@@ -1,5 +1,21 @@
 import SwiftUI
 
+// MARK: - Generic Haptic Feedback Helper
+
+struct Haptics {
+    static func simpleTap() {
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+    }
+    
+    static func simpleSuccess() {
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+    }
+}
+
+// MARK: - Value-change based Haptics
+
 struct HapticOnChangeModifier<V: Equatable>: ViewModifier {
     let value: V
     @State private var isFirstChange = true

@@ -82,6 +82,7 @@ struct LiveWorkoutView: View {
                     
                     // Footer: Next Exercise Button
                     Button(action: { 
+                        Haptics.simpleTap()
                         sessionManager.nextExercise()
                     }) {
                         Text(sessionManager.currentExerciseIndex < sessionManager.dailyTask.workouts.count - 1 ? "下一个动作" : "完成训练")

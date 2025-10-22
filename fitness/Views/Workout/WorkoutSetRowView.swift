@@ -31,7 +31,10 @@ struct WorkoutSetRowView: View {
                     .multilineTextAlignment(.center)
             }
 
-            Button(action: onToggleCompletion) {
+            Button(action: {
+                Haptics.simpleSuccess()
+                onToggleCompletion()
+            }) {
                 Image(systemName: (set.isCompleted ?? false) ? "checkmark.circle.fill" : "circle")
                     .font(.title2)
                     .foregroundColor((set.isCompleted ?? false) ? .green : .gray)

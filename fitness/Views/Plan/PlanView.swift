@@ -65,6 +65,7 @@ struct PlanView: View {
                 Text("今日锻炼").font(.title2).bold()
                 Spacer()
                 Button("开始今日训练") {
+                    Haptics.simpleTap()
                     self.selectedTask = planViewModel.currentDailyTask
                 }
                 .buttonStyle(.borderedProminent)
