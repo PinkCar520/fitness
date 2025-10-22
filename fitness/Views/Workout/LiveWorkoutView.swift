@@ -6,6 +6,7 @@ struct LiveWorkoutView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showSummary: Bool = false
     @State private var completedWorkouts: [Workout] = []
+    @State private var showEndWorkoutAlert: Bool = false
     
     init(dailyTask: DailyTask, modelContext: ModelContext) {
         _sessionManager = StateObject(wrappedValue: WorkoutSessionManager(dailyTask: dailyTask, modelContext: modelContext))
@@ -103,11 +104,19 @@ struct LiveWorkoutView: View {
             .toolbar { 
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("结束") {
-                        completedWorkouts = sessionManager.endWorkout()
-                        showSummary = true
+                        showEndWorkoutAlert = true
                     }
                     .foregroundColor(.red)
                 }
+            }
+            .alert("结束训练?", isPresented: $showEndWorkoutAlert) {
+                Button("确认结束", role: .destructive) {
+                    completedWorkouts = sessionManager.endWorkout()
+                    showSummary = true
+                }
+                Button("取消", role: .cancel) { }
+            } message: {
+                Text("您确定要结束当前的训练吗？所有进度将被保存。")
             }
             .sheet(isPresented: $showSummary) {
                 WorkoutSummaryView(completedWorkouts: completedWorkouts)
