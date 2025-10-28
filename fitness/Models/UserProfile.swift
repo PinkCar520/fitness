@@ -60,13 +60,14 @@ enum Interest: String, Codable, CaseIterable, Identifiable {
     var id: Self { self }
 }
 
-enum Equipment: String, Codable, CaseIterable, Identifiable {
-    case yogaMat = "瑜伽垫"
-    case dumbbells = "哑铃"
-    case resistanceBands = "弹力带"
-    case treadmill = "跑步机/单车"
-    var id: Self { self }
-}
+// Removed old Equipment enum
+// enum Equipment: String, Codable, CaseIterable, Identifiable {
+//     case yogaMat = "瑜伽垫"
+//     case dumbbells = "哑铃"
+//     case resistanceBands = "弹力带"
+//     case treadmill = "跑步机/单车"
+//     var id: Self { self }
+// }
 
 enum Motivator: String, Codable, CaseIterable, Identifiable {
     case appearance = "看到身体外形的变化"
@@ -153,7 +154,7 @@ struct UserProfile: Codable, Identifiable, Equatable {
     var workoutLocation: WorkoutLocation?
     var healthConditions: [HealthCondition]?
     var interests: [Interest]?
-    var equipment: [Equipment]?
+    var equipment: [EquipmentType]? // Changed to EquipmentType
     var motivators: [Motivator]?
     var challenges: [Challenge]?
     var dietaryHabits: [DietaryHabit]?
@@ -182,7 +183,7 @@ struct UserProfile: Codable, Identifiable, Equatable {
          workoutLocation: WorkoutLocation? = nil,
          healthConditions: [HealthCondition]? = nil,
          interests: [Interest]? = nil,
-         equipment: [Equipment]? = nil,
+         equipment: [EquipmentType]? = nil, // Changed to EquipmentType
          motivators: [Motivator]? = nil,
          challenges: [Challenge]? = nil,
          dietaryHabits: [DietaryHabit]? = nil,

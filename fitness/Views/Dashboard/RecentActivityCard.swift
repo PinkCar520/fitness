@@ -98,18 +98,3 @@ struct RecentActivityCard: View {
         .animation(.easeInOut, value: distanceValue)
     }
 }
-
-struct RecentActivityCard_Previews: PreviewProvider {
-    static var previews: some View {
-        let mockWorkout = HKWorkout(
-            activityType: .running,
-            start: Calendar.current.date(byAdding: .hour, value: -2, to: Date())!,
-            end: Date(),
-            duration: 7200, // 2 hours
-            totalEnergyBurned: HKQuantity(unit: .kilocalorie(), doubleValue: 800),
-            totalDistance: HKQuantity(unit: .meter(), doubleValue: 15000),
-            metadata: nil
-        )
-        RecentActivityCard(mostRecentWorkout: mockWorkout)
-    }
-}

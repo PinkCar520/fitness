@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CalendarView: View {
     @Binding var selectedDate: Date?
+    let completedDates: Set<Date>
     
     @State private var currentWeekStartDate: Date = Date()
 
@@ -86,6 +87,8 @@ struct CalendarView: View {
                             return details
                         }()
 
+                        let isCompleted = completedDates.contains { calendar.isDate($0, inSameDayAs: date) }
+
                         DayView(date: date, 
                                 selectedDate: $selectedDate, 
                                 emeraldGreen: emeraldGreen, 
@@ -94,7 +97,8 @@ struct CalendarView: View {
                                 isWeekend: calendar.isDateInWeekend(date), 
                                 workoutDetails: mockWorkoutDetails, 
                                 isRecordBreaking: calendar.component(.day, from: date) == 15 ? true : false, 
-                                isConsecutiveWorkout: calendar.component(.day, from: date) == 16 ? true : false)
+                                isConsecutiveWorkout: calendar.component(.day, from: date) == 16 ? true : false,
+                                isCompleted: isCompleted)
                     }
                 }
                 .padding(.horizontal)
@@ -353,6 +357,9 @@ struct DayView: View {
     var workoutDetails: [WorkoutDetail] = []
     let isRecordBreaking: Bool
     let isConsecutiveWorkout: Bool
+    let isCompleted: Bool
+
+    @State private var showTooltip = false // New state for tooltip visibility
 
     private let calendar = Calendar.current
 
@@ -361,20 +368,16 @@ struct DayView: View {
         return calendar.isDate(date, inSameDayAs: selected)
     }
 
-    private var isTooltipVisible: Bool {
-        isSelected
-    }
-
     var body: some View {
         let segments = mockSegments(for: date)
 
         ZStack {
             // Date number and selection background
             Text(String(calendar.component(.day, from: date)))
-                .font(.system(size: 15, weight: .bold)) // Smaller font
+                .font(.system(size: 15, weight: .bold))
                 .kerning(-0.2)
                 .foregroundColor(isSelected ? .white : (isWeekend ? Color.gray.opacity(0.6) : Color(red: 0.2, green: 0.2, blue: 0.2)))
-                .frame(width: 32, height: 32) // Smaller number background
+                .frame(width: 32, height: 32)
                 .background(
                     ZStack {
                         if isSelected {
@@ -392,29 +395,45 @@ struct DayView: View {
                 .shadow(color: isSelected ? systemBlue.opacity(0.3) : .clear, radius: isSelected ? 5 : 0, x: 0, y: isSelected ? 3 : 0)
 
             // Progress Ring surrounding the date
-            SegmentedProgressRingView(segments: segments, lineWidth: 2) // Thinner ring
-                .frame(width: 38, height: 38) // Smaller ring
+            SegmentedProgressRingView(segments: segments, lineWidth: 2)
+                .frame(width: 38, height: 38)
 
-        }
-        .frame(width: 40, height: 40) // Smaller overall frame
-        .contentShape(Rectangle()) // Make the whole area tappable
-        .onTapGesture {
-            if self.isSelected {
-                self.selectedDate = nil
-            } else {
-                self.selectedDate = date
+            // Completion Checkmark
+            if isCompleted {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                    .font(.system(size: 12))
+                    .frame(width: 12, height: 12)
+                    .background(Circle().fill(Color.white))
+                    .offset(x: 14, y: -14)
             }
+        }
+        .frame(width: 40, height: 40)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            self.selectedDate = date
         }
         .overlay(
             ZStack {
-                if isTooltipVisible {
+                if showTooltip {
                     TooltipView(segments: segments)
-                        .offset(y: -85) // Adjust offset for smaller size
+                        .offset(y: -85)
                         .transition(.opacity.combined(with: .scale))
                 }
             }
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isTooltipVisible)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: showTooltip)
         )
+        .onChange(of: isSelected) { _, isNowSelected in
+            if isNowSelected {
+                showTooltip = true
+                Task {
+                    try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+                    showTooltip = false
+                }
+            } else {
+                showTooltip = false
+            }
+        }
     }
 
     private var isFutureDate: Bool {
@@ -448,8 +467,14 @@ extension Calendar {
 struct CalendarView_Previews: PreviewProvider {
     @State static var selectedDate: Date? = Date()
     static var previews: some View {
-        let calendar = Calendar.current // Local calendar instance
-        CalendarView(selectedDate: $selectedDate)
+        // Create a sample set of completed dates for preview
+        let calendar = Calendar.current
+        let today = Date()
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: today)!
+        let twoDaysAgo = calendar.date(byAdding: .day, value: -2, to: today)!
+        let completedDates: Set<Date> = [yesterday, twoDaysAgo]
+
+        CalendarView(selectedDate: $selectedDate, completedDates: completedDates)
             .padding()
             .previewLayout(.sizeThatFits)
     }

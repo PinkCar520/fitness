@@ -8,8 +8,8 @@ struct ContentView: View {
     @EnvironmentObject var appearanceViewModel: AppearanceViewModel
     @EnvironmentObject var profileViewModel: ProfileViewModel
     @EnvironmentObject var achievementManager: AchievementManager
+    @EnvironmentObject var appState: AppState
     
-    @State private var selectedIndex = 0 // Default to the first tab
     @State private var showInputSheet = false
     @State private var showOnboarding: Bool
 
@@ -23,7 +23,10 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             if !showOnboarding {
-                TabView(selection: $selectedIndex) {
+                TabView(selection: Binding(
+                    get: { appState.selectedTab },
+                    set: { appState.selectedTab = $0 }
+                )) {
                     // Tab 1: Overview
                     SummaryDashboardView(showInputSheet: $showInputSheet, healthKitManager: healthKitManager, weightManager: weightManager)
                         .tabItem {
@@ -83,6 +86,15 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $showOnboarding) {
             OnboardingFlowView(showOnboarding: $showOnboarding)
                 .environmentObject(profileViewModel)
+        }
+        .sheet(isPresented: $appState.workoutSummary.show) {
+            if !appState.workoutSummary.workouts.isEmpty {
+                WorkoutSummaryView(completedWorkouts: appState.workoutSummary.workouts)
+                    .presentationDetents([.fraction(0.75), .large])
+                    .presentationDragIndicator(.visible)
+                    .presentationDragIndicator(.visible)
+                    .presentationCornerRadius(32)
+            }
         }
     }
 }

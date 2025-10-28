@@ -2,6 +2,19 @@ import SwiftUI
 import SwiftData
 import Charts
 
+// Data structure for the pie chart
+struct WorkoutTypeDistribution: Identifiable {
+    var id: WorkoutType { type }
+    let type: WorkoutType
+    let count: Int
+}
+
+// Data structure for PRs
+struct PersonalRecords {
+    let heaviestLift: (workoutName: String, weight: Double)?
+    let longestRun: (distance: Double, duration: TimeInterval)?
+}
+
 struct StatsView: View {
     // Time Frame Selection
     enum TimeFrame: String, CaseIterable, Identifiable {
@@ -29,16 +42,17 @@ struct StatsView: View {
     @State private var workoutDays: Int = 0
 
     // Computed property for workout frequency chart
-    private var workoutFrequencyData: [WeeklyWorkoutActivity] {
+    private var relevantWorkouts: [Workout] {
         let calendar = Calendar.current
         let endDate = Date()
         guard let startDate = calendar.date(byAdding: .day, value: -selectedTimeFrame.days, to: endDate) else {
             return []
         }
+        return workouts.filter { $0.date >= startDate && $0.date <= endDate }
+    }
 
-        let relevantWorkouts = workouts.filter { $0.date >= startDate && $0.date <= endDate }
-        
-        // Group by week start date
+    private var workoutFrequencyData: [WeeklyWorkoutActivity] {
+        let calendar = Calendar.current
         let groupedByWeek = Dictionary(grouping: relevantWorkouts) { workout -> Date in
             calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: workout.date))!
         }
@@ -47,6 +61,46 @@ struct StatsView: View {
             return WeeklyWorkoutActivity(weekOf: weekStartDate, count: workoutsInWeek.count)
         }.sorted(by: { $0.weekOf < $1.weekOf })
     }
+    
+    private var workoutTypeDistributionData: [WorkoutTypeDistribution] {
+        let groupedByType = Dictionary(grouping: relevantWorkouts, by: { $0.type })
+        
+        return groupedByType.map { (type, workouts) in
+            WorkoutTypeDistribution(type: type, count: workouts.count)
+        }.sorted { $0.count > $1.count }
+    }
+    
+    private var personalRecords: PersonalRecords {
+        var heaviestLift: (workoutName: String, weight: Double)? = nil
+        var longestRun: (distance: Double, duration: TimeInterval)? = nil
+        
+        let strengthWorkouts = relevantWorkouts.filter { $0.type == .strength }
+        var maxWeight: Double = 0
+        
+        for workout in strengthWorkouts {
+            for set in workout.sets ?? [] {
+                if let weight = set.weight { // Safely unwrap set.weight
+                    if weight > maxWeight {
+                        maxWeight = weight
+                        heaviestLift = (workout.name, maxWeight)
+                    }
+                }
+            }
+        }
+        
+        let cardioWorkouts = relevantWorkouts.filter { $0.type == .cardio }
+        var maxDistance: Double = 0
+        
+        for workout in cardioWorkouts {
+            if let distance = workout.distance, distance > maxDistance {
+                maxDistance = distance
+                longestRun = (maxDistance, workout.duration ?? 0)
+            }
+        }
+        
+        return PersonalRecords(heaviestLift: heaviestLift, longestRun: longestRun)
+    }
+
 
     var body: some View {
         NavigationStack {
@@ -72,6 +126,13 @@ struct StatsView: View {
 
                     // Workout Frequency Chart
                     WorkoutFrequencyChartView(data: workoutFrequencyData)
+                    
+                    // Workout Type Distribution
+                    WorkoutTypePieChartView(data: workoutTypeDistributionData)
+                    
+                    // Personal Records
+                    PersonalRecordsView(records: personalRecords)
+
 
                 }
                 .padding()
@@ -146,6 +207,78 @@ struct StatsView_Previews: PreviewProvider {
 
         return StatsView()
             .modelContainer(container)
-            .environmentObject(HealthKitManager())
+    }
+}
+
+// Pie chart for workout type distribution
+struct WorkoutTypePieChartView: View {
+    let data: [WorkoutTypeDistribution]
+    
+    var body: some View {
+        VStack(alignment: .leading) {
+            Text("运动类型分布")
+                .font(.title3).bold()
+            
+            Chart(data) { item in
+                SectorMark(
+                    angle: .value("Count", item.count),
+                    innerRadius: .ratio(0.618),
+                    angularInset: 2.0
+                )
+                .foregroundStyle(by: .value("Type", item.type.rawValue))
+                .cornerRadius(8)
+            }
+            .chartLegend(position: .bottom, alignment: .center)
+            .frame(height: 220)
+        }
+        .padding()
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(12)
+    }
+}
+
+// View for Personal Records
+struct PersonalRecordsView: View {
+    let records: PersonalRecords
+    
+    var body: some View {
+        VStack(alignment: .leading) {
+            Text("个人最佳记录 (PR)")
+                .font(.title3).bold()
+            
+            if records.heaviestLift == nil && records.longestRun == nil {
+                ContentUnavailableView("无记录", systemImage: "trophy.slash", description: Text("完成一些训练来解锁您的个人记录。"))
+                    .frame(height: 150)
+            } else {
+                VStack(spacing: 10) {
+                    if let lift = records.heaviestLift {
+                        HStack {
+                            Image(systemName: "dumbbell.fill").foregroundColor(.blue)
+                            Text("最重举重 ('\(lift.workoutName)')")
+                            Spacer()
+                            Text("\(lift.weight, specifier: "%.1f") kg").bold()
+                        }
+                        .padding()
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+                    
+                    if let run = records.longestRun {
+                        HStack {
+                            Image(systemName: "figure.run").foregroundColor(.green)
+                            Text("最长跑步距离")
+                            Spacer()
+                            Text("\(run.distance, specifier: "%.2f") km").bold()
+                        }
+                        .padding()
+                        .background(Color.green.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(12)
     }
 }

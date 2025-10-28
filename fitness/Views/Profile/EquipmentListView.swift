@@ -6,8 +6,8 @@ struct EquipmentListView: View {
     var body: some View {
         Form {
             Section(header: Text("你拥有的设备"), footer: Text("我们会根据你的设备，解锁更多专属训练动作。")) {
-                ForEach(Equipment.allCases) { equipment in
-                    EquipmentToggleRow(equipment: equipment, selectedEquipment: Binding(
+                ForEach(EquipmentType.allCases) { equipmentType in // Changed to EquipmentType.allCases
+                    EquipmentToggleRow(equipmentType: equipmentType, selectedEquipment: Binding(
                         get: { profile.equipment ?? [] },
                         set: { profile.equipment = $0 }
                     ))
@@ -19,25 +19,25 @@ struct EquipmentListView: View {
 }
 
 struct EquipmentToggleRow: View {
-    let equipment: Equipment
-    @Binding var selectedEquipment: [Equipment]
+    let equipmentType: EquipmentType // Changed to EquipmentType
+    @Binding var selectedEquipment: [EquipmentType] // Changed to EquipmentType
 
     private var isSelected: Bool {
-        selectedEquipment.contains(equipment)
+        selectedEquipment.contains(equipmentType)
     }
 
     var body: some View {
         Button(action: {
             withAnimation {
                 if isSelected {
-                    selectedEquipment.removeAll { $0 == equipment }
+                    selectedEquipment.removeAll { $0 == equipmentType }
                 } else {
-                    selectedEquipment.append(equipment)
+                    selectedEquipment.append(equipmentType)
                 }
             }
         }) {
             HStack {
-                Text(equipment.rawValue)
+                Text(equipmentType.rawValue) // Changed to equipmentType.rawValue
                     .foregroundColor(.primary)
                 Spacer()
                 if isSelected {
@@ -52,7 +52,11 @@ struct EquipmentToggleRow: View {
 struct EquipmentListView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            EquipmentListView(profile: .constant(UserProfile()))
+            // Provide a mock UserProfile with EquipmentType
+            @State var mockProfile = UserProfile()
+            mockProfile.equipment = [.dumbbells, .yogaMat] // Example with EquipmentType
+            
+            return EquipmentListView(profile: $mockProfile)
         }
     }
 }

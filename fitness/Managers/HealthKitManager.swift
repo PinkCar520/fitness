@@ -35,7 +35,7 @@ enum HealthDataType {
     case distance
 }
 
-final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
+final class HealthKitManager: ObservableObject, HealthKitManagerProtocol, @unchecked Sendable {
     private let healthStore = HKHealthStore()
     
     @Published var lastWeightSample: HKQuantitySample?
@@ -498,7 +498,7 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
                     print("Performing initial HealthKit import...")
                     self.readAllWeightSamples { samples, error in
                         if let samples = samples {
-                            DispatchQueue.main.async {
+                            Task { @MainActor in
                                 weightManager.importHealthKitSamples(samples)
                                 UserDefaults.standard.set(true, forKey: "hasPerformedInitialHealthKitImport")
                             }
@@ -598,10 +598,12 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol {
                 }
                 
                 self.healthStore.delete(samplesToDelete) { success, error in
-                    if let error = error {
-                        print("Error deleting from HealthKit: \(error.localizedDescription)")
+                    Task { @MainActor in
+                        if let error = error {
+                            print("Error deleting from HealthKit: \(error.localizedDescription)")
+                        }
+                        continuation.resume(returning: success)
                     }
-                    continuation.resume(returning: success)
                 }
             }
             healthStore.execute(query)

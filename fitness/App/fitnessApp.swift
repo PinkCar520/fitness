@@ -10,6 +10,7 @@ struct fitnessApp: App {
     @StateObject private var appearanceViewModel = AppearanceViewModel()
     @StateObject private var recommendationManager: RecommendationManager
     @StateObject private var achievementManager: AchievementManager
+    @StateObject private var appState = AppState()
     
     let modelContainer: ModelContainer
 
@@ -53,6 +54,7 @@ struct fitnessApp: App {
                 .environmentObject(weightManager)
                 .environmentObject(recommendationManager)
                 .environmentObject(achievementManager)
+                .environmentObject(appState)
                             .onOpenURL { url in
                                 // Handle the deep link from the widget
                                 if url.scheme == "fitness" && url.host == "add-weight" {

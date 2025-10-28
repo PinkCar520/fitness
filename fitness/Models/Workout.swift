@@ -12,7 +12,7 @@ enum WorkoutType: String, Codable {
 // The new struct for detailed set tracking in strength workouts
 struct WorkoutSet: Codable, Hashable {
     var reps: Int
-    var weight: Double
+    var weight: Double? // Changed to optional
     var isCompleted: Bool? = false
 }
 
@@ -20,7 +20,7 @@ struct WorkoutSet: Codable, Hashable {
 final class Workout {
     // Existing properties
     var name: String
-    var durationInMinutes: Int
+    var durationInMinutes: Int? // Changed to optional
     var caloriesBurned: Int
     var date: Date
     
@@ -33,16 +33,22 @@ final class Workout {
     var sets: [WorkoutSet]? // For Strength
     var notes: String? // For Other/General
 
+    var isCompleted: Bool = false
+
+    var dailyTaskID: UUID? // Link to the DailyTask
+
     // Updated initializer
     init(name: String,
-         durationInMinutes: Int,
+         durationInMinutes: Int? = nil, // Changed to optional with default nil
          caloriesBurned: Int,
          date: Date,
          type: WorkoutType,
          distance: Double? = nil,
          duration: Double? = nil,
          sets: [WorkoutSet]? = nil,
-         notes: String? = nil) {
+         notes: String? = nil,
+         isCompleted: Bool = false,
+         dailyTaskID: UUID? = nil) { // Added dailyTaskID
         self.name = name
         self.durationInMinutes = durationInMinutes
         self.caloriesBurned = caloriesBurned
@@ -52,5 +58,8 @@ final class Workout {
         self.duration = duration
         self.sets = sets
         self.notes = notes
+        self.isCompleted = isCompleted
+        self.dailyTaskID = dailyTaskID // Added assignment
     }
 }
+

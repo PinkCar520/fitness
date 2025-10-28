@@ -2,11 +2,13 @@ import SwiftUI
 import SwiftData
 
 struct OnboardingFlowView: View {
+    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var profileViewModel: ProfileViewModel
     @EnvironmentObject var healthKitManager: HealthKitManager
     @EnvironmentObject var weightManager: WeightManager
+    @EnvironmentObject var recommendationManager: RecommendationManager // New
     @Binding var showOnboarding: Bool
-    
+
     @State private var onboardingData: UserProfile
     @State private var selection = 0
 
@@ -23,7 +25,7 @@ struct OnboardingFlowView: View {
         _showOnboarding = showOnboarding
 
         // Try to load saved progress
-        if let savedData = UserDefaults.standard.data(forKey: onboardingDataKey), 
+        if let savedData = UserDefaults.standard.data(forKey: onboardingDataKey),
            let decodedData = try? JSONDecoder().decode(UserProfile.self, from: savedData) {
             _onboardingData = State(initialValue: decodedData)
             _selection = State(initialValue: UserDefaults.standard.integer(forKey: onboardingStepKey))
@@ -33,7 +35,7 @@ struct OnboardingFlowView: View {
             _selection = State(initialValue: 0)
         }
     }
-    
+
     private var buttonText: String {
         switch selection {
         case 0:
@@ -69,22 +71,25 @@ struct OnboardingFlowView: View {
     private func handleCompletion() {
         isGeneratingPlan = true
         // Simulate network call with a delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+        // DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             // Simulate a random failure
-            if Bool.random() { // Success
+            // if Bool.random() { // Success
+                let generatedPlan = recommendationManager.generateInitialWorkoutPlan(userProfile: onboardingData)
+                modelContext.insert(generatedPlan)
+
                 onboardingData.hasCompletedOnboarding = true
                 profileViewModel.userProfile = onboardingData
                 profileViewModel.saveProfile()
-                                Task {
+                Task {
                     await healthKitManager.setupHealthKitData(weightManager: weightManager)
                 }
                 clearSavedProgress()
                 withAnimation { selection = 5 }
-            } else { // Failure
-                showNetworkErrorAlert = true
-            }
+            // } else { // Failure
+            //     showNetworkErrorAlert = true
+            // }
             isGeneratingPlan = false
-        }
+        // }
     }
 
     private func saveProgress() {
@@ -181,10 +186,13 @@ struct OnboardingFlowView_Previews: PreviewProvider {
         let container = try! ModelContainer(for: HealthMetric.self, configurations: config)
         let healthKitManager = HealthKitManager()
         let weightManager = WeightManager(healthKitManager: healthKitManager, modelContainer: container)
+        let profileViewModel = ProfileViewModel()
 
         OnboardingFlowView(showOnboarding: .constant(true))
-            .environmentObject(ProfileViewModel())
+            .environmentObject(profileViewModel)
             .environmentObject(healthKitManager)
             .environmentObject(weightManager)
+            .environmentObject(RecommendationManager(profileViewModel: profileViewModel))
+            .modelContainer(container)
     }
 }

@@ -1,0 +1,57 @@
+[
+  {
+    "id": "dumbbell_squat",
+    "name": "哑铃深蹲",
+    "description": "一个锻炼下肢和核心力量的基础复合动作。",
+    "videoURL": "dumbbell_squat_demo.mp4",
+    "targetMuscles": ["腿部", "臀部", "核心"],
+    "equipmentNeeded": ["哑铃"],
+    "difficultyLevel": "初级",
+    "isHighImpact": false,
+    "avoidForConditions": ["膝盖不适"]
+  },
+  {
+    "id": "push_up",
+    "name": "俯卧撑",
+    "description": "经典的胸部、肩部和三头肌训练动作。",
+    "videoURL": "push_up_demo.mp4",
+    "targetMuscles": ["胸部", "肩部", "肱三头肌", "核心"],
+    "equipmentNeeded": ["徒手"],
+    "difficultyLevel": "初级",
+    "isHighImpact": false,
+    "avoidForConditions": ["肩颈不适"]
+  },
+  {
+    "id": "plank",
+    "name": "平板支撑",
+    "description": "有效的核心力量训练。",
+    "videoURL": "plank_demo.mp4",
+    "targetMuscles": ["核心", "肩部"],
+    "equipmentNeeded": ["徒手"],
+    "difficultyLevel": "初级",
+    "isHighImpact": false,
+    "avoidForConditions": ["腰部不适"]
+  },
+  {
+    "id": "burpee",
+    "name": "波比跳",
+    "description": "全身性的高强度有氧动作。",
+    "videoURL": "burpee_demo.mp4",
+    "targetMuscles": ["全身", "有氧"],
+    "equipmentNeeded": ["徒手"],
+    "difficultyLevel": "中级",
+    "isHighImpact": true,
+    "avoidForConditions": ["膝盖不适", "腰部不适"]
+  },
+  {
+    "id": "yoga_downward_dog",
+    "name": "下犬式",
+    "description": "瑜伽基础体式，伸展全身。",
+    "videoURL": "yoga_downward_dog_demo.mp4",
+    "targetMuscles": ["全身"],
+    "equipmentNeeded": ["瑜伽垫"],
+    "difficultyLevel": "初级",
+    "isHighImpact": false,
+    "avoidForConditions": null
+  }
+]

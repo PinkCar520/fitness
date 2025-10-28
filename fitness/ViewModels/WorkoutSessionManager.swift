@@ -1,16 +1,33 @@
 import Foundation
 import SwiftData
 
-// A struct to hold the progress of a single exercise within a session
-struct ExerciseProgress {
+// MARK: - Codable State Management Structs
+
+struct ExerciseProgress: Codable {
     var sets: [WorkoutSet]?
     var distance: Double?
     var duration: Double?
     var notes: String?
 }
 
+struct WorkoutSessionState: Codable {
+    let dailyTaskID: UUID
+    let currentExerciseIndex: Int
+    let elapsedTime: TimeInterval
+    let sessionProgress: [Int: ExerciseProgress]
+    
+    // In-flight progress for the current exercise
+    let currentActualSets: [WorkoutSet]
+    let currentDistance: Double
+    let currentDuration: Double
+    let currentNotes: String
+}
+
+
 @MainActor
 class WorkoutSessionManager: ObservableObject {
+    
+    // MARK: - Properties
     
     @Published var dailyTask: DailyTask
     @Published var currentExerciseIndex: Int = 0
@@ -33,10 +50,15 @@ class WorkoutSessionManager: ObservableObject {
     @Published var actualSets: [WorkoutSet] = []
     @Published var currentDistance: Double = 0.0
     @Published var currentDuration: Double = 0.0
-    @Published var currentNotes: String = ""
-    
-    private var sessionProgress: [Int: ExerciseProgress] = [:]    
+    @Published var currentNotes: String = "" // ADDED: Missing property
+    private var sessionProgress: [Int: ExerciseProgress] = [:]
     private var modelContext: ModelContext
+    
+    // MARK: - State Persistence
+    
+    private static let resumableWorkoutKey = "resumableWorkoutSession"
+
+    // MARK: - Lifecycle
     
     init(dailyTask: DailyTask, modelContext: ModelContext) {
         self.dailyTask = dailyTask
@@ -51,11 +73,20 @@ class WorkoutSessionManager: ObservableObject {
         
         loadSetsForCurrentExercise()
         
-        // Start the timer
+        // Start the main timer
+        startMasterTimer()
+    }
+    
+    private func startMasterTimer() {
+        timer?.invalidate() // Ensure no duplicate timers
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            self?.elapsedTime += 1
+            Task { @MainActor in
+                self?.elapsedTime += 1
+            }
         }
     }
+    
+    // MARK: - Core Workout Flow
     
     private func loadSetsForCurrentExercise() {
         guard let workout = currentWorkout else { return }
@@ -74,6 +105,8 @@ class WorkoutSessionManager: ObservableObject {
             self.actualSets = []
         }
         self.currentNotes = "" // Reset notes for the new exercise
+        self.currentDistance = 0.0
+        self.currentDuration = 0.0
     }
     
     func endWorkout() -> [Workout] {
@@ -87,25 +120,31 @@ class WorkoutSessionManager: ObservableObject {
         let finalProgress = ExerciseProgress(sets: actualSets, distance: currentDistance, duration: currentDuration, notes: currentNotes)
         sessionProgress[currentExerciseIndex] = finalProgress
         
-        // Iterate over all the progress and save each workout
+        // 1. Update the original plan's workouts with actual data
         for (index, progress) in sessionProgress {
             guard dailyTask.workouts.indices.contains(index) else { continue }
-            let originalWorkout = dailyTask.workouts[index]
             
-            let newWorkout = Workout(
-                name: originalWorkout.name,
-                durationInMinutes: Int(progress.duration ?? elapsedTime / 60), // Refine duration logic
-                caloriesBurned: originalWorkout.caloriesBurned, // Placeholder
-                date: Date(),
-                type: originalWorkout.type,
-                distance: progress.distance,
-                duration: progress.duration,
-                sets: progress.sets,
-                notes: progress.notes
-            )
-            modelContext.insert(newWorkout)
-            completedWorkouts.append(newWorkout)
+            // Get the workout from the plan
+            let workoutToUpdate = dailyTask.workouts[index]
+            
+            // Update its properties with the actual performance
+            workoutToUpdate.isCompleted = true
+            workoutToUpdate.sets = progress.sets
+            workoutToUpdate.distance = progress.distance
+            workoutToUpdate.duration = progress.duration
+            workoutToUpdate.notes = progress.notes
+            // The date and calories burned remain as planned
+            
+            completedWorkouts.append(workoutToUpdate)
         }
+
+        // 2. Check if the entire daily task is now complete
+        if dailyTask.workouts.allSatisfy({ $0.isCompleted }) {
+            dailyTask.isCompleted = true
+        }
+        
+        // Clear any saved state upon successful completion
+        Self.clearSavedState()
         
         // Try to save the context
         do {
@@ -127,7 +166,7 @@ class WorkoutSessionManager: ObservableObject {
             loadSetsForCurrentExercise()
         } else {
             // This was the last exercise, so we can end the workout.
-            endWorkout()
+            // Note: endWorkout() is now called from the View layer to show summary
         }
     }
     
@@ -145,12 +184,14 @@ class WorkoutSessionManager: ObservableObject {
             // If the set is now complete, start the rest timer
             restTimeRemaining = 60 // 60 seconds rest
             restTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-                guard let self = self else { return }
-                if self.restTimeRemaining > 0 {
-                    self.restTimeRemaining -= 1
-                } else {
-                    self.restTimer?.invalidate()
-                    self.restTimer = nil
+                Task { @MainActor in
+                    guard let self = self else { return }
+                    if self.restTimeRemaining > 0 {
+                        self.restTimeRemaining -= 1
+                    } else {
+                        self.restTimer?.invalidate()
+                        self.restTimer = nil
+                    }
                 }
             }
         } else {
@@ -159,5 +200,50 @@ class WorkoutSessionManager: ObservableObject {
         }
     }
     
-    // Add more methods to manage the workout session
+    // MARK: - State Restoration Logic
+    
+    func saveState() {
+        let currentState = WorkoutSessionState(
+            dailyTaskID: self.dailyTask.id,
+            currentExerciseIndex: self.currentExerciseIndex,
+            elapsedTime: self.elapsedTime,
+            sessionProgress: self.sessionProgress,
+            currentActualSets: self.actualSets,
+            currentDistance: self.currentDistance,
+            currentDuration: self.currentDuration,
+            currentNotes: self.currentNotes
+        )
+        
+        if let encodedData = try? JSONEncoder().encode(currentState) {
+            UserDefaults.standard.set(encodedData, forKey: Self.resumableWorkoutKey)
+            print("Workout state saved.")
+        }
+    }
+    
+    func restore(from state: WorkoutSessionState) {
+        self.currentExerciseIndex = state.currentExerciseIndex
+        self.elapsedTime = state.elapsedTime
+        self.sessionProgress = state.sessionProgress
+        self.actualSets = state.currentActualSets
+        self.currentDistance = state.currentDistance
+        self.currentDuration = state.currentDuration
+        self.currentNotes = state.currentNotes
+        
+        // Restart the master timer
+        startMasterTimer()
+        print("Workout state restored.")
+    }
+    
+    static func loadSavedState() -> WorkoutSessionState? {
+        guard let savedData = UserDefaults.standard.data(forKey: resumableWorkoutKey),
+              let decodedState = try? JSONDecoder().decode(WorkoutSessionState.self, from: savedData) else {
+            return nil
+        }
+        return decodedState
+    }
+    
+    static func clearSavedState() {
+        UserDefaults.standard.removeObject(forKey: resumableWorkoutKey)
+        print("Saved workout state cleared.")
+    }
 }

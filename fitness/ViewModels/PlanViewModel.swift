@@ -2,6 +2,8 @@ import Foundation
 import Combine
 import SwiftData
 
+
+
 class PlanViewModel: ObservableObject {
     @Published var selectedDate: Date = Date() {
         didSet {
@@ -13,20 +15,20 @@ class PlanViewModel: ObservableObject {
     @Published var currentDailyTask: DailyTask? = nil
 
     private var activePlan: Plan?
-    private var _allWorkouts: [Workout] = []
-    private var _allMeals: [Meal] = []
     
     private var modelContext: ModelContext
     private var profileViewModel: ProfileViewModel
+    // private var recommendationManager: RecommendationManager // Removed property
 
-    init(profileViewModel: ProfileViewModel, modelContext: ModelContext) {
+    init(profileViewModel: ProfileViewModel, modelContext: ModelContext) { // Updated init
         self.profileViewModel = profileViewModel
         self.modelContext = modelContext
+        // self.recommendationManager = recommendationManager // Removed assignment
         
         refreshData()
     }
 
-    private func refreshData() {
+    func refreshData() {
         loadActivePlan()
         filterPlansForSelectedDate()
     }
@@ -37,133 +39,38 @@ class PlanViewModel: ObservableObject {
         
         self.activePlan = try? modelContext.fetch(descriptor).first
         
-        guard let activePlan = self.activePlan else {
+        guard self.activePlan != nil else {
             // No active plan, clear current data
-            self._allWorkouts = []
-            self._allMeals = []
+            self.workouts = []
+            self.meals = []
             return
         }
-        
-        // Directly access workouts and meals from DailyTask relationships
-        var workouts: [Workout] = []
-        var meals: [Meal] = []
-        
-        for task in activePlan.dailyTasks {
-            workouts.append(contentsOf: task.workouts)
-            meals.append(contentsOf: task.meals)
-        }
-        _allWorkouts = workouts
-        _allMeals = meals
         
         filterPlansForSelectedDate()
     }
 
-    func generatePlan(config: PlanConfiguration) {
-        archiveOldPlan()
+    func generatePlan(config: PlanConfiguration, recommendationManager: RecommendationManager) { // Re-added method with recommendationManager argument
+        archiveOldPlan() // Archive existing active plan
 
-        var generatedWorkouts: [Workout] = []
-        var generatedMeals: [Meal] = []
-        let startDate = Date()
-        let calendar = Calendar.current
+        // Create a temporary UserProfile for plan generation based on config
+        var tempUserProfile = profileViewModel.userProfile // Start with current user profile
+        tempUserProfile.goal = config.goal
+        tempUserProfile.experienceLevel = config.experienceLevel
+        // For manual plan generation, we might need to map more config properties
+        // For now, let's assume config provides enough to override/set these.
+        // This part needs careful mapping. For now, just use goal and experienceLevel from config.
 
-        // Convert Set<Weekday> to a Set<Int> that matches Calendar's weekday component (Sunday=1, Monday=2, etc.)
-        let trainingWeekdayInts = Set(config.trainingDays.map { weekday -> Int in
-            switch weekday {
-            case .sunday: return 1
-            case .monday: return 2
-            case .tuesday: return 3
-            case .wednesday: return 4
-            case .thursday: return 5
-            case .friday: return 6
-            case .saturday: return 7
-            }
-        })
-
-        for dayOffset in 0..<config.planDuration {
-            guard let date = calendar.date(byAdding: .day, value: dayOffset, to: startDate) else { continue }
-            let weekday = calendar.component(.weekday, from: date)
-
-            // Schedule workout if the current day is a selected training day
-            if trainingWeekdayInts.contains(weekday) {
-                var workoutName = "综合训练"
-                var baseCalories = 400
-
-                switch config.goal {
-                case .fatLoss:
-                    workoutName = "减脂有氧"
-                    baseCalories = 350
-                case .muscleGain:
-                    workoutName = "力量增肌"
-                    baseCalories = 450
-                case .healthImprovement:
-                    workoutName = "健康综合"
-                    baseCalories = 300
-                }
-
-                // Adjust calories based on duration
-                let finalCalories = Int(Double(baseCalories) * (Double(config.workoutDurationPerSession) / 45.0))
-
-                let workoutType: WorkoutType
-                switch config.goal {
-                case .fatLoss:
-                    workoutType = .cardio
-                case .muscleGain:
-                    workoutType = .strength
-                case .healthImprovement:
-                    workoutType = .other
-                }
-
-                var workoutSets: [WorkoutSet] = []
-                if workoutType == .strength {
-                    workoutSets = [
-                        WorkoutSet(reps: 12, weight: 0, isCompleted: false),
-                        WorkoutSet(reps: 12, weight: 0, isCompleted: false),
-                        WorkoutSet(reps: 10, weight: 0, isCompleted: false),
-                        WorkoutSet(reps: 8, weight: 0, isCompleted: false)
-                    ]
-                }
-
-                let workout = Workout(name: workoutName, durationInMinutes: config.workoutDurationPerSession, caloriesBurned: finalCalories, date: date, type: workoutType, sets: workoutSets)
-                generatedWorkouts.append(workout)
-                modelContext.insert(workout) // Insert workout into context
-            }
-
-            // Add meals for every day
-            let meal1 = Meal(name: "健康早餐", calories: 400, date: date, mealType: .breakfast)
-            let meal2 = Meal(name: "均衡午餐", calories: 600, date: date, mealType: .lunch)
-            let meal3 = Meal(name: "清淡晚餐", calories: 500, date: date, mealType: .dinner)
-            generatedMeals.append(meal1)
-            generatedMeals.append(meal2)
-            generatedMeals.append(meal3)
-            modelContext.insert(meal1) // Insert meals into context
-            modelContext.insert(meal2)
-            modelContext.insert(meal3)
-        }
-        
-        var dailyTasks: [DailyTask] = []
-        for dayOffset in 0..<config.planDuration {
-            guard let date = calendar.date(byAdding: .day, value: dayOffset, to: startDate) else { continue }
-            let workoutsForDay = generatedWorkouts.filter { calendar.isDate($0.date, inSameDayAs: date) }
-            let mealsForDay = generatedMeals.filter { calendar.isDate($0.date, inSameDayAs: date) }
-            
-            if !workoutsForDay.isEmpty || !mealsForDay.isEmpty {
-                let dailyTask = DailyTask(date: date, workouts: workoutsForDay, meals: mealsForDay)
-                dailyTasks.append(dailyTask)
-                modelContext.insert(dailyTask) // Insert dailyTask into context
-            }
-        }
-        
-        let newPlan = Plan(name: "\(config.planDuration)天\(config.goal.rawValue)计划", goal: config.goal, startDate: startDate, duration: config.planDuration, tasks: dailyTasks, status: "active")
-        
+        // Call the RecommendationManager to generate the plan
+        let newPlan = recommendationManager.generateInitialWorkoutPlan(userProfile: tempUserProfile)
         modelContext.insert(newPlan)
-        
+
         do {
             try modelContext.save()
         } catch {
             print("Failed to save new plan: \(error.localizedDescription)")
         }
-        
-        refreshData()
+
+        refreshData() // Refresh data to load the new active plan
     }
 
     private func archiveOldPlan() {
@@ -179,13 +86,21 @@ class PlanViewModel: ObservableObject {
 
     private func filterPlansForSelectedDate() {
         let calendar = Calendar.current
-        workouts = _allWorkouts.filter { calendar.isDate($0.date, inSameDayAs: selectedDate) }
-        meals = _allMeals.filter { calendar.isDate($0.date, inSameDayAs: selectedDate) }
         
-        if let activePlan = activePlan {
-            self.currentDailyTask = activePlan.dailyTasks.first { calendar.isDate($0.date, inSameDayAs: selectedDate) }
-        } else {
+        guard let activePlan = activePlan else {
+            self.workouts = []
+            self.meals = []
             self.currentDailyTask = nil
+            return
         }
+
+        self.currentDailyTask = activePlan.dailyTasks.first { calendar.isDate($0.date, inSameDayAs: selectedDate) }
+        self.workouts = currentDailyTask?.workouts ?? []
+        self.meals = currentDailyTask?.meals ?? []
+    }
+    
+    func findDailyTask(by id: UUID) -> DailyTask? {
+        // Search through all tasks in the active plan
+        return activePlan?.dailyTasks.first { $0.id == id }
     }
 }

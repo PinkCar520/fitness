@@ -1,5 +1,21 @@
 import Foundation
 import SwiftData
+import SwiftUI // Added for Identifiable
+
+// MARK: - Supporting Enums for Plan Configuration
+
+enum Weekday: String, Codable, CaseIterable, Identifiable {
+    case monday = "周一"
+    case tuesday = "周二"
+    case wednesday = "周三"
+    case thursday = "周四"
+    case friday = "周五"
+    case saturday = "周六"
+    case sunday = "周日"
+    var id: String { self.rawValue }
+}
+
+
 
 @Model
 final class Plan {
@@ -36,10 +52,13 @@ final class DailyTask: Identifiable {
     @Relationship(deleteRule: .cascade) var workouts: [Workout] = []
     @Relationship(deleteRule: .cascade) var meals: [Meal] = []
     
-    init(id: UUID = UUID(), date: Date, workouts: [Workout] = [], meals: [Meal] = []) {
+    var isCompleted: Bool = false
+    
+    init(id: UUID = UUID(), date: Date, workouts: [Workout] = [], meals: [Meal] = [], isCompleted: Bool = false) {
         self.id = id
         self.date = date
         self.workouts = workouts
         self.meals = meals
+        self.isCompleted = isCompleted
     }
 }

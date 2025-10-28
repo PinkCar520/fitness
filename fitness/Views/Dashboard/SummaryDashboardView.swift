@@ -20,6 +20,9 @@ struct SummaryDashboardView: View {
     private let healthKitManager: HealthKitManager
     private let weightManager: WeightManager
 
+    // Query for active plan
+    @Query(filter: #Predicate<Plan> { $0.status == "active" }) private var activePlans: [Plan]
+
     init(showInputSheet: Binding<Bool>, healthKitManager: HealthKitManager, weightManager: WeightManager) {
         self._showInputSheet = showInputSheet
         self.healthKitManager = healthKitManager
@@ -31,6 +34,23 @@ struct SummaryDashboardView: View {
     @ViewBuilder
     private func dashboardContent(card: DashboardCard) -> some View {
         switch card.id {
+        case .todaysWorkout:
+            // Logic for Today's Workout Card
+            if let activePlan = activePlans.first {
+                let today = Calendar.current.startOfDay(for: Date())
+                // Try to find today's task
+                if let todayTask = activePlan.dailyTasks.first(where: { Calendar.current.isDate($0.date, inSameDayAs: today) }) {
+                    TodaysWorkoutCard(dailyTask: todayTask, isNoActivePlan: false)
+                } else {
+                    // If no specific task for today, create a dummy DailyTask for a rest day
+                    let restDayTask = DailyTask(date: today, workouts: [])
+                    TodaysWorkoutCard(dailyTask: restDayTask, isNoActivePlan: false)
+                }
+            } else {
+                // If no active plan at all, create a dummy DailyTask to indicate no plan
+                let noPlanTask = DailyTask(date: Date(), workouts: [])
+                TodaysWorkoutCard(dailyTask: noPlanTask, isNoActivePlan: true)
+            }
         case .fitnessRings:
             FitnessRingCard(activitySummary: dashboardViewModel.activitySummary)
         case .goalProgress:
@@ -57,25 +77,6 @@ struct SummaryDashboardView: View {
                 
                 ScrollView {
                     VStack(spacing: 16) {
-                        // Recommendation Section
-                        if !recommendationManager.recommendedContent.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("为你推荐")
-                                    .font(.headline)
-                                    .padding(.horizontal)
-                                ForEach(recommendationManager.recommendedContent, id: \.self) {
-                                    recommendation in
-                                    Text(recommendation)
-                                        .font(.subheadline)
-                                        .padding(.vertical, 8)
-                                        .padding(.horizontal)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .background(Color(UIColor.secondarySystemGroupedBackground))
-                                        .cornerRadius(10)
-                                }
-                            }
-                            .padding(.bottom, 8)
-                        }
 
                         // Dynamically generate cards
                         ForEach(dashboardViewModel.cards) { card in
@@ -160,7 +161,7 @@ struct SummaryDashboardView: View {
                             .sheet(isPresented: $showEditSheet) {
                                 EditDashboardView()
                                     .environmentObject(dashboardViewModel) // Inject DashboardViewModel
-                                    .presentationDetents([.medium, .large])
+                                    .presentationDetents([.fraction(0.85), .large])
                             }        }
     }
 }

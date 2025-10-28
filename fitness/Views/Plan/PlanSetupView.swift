@@ -1,24 +1,11 @@
 import SwiftUI
+import Foundation // Added for general type resolution
 
 // MARK: - Supporting Enums and Structs
 
-enum TrainingDifficulty: String, CaseIterable, Identifiable {
-    case beginner = "初级"
-    case intermediate = "中级"
-    case advanced = "高级"
-    var id: String { self.rawValue }
-}
 
-enum Weekday: String, CaseIterable, Identifiable {
-    case monday = "周一"
-    case tuesday = "周二"
-    case wednesday = "周三"
-    case thursday = "周四"
-    case friday = "周五"
-    case saturday = "周六"
-    case sunday = "周日"
-    var id: String { self.rawValue }
-}
+
+
 
 struct PlanConfiguration {
     var goal: FitnessGoal = .fatLoss
@@ -28,6 +15,7 @@ struct PlanConfiguration {
     var trainingDays: Set<Weekday> = []
     var sleepDurationTarget: Int = 8
     var planDuration: Int = 30
+    var experienceLevel: ExperienceLevel = .beginner
 }
 
 // MARK: - Main View
@@ -37,46 +25,107 @@ struct PlanSetupView: View {
     
     @State private var config = PlanConfiguration()
     @State private var currentStep = 0
+    @State private var isLoadingPlan = false // NEW STATE VARIABLE
     
     var onComplete: (PlanConfiguration) -> Void
 
-    private let totalSteps = 7
+    private let totalSteps = 8
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                TabView(selection: $currentStep) {
-                    GoalStepView(selectedGoal: $config.goal, currentStep: $currentStep).tag(0)
-                    TargetWeightStepView(targetWeight: $config.targetWeight, currentStep: $currentStep).tag(1)
-                    DurationStepView(duration: $config.workoutDurationPerSession, currentStep: $currentStep).tag(2)
-                    LifestyleStepView(sleepTarget: $config.sleepDurationTarget).tag(3)
-                    CycleStepView(planDuration: $config.planDuration).tag(4)
-                    ScheduleStepView(frequency: $config.workoutFrequency, selectedDays: $config.trainingDays).tag(5)
-                    ConfirmationStepView(config: config, onComplete: {
-                        onComplete(config)
-                        dismiss()
-                    }).tag(6)
+            ZStack { // WRAP WITH ZSTACK FOR OVERLAY
+                VStack(spacing: 0) {
+                    Text("我们的计划是根据您的健身目标、经验水平、目标体重、每次训练时长、每周训练频率、睡眠目标和计划总周期等多个维度智能生成的。我们致力于提供个性化且科学的训练方案，帮助您高效达成目标。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding()
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(10)
+                        .padding(.horizontal)
+
+                    ProgressView(value: Double(currentStep + 1), total: Double(totalSteps))
+                        .progressViewStyle(.linear)
+                        .padding(.horizontal)
+                        .padding(.top, 10) // Add some padding from the top
+                    TabView(selection: $currentStep) {
+                        GoalStepView(selectedGoal: $config.goal, currentStep: $currentStep).tag(0)
+                        ExperienceLevelStepView(experienceLevel: $config.experienceLevel, currentStep: $currentStep).tag(1)
+                        TargetWeightStepView(targetWeight: $config.targetWeight, currentStep: $currentStep).tag(2)
+                        DurationStepView(duration: $config.workoutDurationPerSession, currentStep: $currentStep).tag(3)
+                        LifestyleStepView(sleepTarget: $config.sleepDurationTarget).tag(4)
+                        CycleStepView(planDuration: $config.planDuration).tag(5)
+                        ScheduleStepView(frequency: $config.workoutFrequency, selectedDays: $config.trainingDays).tag(6)
+                        ConfirmationStepView(config: config, onComplete: {
+                            onComplete(config)
+                            dismiss()
+                        }, isLoadingPlan: $isLoadingPlan).tag(7) // PASS BINDING
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-            }
-            .navigationTitle("制定新计划")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundColor(.secondary)
-                            .font(.title3)
+                .navigationTitle("制定新计划")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button { dismiss() } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundColor(.secondary)
+                                .font(.title3)
+                        }
                     }
                 }
-            }
+
+                // LOADING OVERLAY
+                if isLoadingPlan {
+                    Color.black.opacity(0.4)
+                        .edgesIgnoringSafeArea(.all)
+                    ProgressView("生成计划中...")
+                        .progressViewStyle(.circular)
+                        .padding()
+                        .background(Color.white)
+                        .cornerRadius(10)
+                }
+            } // END ZSTACK
         }
     }
 }
 
 // MARK: - Animated Icon
 
+private struct ExperienceLevelStepView: View {
+    @Binding var experienceLevel: ExperienceLevel
+    @Binding var currentStep: Int
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            AnimatedRunningIcon() // Reusing existing icon
+            Spacer().frame(height: 30)
+            Text("您的训练经验水平是？").font(.largeTitle).bold().multilineTextAlignment(.center)
+
+            Picker("经验水平", selection: $experienceLevel) {
+                ForEach(ExperienceLevel.allCases) { level in
+                    Text(level.rawValue).tag(level)
+                }
+            }
+            .pickerStyle(.wheel)
+            .frame(height: 150)
+
+            Spacer()
+
+            Button("下一步") {
+                withAnimation { currentStep += 1 }
+            }
+            .font(.headline)
+            .fontWeight(.bold)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.accentColor)
+            .foregroundColor(.white)
+            .cornerRadius(12)
+        }.padding()
+    }
+}
 private struct AnimatedRunningIcon: View {
     @State private var isAnimating = false
 
@@ -245,6 +294,7 @@ private struct CycleStepView: View {
 private struct ConfirmationStepView: View {
     let config: PlanConfiguration
     let onComplete: () -> Void
+    @Binding var isLoadingPlan: Bool // NEW BINDING
     
     private let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
@@ -258,6 +308,7 @@ private struct ConfirmationStepView: View {
                     
                     LazyVGrid(columns: columns, spacing: 12) {
                         ConfirmationCard(iconName: "flag.fill", label: "主要目标", value: config.goal.rawValue)
+                        ConfirmationCard(iconName: "person.fill", label: "经验水平", value: config.experienceLevel.rawValue)
                         ConfirmationCard(iconName: "figure.scale", label: "目标体重", value: String(format: "%.0f kg", config.targetWeight))
                         ConfirmationCard(iconName: "calendar", label: "每周频率", value: "\(config.workoutFrequency) 天")
                         ConfirmationCard(iconName: "hourglass", label: "每次时长", value: "\(config.workoutDurationPerSession) 分钟")
@@ -267,7 +318,11 @@ private struct ConfirmationStepView: View {
 
                     ConfirmationCard(iconName: "checklist", label: "训练日", value: config.trainingDays.isEmpty ? "未指定" : config.trainingDays.map { $0.rawValue }.sorted().joined(separator: ", "))
                     
-                    Button(action: onComplete) {
+                    Button(action: {
+                        isLoadingPlan = true // Set loading state
+                        onComplete() // Trigger plan generation
+                        // isLoadingPlan will be set to false by the dismiss() in PlanSetupView's onComplete
+                    }) {
                         Text("生成计划")
                             .fontWeight(.bold)
                             .frame(maxWidth: .infinity)

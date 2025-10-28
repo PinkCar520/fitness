@@ -11,6 +11,7 @@ struct DashboardCard: Identifiable, Codable, Hashable {
     var isVisible: Bool = true
 
     enum CardType: String, Codable, CaseIterable {
+        case todaysWorkout = "TodaysWorkout" // Add this new case
         case fitnessRings = "FitnessRings"
         case goalProgress = "GoalProgress"
         case stepsAndDistance = "StepsAndDistance"
@@ -143,6 +144,13 @@ class DashboardViewModel: ObservableObject {
         saveCardOrder()
     }
 
+    func deleteVisibleCard(at offsets: IndexSet) {
+        if let index = offsets.first {
+            let cardToToggle = visibleCards[index]
+            toggleVisibility(for: cardToToggle)
+        }
+    }
+
     func saveCardOrder() {
         if let encoded = try? JSONEncoder().encode(cards) {
             UserDefaults.standard.set(encoded, forKey: userDefaultsKey)
@@ -161,6 +169,7 @@ class DashboardViewModel: ObservableObject {
     
     private var defaultCards: [DashboardCard] {
         [
+            DashboardCard(id: .todaysWorkout, name: "今日训练"), // Add this
             DashboardCard(id: .fitnessRings, name: "健身圆环"),
             DashboardCard(id: .goalProgress, name: "目标进度"),
             DashboardCard(id: .stepsAndDistance, name: "步数与距离"),

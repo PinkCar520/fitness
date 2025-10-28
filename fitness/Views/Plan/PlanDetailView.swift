@@ -11,7 +11,7 @@ struct PlanDetailView: View {
                     .font(.largeTitle)
                     .fontWeight(.bold)
                 
-                Text("目标: \(plan.goal)")
+                Text("目标: " + plan.goal)
                     .font(.title2)
                     .foregroundColor(.secondary)
                 
@@ -43,7 +43,7 @@ struct PlanDetailView: View {
                                 Image(systemName: "figure.run")
                                 Text(workout.name)
                                 Spacer()
-                                Text("\(workout.durationInMinutes) 分钟")
+                                Text("\(workout.durationInMinutes ?? 0) 分钟")
                             }
                             .font(.subheadline)
                         }
