@@ -32,9 +32,7 @@ struct StatsView: View {
         }
     }
     @State private var selectedTimeFrame: TimeFrame = .thirtyDays
-    // View mode for single-container layout
-    enum ViewMode: String, CaseIterable, Identifiable { case overview = "概览", trend = "趋势", distribution = "分布"; var id: String { rawValue } }
-    @State private var selectedView: ViewMode = .overview
+    
     @StateObject private var viewModel = StatsViewModel()
     
     
@@ -116,14 +114,6 @@ struct StatsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     emptyStateBanner
-                    // Time Frame Picker
-                    Picker("Time Frame", selection: $selectedTimeFrame) {
-                        ForEach(TimeFrame.allCases) { timeFrame in
-                            Text(timeFrame.rawValue).tag(timeFrame)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-
                     // View Mode Picker
                     Picker("View Mode", selection: $selectedView) {
                         ForEach(ViewMode.allCases) { mode in
@@ -151,12 +141,13 @@ struct StatsView: View {
                 refreshAll()
             }
             
+            
         }
     }
 
     // execution summary section removed per request
 
-    // MARK: - Single-container Sections
+    // MARK: - Single-container Sections (to be removed in rollback)
     private var overviewSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("核心指标").font(.title3).bold()
@@ -173,6 +164,8 @@ struct StatsView: View {
             .frame(height: 180)
         }
     }
+
+    // floatingTimeFramePicker removed in rollback
 
     private var trendSection: some View {
         VStack(alignment: .leading, spacing: 12) {
