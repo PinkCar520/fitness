@@ -18,6 +18,9 @@ final class BodyProfileViewModel: ObservableObject {
     @Published var selectedMetric: ChartableMetric = .weight
     @Published var timeRange: TimeRange = .thirty
     @Published var chartData: [DateValuePoint] = []
+    @Published var averageValue: Double?
+    @Published var goalValue: Double?
+    @Published var insights: [String] = []
 
     // Latest snapshot
     @Published var latestWeight: Double?
@@ -44,6 +47,17 @@ final class BodyProfileViewModel: ObservableObject {
 
         // chart
         chartData = series(for: selectedMetric, metrics: metrics, days: timeRange.days)
+        averageValue = average(of: chartData)
+
+        // optional goal: use user targetWeight when metric is weight
+        if selectedMetric == .weight, profile.targetWeight > 0 {
+            goalValue = profile.targetWeight
+        } else {
+            goalValue = nil
+        }
+
+        // insights
+        insights = buildInsights(profile: profile)
     }
 
     func series(for metric: ChartableMetric, metrics: [HealthMetric], days: Int) -> [DateValuePoint] {
@@ -62,5 +76,46 @@ final class BodyProfileViewModel: ObservableObject {
             .sorted(by: { $0.date < $1.date })
             .map { DateValuePoint(date: $0.date, value: $0.value) }
     }
-}
 
+    private func average(of series: [DateValuePoint]) -> Double? {
+        guard !series.isEmpty else { return nil }
+        let sum = series.reduce(0) { $0 + $1.value }
+        return sum / Double(series.count)
+    }
+
+    private func buildInsights(profile: UserProfile) -> [String] {
+        var lines: [String] = []
+        // BMI
+        if bmi > 0 {
+            switch HealthStandards.bmiCategoryWHO(bmi) {
+            case .underweight: lines.append("BMI 偏低：增加优质蛋白与力量训练")
+            case .normal: lines.append("BMI 正常：保持当前节奏")
+            case .overweight: lines.append("BMI 超重：控制热量并增加活动量")
+            case .obese: lines.append("BMI 肥胖：建议循序渐进并关注膝踝负担")
+            }
+        }
+        // Body fat
+        if let gender = Gender(rawValue: profile.gender.rawValue), let value = latestBodyFat, value > 0 {
+            let band = HealthStandards.bodyFatBand(gender: gender, value: value)
+            switch band {
+            case .athletic: lines.append("体脂优秀：注意恢复与营养平衡")
+            case .fit: lines.append("体脂良好：维持训练频率与强度")
+            case .average: lines.append("体脂一般：可适度增加有氧+力量")
+            case .high: lines.append("体脂偏高：优先饮食管理与低冲击有氧")
+            }
+        }
+        // VO2max
+        if let vo2 = latestVO2Max, vo2 > 0 {
+            let age = Calendar.current.dateComponents([.year], from: profile.dateOfBirth, to: Date()).year ?? 30
+            let cat = HealthStandards.vo2MaxCategoryWHO(gender: profile.gender, age: age, vo2max: vo2)
+            switch cat {
+            case .veryLow: lines.append("VO2max 很低：从轻量有氧开始，逐步提升")
+            case .low: lines.append("VO2max 较低：加入间歇训练提升心肺")
+            case .fair: lines.append("VO2max 中等：保持每周 3–4 次有氧")
+            case .good: lines.append("VO2max 良好：可尝试更高强度间歇")
+            case .excellent: lines.append("VO2max 优秀：注意恢复与周期化训练")
+            }
+        }
+        return lines
+    }
+}

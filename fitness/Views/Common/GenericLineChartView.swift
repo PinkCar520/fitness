@@ -13,6 +13,8 @@ struct GenericLineChartView: View {
     let data: [DateValuePoint]
     let color: Color
     let unit: String
+    let averageValue: Double? = nil
+    let goalValue: Double? = nil
 
     @State private var selectedPoint: DateValuePoint? // For tap gesture
     @State private var currentPoint: DateValuePoint?  // For drag gesture
@@ -60,6 +62,28 @@ struct GenericLineChartView: View {
                         }
                     }
                     
+                    // Mean/Goal Rule Marks
+                    if let avg = averageValue {
+                        RuleMark(y: .value("Average", avg))
+                            .foregroundStyle(Color.gray.opacity(0.4))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                            .annotation(position: .top, alignment: .leading) {
+                                Text("均值 \(String(format: "%.1f", avg)) \(unit)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                    }
+                    if let goal = goalValue {
+                        RuleMark(y: .value("Goal", goal))
+                            .foregroundStyle(color.opacity(0.5))
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [6, 3]))
+                            .annotation(position: .top, alignment: .trailing) {
+                                Text("目标 \(String(format: "%.1f", goal)) \(unit)")
+                                    .font(.caption)
+                                    .foregroundStyle(color)
+                            }
+                    }
+
                     // RuleMark for drag/tap interaction
                     if let currentPoint = self.currentPoint {
                         RuleMark(x: .value("Selected", currentPoint.date))

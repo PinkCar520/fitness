@@ -17,6 +17,8 @@ struct BodyProfileView: View {
     
     @State private var showInputSheet = false
     @State private var selectedChartMetric: ChartableMetric = .weight
+    @State private var selectedRange: BodyProfileViewModel.TimeRange = .thirty
+    @StateObject private var vm = BodyProfileViewModel()
 
     // Computed properties to get latest values
     private var latestWeight: Double {
@@ -25,11 +27,7 @@ struct BodyProfileView: View {
     private var latestBodyFat: Double {
         metrics.first(where: { $0.type == .bodyFatPercentage })?.value ?? 0
     }
-    private var bmi: Double {
-        let height = profileViewModel.userProfile.height / 100 // in meters
-        guard height > 0, latestWeight > 0 else { return 0 }
-        return latestWeight / (height * height)
-    }
+    private var bmi: Double { vm.bmi }
     private var latestWaistCircumference: Double {
         latestValue(for: .waistCircumference) ?? 0
     }
@@ -55,27 +53,7 @@ struct BodyProfileView: View {
         latestValue(for: .waistToHipRatio) ?? 0
     }
 
-    // Computed property to prepare data for the chart based on selection
-    private var chartData: [DateValuePoint] {
-        let selectedType: MetricType
-        switch selectedChartMetric {
-        case .weight:
-            selectedType = .weight
-        case .bodyFat:
-            selectedType = .bodyFatPercentage
-        case .waist:
-            selectedType = .waistCircumference
-        case .heartRate:
-            selectedType = .heartRate
-        case .vo2Max:
-            selectedType = .vo2Max
-        }
-        
-        return metrics
-            .filter { $0.type == selectedType }
-            .map { DateValuePoint(date: $0.date, value: $0.value) }
-            .sorted(by: { $0.date < $1.date })
-    }
+    private var chartData: [DateValuePoint] { vm.chartData }
     
     private var chartTitle: String {
         "\(selectedChartMetric.rawValue)趋势"
@@ -136,11 +114,21 @@ struct BodyProfileView: View {
                         .pickerStyle(.segmented)
                         .padding(.horizontal)
                         
+                        Picker("Range", selection: $selectedRange) {
+                            ForEach(BodyProfileViewModel.TimeRange.allCases) { range in
+                                Text(range.title).tag(range)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal)
+                        
                         GenericLineChartView(
                             title: chartTitle,
                             data: chartData,
                             color: chartColor,
-                            unit: chartUnit
+                            unit: chartUnit,
+                            averageValue: vm.averageValue,
+                            goalValue: vm.goalValue
                         )
                         .frame(minHeight: 220)
                     }
@@ -168,6 +156,24 @@ struct BodyProfileView: View {
 
                     BodyCompositionSummary(bmi: bmi, bodyFat: latestBodyFat)
                         .padding(.horizontal)
+
+                    if !vm.insights.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("建议与解读").font(.title3).bold().padding(.horizontal)
+                            VStack(alignment: .leading, spacing: 6) {
+                                ForEach(vm.insights, id: \.self) { line in
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "lightbulb.fill").foregroundStyle(.yellow)
+                                        Text(line).font(.footnote)
+                                    }
+                                }
+                            }
+                            .padding()
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(12)
+                            .padding(.horizontal)
+                        }
+                    }
 
                     // Visual Records Placeholder Section
                     VStack(alignment: .leading, spacing: 10) {
@@ -212,6 +218,10 @@ struct BodyProfileView: View {
             }
             .padding()
         }
+        .onAppear { refreshVM() }
+        .onChange(of: metrics.map(\.date)) { _ in refreshVM() }
+        .onChange(of: selectedChartMetric) { _ in refreshVM() }
+        .onChange(of: selectedRange) { _ in refreshVM() }
         .sheet(isPresented: $showInputSheet) {
             InputSheetView()
         }
@@ -251,6 +261,14 @@ struct BodyProfileView: View {
             }
             .padding(.horizontal)
         }
+    }
+}
+
+private extension BodyProfileView {
+    func refreshVM() {
+        vm.selectedMetric = selectedChartMetric
+        vm.timeRange = selectedRange
+        vm.refresh(metrics: metrics, profile: profileViewModel.userProfile)
     }
 }
 
