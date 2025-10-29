@@ -131,12 +131,18 @@ struct StatsView: View {
 
                     executionSummarySection
 
+                    // Daily Execution Heatmap
+                    DailyHeatmapView(days: dailyStatuses)
+
                     // Workout Frequency Chart
                     WorkoutFrequencyChartView(data: workoutFrequencyData)
                     
                     // Workout Type Distribution
                     WorkoutTypePieChartView(data: workoutTypeDistributionData)
-                    
+
+                    // Type Efficiency Card
+                    typeEfficiencySection
+
                     // VO2max Trend
                     GenericLineChartView(
                         title: "VO2max 趋势",
@@ -157,6 +163,14 @@ struct StatsView: View {
                         data: viewModel.bodyFatTrend,
                         color: .orange,
                         unit: "%"
+                    )
+
+                    // Weight vs Calories (stacked)
+                    GenericLineChartView(
+                        title: "每日消耗（卡路里）",
+                        data: dailyCaloriesSeries,
+                        color: .pink,
+                        unit: "kcal"
                     )
 
                     Button {
@@ -255,6 +269,107 @@ struct StatsView: View {
             dateCursor = prev
         }
         return .init(completedDays: completed, skippedDays: skipped, streakDays: streak)
+    }
+
+    // MARK: - Heatmap Data
+    private var dailyStatuses: [DailyStatus] {
+        let calendar = Calendar.current
+        let now = calendar.startOfDay(for: Date())
+        let start = calendar.date(byAdding: .day, value: -selectedTimeFrame.days + 1, to: now) ?? now
+        guard let plan = activePlans.first else {
+            return dateRange(from: start, to: now).map { DailyStatus(date: $0, state: .none) }
+        }
+        let index = Dictionary(grouping: plan.dailyTasks, by: { calendar.startOfDay(for: $0.date) })
+        return dateRange(from: start, to: now).map { day in
+            if let task = index[day]?.first {
+                return DailyStatus(date: day, state: task.isCompleted ? .completed : (task.isSkipped ? .skipped : .none))
+            } else {
+                return DailyStatus(date: day, state: .none)
+            }
+        }
+    }
+
+    private func dateRange(from start: Date, to end: Date) -> [Date] {
+        var days: [Date] = []
+        var d = start
+        let cal = Calendar.current
+        while d <= end {
+            days.append(d)
+            d = cal.date(byAdding: .day, value: 1, to: d) ?? d
+        }
+        return days
+    }
+
+    // MARK: - Type Efficiency
+    private var typeEfficiencySection: some View {
+        let window = selectedTimeFrame.days
+        let current = efficiencyMetrics(inLastDays: window)
+        let previous = efficiencyMetrics(inLastDays: window, offset: window)
+        let rows = current.map { (type, cur) -> (WorkoutType, (sessions: Int, minutes: Double, calories: Double), delta: Int) in
+            let prev = previous[type]
+            let delta = cur.sessions - (prev?.sessions ?? 0)
+            return (type, cur, delta)
+        }.sorted { $0.1.calories > $1.1.calories }
+
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("类型效率").font(.title3).bold()
+            ForEach(rows.prefix(3), id: \.0) { row in
+                HStack {
+                    Text(row.0.rawValue).font(.subheadline)
+                    Spacer()
+                    Text("\(Int(row.1.minutes)) 分 / \(Int(row.1.calories)) 千卡").font(.caption)
+                    deltaBadge(row.delta)
+                }
+                .padding(8)
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(8)
+            }
+        }
+        .padding()
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(12)
+    }
+
+    private func deltaBadge(_ delta: Int) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
+            Text("\(delta)")
+        }
+        .font(.caption2.weight(.semibold))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background((delta >= 0 ? Color.green : Color.red).opacity(0.15))
+        .foregroundStyle(delta >= 0 ? Color.green : Color.red)
+        .cornerRadius(8)
+    }
+
+    private func efficiencyMetrics(inLastDays days: Int, offset: Int = 0) -> [WorkoutType: (sessions: Int, minutes: Double, calories: Double)] {
+        let cal = Calendar.current
+        let end = cal.startOfDay(for: Date()).addingTimeInterval(TimeInterval(-offset * 86400))
+        let start = cal.date(byAdding: .day, value: -days + 1, to: end) ?? end
+        let windowWorkouts = workouts.filter { $0.date >= start && $0.date <= end }
+        var dict: [WorkoutType: (sessions: Int, minutes: Double, calories: Double)] = [:]
+        for w in windowWorkouts {
+            let m = (w.durationInMinutes ?? 0)
+            let c = (w.caloriesBurned ?? 0)
+            let cur = dict[w.type] ?? (sessions: 0, minutes: 0, calories: 0)
+            dict[w.type] = (sessions: cur.sessions + 1, minutes: cur.minutes + m, calories: cur.calories + c)
+        }
+        return dict
+    }
+
+    // MARK: - Calories series by day (from workouts)
+    private var dailyCaloriesSeries: [DateValuePoint] {
+        let cal = Calendar.current
+        let now = cal.startOfDay(for: Date())
+        let start = cal.date(byAdding: .day, value: -selectedTimeFrame.days + 1, to: now) ?? now
+        let relevant = workouts.filter { $0.date >= start && $0.date <= now }
+        let grouped = Dictionary(grouping: relevant, by: { cal.startOfDay(for: $0.date) })
+        let days = dateRange(from: start, to: now)
+        return days.map { day in
+            let sum = (grouped[day] ?? []).reduce(0) { $0 + ($1.caloriesBurned ?? 0) }
+            return DateValuePoint(date: day, value: sum)
+        }
     }
 }
 
