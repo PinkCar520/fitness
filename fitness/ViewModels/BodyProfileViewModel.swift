@@ -71,10 +71,17 @@ final class BodyProfileViewModel: ObservableObject {
         case .heartRate: type = .heartRate
         case .vo2Max: type = .vo2Max
         }
-        return metrics
+        let series = metrics
             .filter { $0.type == type && $0.date >= start && $0.date <= now }
             .sorted(by: { $0.date < $1.date })
             .map { DateValuePoint(date: $0.date, value: $0.value) }
+        return downsample(series, maxPoints: 200)
+    }
+
+    private func downsample(_ points: [DateValuePoint], maxPoints: Int) -> [DateValuePoint] {
+        guard points.count > maxPoints && maxPoints > 0 else { return points }
+        let step = max(1, points.count / maxPoints)
+        return points.enumerated().compactMap { idx, p in idx % step == 0 ? p : nil }
     }
 
     private func average(of series: [DateValuePoint]) -> Double? {

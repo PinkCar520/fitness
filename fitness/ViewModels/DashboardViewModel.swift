@@ -42,6 +42,8 @@ struct DashboardInsightItem: Identifiable, Equatable {
         case startWorkout
         case logWeight
         case openPlan
+        case openBodyProfileWeight
+        case openStats
         case none
     }
 
@@ -390,14 +392,14 @@ class DashboardViewModel: ObservableObject {
                 title: "体重略有上升",
                 message: "与一周前相比上升了 \(String(format: "%.1f", delta)) kg，保持饮食节奏并适度增加活动量。",
                 tone: .warning,
-                intent: .logWeight
+                intent: .openBodyProfileWeight
             )
         } else {
             return DashboardInsightItem(
                 title: "体重在下降",
                 message: "较一周前下降 \(String(format: "%.1f", abs(delta))) kg，记得补充优质蛋白与充足睡眠。",
                 tone: .positive,
-                intent: .none
+                intent: .openBodyProfileWeight
             )
         }
     }

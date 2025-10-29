@@ -106,6 +106,12 @@ struct BodyProfileView: View {
         .onChange(of: metrics.map(\.date)) { _ in refreshVM() }
         .onChange(of: selectedChartMetric) { _ in refreshVM() }
         .onChange(of: selectedRange) { _ in refreshVM() }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToBodyProfileMetric)) { notif in
+            if let metric = notif.userInfo?["metric"] as? String {
+                if metric == "weight" { selectedChartMetric = .weight }
+                if metric == "bodyFat" { selectedChartMetric = .bodyFat }
+            }
+        }
         .sheet(isPresented: $showInputSheet) {
             InputSheetView()
         }
@@ -201,6 +207,10 @@ struct BodyProfileView: View {
         return Group {
             metricSection(title: "身体成分", items: items)
             BodyCompositionSummary(bmi: bmi, bodyFat: latestBodyFat)
+                .padding(.horizontal)
+            Text("标准来源：WHO；国标作为补充参考")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
                 .padding(.horizontal)
         }
     }
