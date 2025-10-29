@@ -43,6 +43,7 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol, @unche
     @Published var lastWeightSample: HKQuantitySample?
     @Published var lastBodyFatSample: HKQuantitySample?
     @Published var lastWaistCircumferenceSample: HKQuantitySample?
+    @Published var lastVO2MaxSample: HKQuantitySample?
     @Published var lastSavedWeight: Double?
     @Published var stepCount: Double = 0
     @Published var distance: Double = 0
@@ -70,8 +71,9 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol, @unche
         let workoutType = HKObjectType.workoutType()
         let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate)!
         let sleepAnalysisType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)!
+        let vo2MaxType = HKQuantityType.quantityType(forIdentifier: .vo2Max)!
 
-        let typesToRead: Set<HKObjectType> = [weightType, bodyFatPercentageType, waistCircumferenceType, stepType, distanceType, activitySummaryType, activeEnergyBurnedType, workoutType, heartRateType, sleepAnalysisType]
+        let typesToRead: Set<HKObjectType> = [weightType, bodyFatPercentageType, waistCircumferenceType, stepType, distanceType, activitySummaryType, activeEnergyBurnedType, workoutType, heartRateType, sleepAnalysisType, vo2MaxType]
         let typesToWrite: Set<HKSampleType> = [weightType, bodyFatPercentageType, waistCircumferenceType, workoutType, sleepAnalysisType, heartRateType]
 
         healthStore.requestAuthorization(toShare: typesToWrite, read: typesToRead) { success, error in
@@ -176,6 +178,19 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol, @unche
         let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
         let predicate = HKQuery.predicateForSamples(withStart: .distantPast, end: Date(), options: .strictEndDate)
 
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: 1, sortDescriptors: [sortDescriptor]) { _, results, _ in
+                continuation.resume(returning: results?.first as? HKQuantitySample)
+            }
+            healthStore.execute(query)
+        }
+    }
+
+    // 读取最近 VO2max
+    func readMostRecentVO2Max() async -> HKQuantitySample? {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .vo2Max) else { return nil }
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+        let predicate = HKQuery.predicateForSamples(withStart: .distantPast, end: Date(), options: .strictEndDate)
         return await withCheckedContinuation { continuation in
             let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: 1, sortDescriptors: [sortDescriptor]) { _, results, _ in
                 continuation.resume(returning: results?.first as? HKQuantitySample)

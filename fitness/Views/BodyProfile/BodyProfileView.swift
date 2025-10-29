@@ -6,6 +6,7 @@ enum ChartableMetric: String, CaseIterable, Identifiable {
     case bodyFat = "体脂率"
     case waist = "腰围"
     case heartRate = "心率"
+    case vo2Max = "VO2max"
 
     var id: String { self.rawValue }
 }
@@ -66,6 +67,8 @@ struct BodyProfileView: View {
             selectedType = .waistCircumference
         case .heartRate:
             selectedType = .heartRate
+        case .vo2Max:
+            selectedType = .vo2Max
         }
         
         return metrics
@@ -84,6 +87,7 @@ struct BodyProfileView: View {
         case .bodyFat: return .orange
         case .waist: return .purple
         case .heartRate: return .red
+        case .vo2Max: return .teal
         }
     }
     
@@ -93,6 +97,7 @@ struct BodyProfileView: View {
         case .bodyFat: return "%"
         case .waist: return "cm"
         case .heartRate: return "bpm"
+        case .vo2Max: return "ml/kg/min"
         }
     }
 
@@ -110,6 +115,16 @@ struct BodyProfileView: View {
                             MetricDisplay(title: "静息心率", value: formatted(latestHeartRate, precision: 0), unit: "bpm", icon: "heart.fill", color: .red)
                         ]
                     )
+
+                    // VO2max (如果已授权且有数据)
+                    if let latest = metrics.first(where: { $0.type == .vo2Max })?.value, latest > 0 {
+                        metricSection(
+                            title: "心肺耐力",
+                            items: [
+                                MetricDisplay(title: "VO2max", value: formatted(latest, precision: 1), unit: "ml/kg/min", icon: "lungs.fill", color: .teal)
+                            ]
+                        )
+                    }
 
                     // Chart Section
                     VStack(spacing: 16) {
