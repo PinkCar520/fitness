@@ -10,6 +10,7 @@ struct DailyStatus: Identifiable {
 struct DailyHeatmapView: View {
     let days: [DailyStatus]
     var onTap: ((Date) -> Void)? = nil
+    var onLongPress: ((DailyStatus) -> Void)? = nil
 
     private var weeks: [[DailyStatus]] {
         // Group into weeks ending today, from oldest to newest
@@ -50,6 +51,9 @@ struct DailyHeatmapView: View {
                                     .contentShape(Circle())
                                     .onTapGesture {
                                         if let d = dayStatus?.date { onTap?(d) }
+                                    }
+                                    .onLongPressGesture(minimumDuration: 0.3) {
+                                        if let s = dayStatus { onLongPress?(s) }
                                     }
                             }
                         }

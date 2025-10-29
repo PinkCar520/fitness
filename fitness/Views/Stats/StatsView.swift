@@ -36,6 +36,8 @@ struct StatsView: View {
     @StateObject private var viewModel = StatsViewModel()
     @State private var reportImage: UIImage? = nil
     @State private var showShareSheet = false
+    @State private var showDayInfo: Bool = false
+    @State private var dayInfoText: String = ""
 
     // Environment & Data Sources
     @EnvironmentObject var healthKitManager: HealthKitManager
@@ -43,6 +45,10 @@ struct StatsView: View {
     @Query(sort: \Workout.date, order: .reverse) private var workouts: [Workout]
     @Query(sort: \HealthMetric.date, order: .forward) private var allMetrics: [HealthMetric]
     @Query(filter: #Predicate<Plan> { $0.status == "active" }) private var activePlans: [Plan]
+
+    // Correlation metric selection
+    enum CorrelationMetric: String, CaseIterable, Identifiable { case weight = "体重", bodyFat = "体脂率"; var id: String { rawValue } }
+    @State private var selectedCorrelation: CorrelationMetric = .weight
 
     // State for fetched data
     @State private var totalCalories: Double = 0
@@ -136,10 +142,13 @@ struct StatsView: View {
                     executionSummarySection
 
                     // Daily Execution Heatmap
-                    DailyHeatmapView(days: dailyStatuses) { date in
+                    DailyHeatmapView(days: dailyStatuses, onTap: { date in
                         appState.selectedTab = 1
                         NotificationCenter.default.post(name: .navigateToPlanDate, object: nil, userInfo: ["date": date])
-                    }
+                    }, onLongPress: { status in
+                        dayInfoText = heatmapInfoText(for: status)
+                        showDayInfo = true
+                    })
 
                     // Workout Frequency Chart
                     WorkoutFrequencyChartView(data: workoutFrequencyData)
@@ -187,7 +196,7 @@ struct StatsView: View {
                         unit: "kcal"
                     )
 
-                    // Correlation: Weight vs Calories
+                    // Correlation: Weight/BodyFat vs Calories
                     correlationSection
 
                     Button {
@@ -224,6 +233,11 @@ struct StatsView: View {
                 if let image = reportImage {
                     ShareSheet(items: [image])
                 }
+            }
+            .alert("当天执行详情", isPresented: $showDayInfo) {
+                Button("知道了", role: .cancel) {}
+            } message: {
+                Text(dayInfoText)
             }
         }
     }
@@ -285,16 +299,37 @@ struct StatsView: View {
     // MARK: - Correlation Section (Weight vs Calories)
     private var correlationSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("体重 vs 消耗（相关性）").font(.title3).bold()
+            HStack {
+                Text("相关性（消耗 vs ")
+                Picker("Correlation", selection: $selectedCorrelation) {
+                    ForEach(CorrelationMetric.allCases) { m in Text(m.rawValue).tag(m) }
+                }
+                .pickerStyle(.segmented)
+                Text(")").opacity(0.6)
+                Spacer()
+            }
+            .font(.title3.bold())
+            
             Chart(correlationPoints) { pt in
                 PointMark(
                     x: .value("体重", pt.weight),
                     y: .value("消耗", pt.calories)
                 )
                 .foregroundStyle(Color.purple)
+                // Trendline
+                if let line = correlationTrendline {
+                    LineMark(
+                        x: .value("x", line.0.x), y: .value("y", line.0.y)
+                    )
+                    .foregroundStyle(Color.purple.opacity(0.5))
+                    LineMark(
+                        x: .value("x", line.1.x), y: .value("y", line.1.y)
+                    )
+                    .foregroundStyle(Color.purple.opacity(0.5))
+                }
             }
             .frame(height: 220)
-            Text("提示：相关性仅供参考，饮食与训练强度等因素也会影响体重变化。")
+            Text(correlationSubtitle)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -306,19 +341,20 @@ struct StatsView: View {
     private struct CorrelationPoint: Identifiable { let id = UUID(); let weight: Double; let calories: Double }
 
     private var correlationPoints: [CorrelationPoint] {
-        // Build daily weight series (use latest weight on or before the day)
+        // Build daily series for selected metric (latest on/before day)
         let cal = Calendar.current
         let now = cal.startOfDay(for: Date())
         let start = cal.date(byAdding: .day, value: -selectedTimeFrame.days + 1, to: now) ?? now
-        // Pre-sort weight metrics ascending
-        let weightMetrics = allMetrics.filter { $0.type == .weight }.sorted { $0.date < $1.date }
+        // Pre-sort metrics ascending by selected type
+        let metricType: MetricType = (selectedCorrelation == .weight) ? .weight : .bodyFatPercentage
+        let metricSeries = allMetrics.filter { $0.type == metricType }.sorted { $0.date < $1.date }
         let days = dateRange(from: start, to: now)
         var idx = 0
         var lastWeight: Double? = nil
         var weightsByDay: [Date: Double] = [:]
         for d in days {
             // advance idx to last metric <= d
-            while idx < weightMetrics.count && weightMetrics[idx].date <= d { lastWeight = weightMetrics[idx].value; idx += 1 }
+            while idx < metricSeries.count && metricSeries[idx].date <= d { lastWeight = metricSeries[idx].value; idx += 1 }
             if let w = lastWeight { weightsByDay[d] = w }
         }
         // Calories by day from existing series
@@ -330,6 +366,48 @@ struct StatsView: View {
             }
             return nil
         }
+    }
+
+    private var correlationSubtitle: String {
+        let points = correlationPoints
+        guard points.count >= 3, let r = pearsonR(points: points) else {
+            return "提示：相关性仅供参考，饮食与训练强度等因素也会影响体重/体脂变化。"
+        }
+        return String(format: "相关系数 r = %.2f（仅供参考）", r)
+    }
+
+    // Simple Pearson correlation
+    private func pearsonR(points: [CorrelationPoint]) -> Double? {
+        let n = Double(points.count)
+        guard n >= 2 else { return nil }
+        let xs = points.map { $0.weight }
+        let ys = points.map { $0.calories }
+        let meanX = xs.reduce(0,+) / n
+        let meanY = ys.reduce(0,+) / n
+        let cov = zip(xs, ys).reduce(0.0) { $0 + (($1.0 - meanX) * ($1.1 - meanY)) }
+        let varX = xs.reduce(0) { $0 + pow($1 - meanX, 2) }
+        let varY = ys.reduce(0) { $0 + pow($1 - meanY, 2) }
+        let denom = sqrt(varX * varY)
+        guard denom > 0 else { return nil }
+        return cov / denom
+    }
+
+    // Regression line endpoints for scatter chart
+    private var correlationTrendline: ((x: Double, y: Double), (x: Double, y: Double))? {
+        let pts = correlationPoints
+        guard pts.count >= 2 else { return nil }
+        let xs = pts.map { $0.weight }
+        let ys = pts.map { $0.calories }
+        let n = Double(pts.count)
+        let meanX = xs.reduce(0,+) / n
+        let meanY = ys.reduce(0,+) / n
+        let sxy = zip(xs, ys).reduce(0.0) { $0 + (($1.0 - meanX) * ($1.1 - meanY)) }
+        let sxx = xs.reduce(0) { $0 + pow($1 - meanX, 2) }
+        guard sxx > 0 else { return nil }
+        let b = sxy / sxx
+        let a = meanY - b * meanX
+        guard let minX = xs.min(), let maxX = xs.max() else { return nil }
+        return ((x: minX, y: a + b * minX), (x: maxX, y: a + b * maxX))
     }
 
     private func buildExecutionSummary(days: Int) -> StatsViewModel.ExecutionSummary {
@@ -417,6 +495,17 @@ struct StatsView: View {
         .background(Color.gray.opacity(0.1))
         .cornerRadius(10)
         .padding(.horizontal)
+    }
+
+    private func heatmapInfoText(for status: DailyStatus) -> String {
+        let dateText = status.date.formatted(date: .abbreviated, time: .omitted)
+        let stateText: String
+        switch status.state {
+        case .completed: stateText = "已完成"
+        case .skipped: stateText = "已跳过"
+        case .none: stateText = "无记录"
+        }
+        return "\(dateText)：\(stateText)"
     }
 
     // MARK: - Heatmap Data
