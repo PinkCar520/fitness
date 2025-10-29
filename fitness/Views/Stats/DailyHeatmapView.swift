@@ -9,6 +9,7 @@ struct DailyStatus: Identifiable {
 
 struct DailyHeatmapView: View {
     let days: [DailyStatus]
+    var onTap: ((Date) -> Void)? = nil
 
     private var weeks: [[DailyStatus]] {
         // Group into weeks ending today, from oldest to newest
@@ -46,6 +47,10 @@ struct DailyHeatmapView: View {
                                     .fill(color(for: dayStatus?.state))
                                     .frame(width: 14, height: 14)
                                     .accessibilityLabel(dayStatus?.date.formatted(date: .abbreviated, time: .omitted) ?? "")
+                                    .contentShape(Circle())
+                                    .onTapGesture {
+                                        if let d = dayStatus?.date { onTap?(d) }
+                                    }
                             }
                         }
                     }
@@ -81,4 +86,3 @@ struct DailyHeatmapView: View {
         Circle().fill(color).frame(width: 8, height: 8)
     }
 }
-

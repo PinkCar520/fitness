@@ -38,6 +38,7 @@ struct StatsView: View {
 
     // Environment & Data Sources
     @EnvironmentObject var healthKitManager: HealthKitManager
+    @EnvironmentObject var appState: AppState
     @Query(sort: \Workout.date, order: .reverse) private var workouts: [Workout]
     @Query(sort: \HealthMetric.date, order: .forward) private var allMetrics: [HealthMetric]
     @Query(filter: #Predicate<Plan> { $0.status == "active" }) private var activePlans: [Plan]
@@ -132,7 +133,10 @@ struct StatsView: View {
                     executionSummarySection
 
                     // Daily Execution Heatmap
-                    DailyHeatmapView(days: dailyStatuses)
+                    DailyHeatmapView(days: dailyStatuses) { date in
+                        appState.selectedTab = 1
+                        NotificationCenter.default.post(name: .navigateToPlanDate, object: nil, userInfo: ["date": date])
+                    }
 
                     // Workout Frequency Chart
                     WorkoutFrequencyChartView(data: workoutFrequencyData)
