@@ -16,11 +16,13 @@ final class Meal {
     var calories: Int
     var date: Date
     var mealType: MealType
+    var isCompleted: Bool
 
-    init(name: String, calories: Int, date: Date, mealType: MealType) {
+    init(name: String, calories: Int, date: Date, mealType: MealType, isCompleted: Bool = false) {
         self.name = name
         self.calories = calories
         self.date = date
         self.mealType = mealType
+        self.isCompleted = isCompleted
     }
 }

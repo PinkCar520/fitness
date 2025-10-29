@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import Foundation // Added for general type resolution
 
 // MARK: - Supporting Enums and Structs
@@ -22,10 +23,14 @@ struct PlanConfiguration {
 
 struct PlanSetupView: View {
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var profileViewModel: ProfileViewModel
+    @Query(filter: #Predicate<Plan> { $0.status == "active" }, sort: \.startDate, order: .reverse)
+    private var activePlans: [Plan]
     
     @State private var config = PlanConfiguration()
     @State private var currentStep = 0
     @State private var isLoadingPlan = false // NEW STATE VARIABLE
+    @State private var hasSeededExistingPlan = false
     
     var onComplete: (PlanConfiguration) -> Void
 
@@ -87,6 +92,21 @@ struct PlanSetupView: View {
                 }
             } // END ZSTACK
         }
+        .onAppear {
+            seedConfigIfNeeded()
+        }
+    }
+
+    private func seedConfigIfNeeded() {
+        guard !hasSeededExistingPlan else { return }
+        if let activePlan = activePlans.first {
+            config.goal = activePlan.planGoal.fitnessGoal
+            config.targetWeight = activePlan.planGoal.targetWeight
+            config.planDuration = activePlan.duration
+        } else if let experience = profileViewModel.userProfile.experienceLevel {
+            config.experienceLevel = experience
+        }
+        hasSeededExistingPlan = true
     }
 }
 
@@ -438,7 +458,7 @@ private struct TargetWeightSlider: View {
                         .offset(x: getThumbXOffset(sliderWidth: sliderWidth))
                 }
                 .frame(width: sliderWidth)
-                .gesture(
+                .highPriorityGesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { gesture in
                             let newThumbCenterX = gesture.location.x
@@ -580,8 +600,13 @@ struct Triangle: Shape {
 
 struct PlanSetupView_Previews: PreviewProvider {
     static var previews: some View {
-        PlanSetupView { config in
-            print("Preview: Plan Generated with config: \(config)")
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try! ModelContainer(for: Plan.self, configurations: config)
+
+        return PlanSetupView { generatedConfig in
+            print("Preview: Plan Generated with config: \(generatedConfig)")
         }
+        .modelContainer(container)
+        .environmentObject(ProfileViewModel())
     }
 }

@@ -110,6 +110,34 @@ final class WeightManager: ObservableObject {
     }
 #endif
 
+#if !os(watchOS)
+    @MainActor
+    func syncHealthKitSample(_ sample: HKQuantitySample) {
+        guard let weightType = HKQuantityType.quantityType(forIdentifier: .bodyMass),
+              sample.quantityType == weightType else {
+            return
+        }
+
+        let context = modelContainer.mainContext
+        let start = sample.endDate.addingTimeInterval(-1)
+        let end = sample.endDate.addingTimeInterval(1)
+
+        let descriptor = FetchDescriptor<HealthMetric>(
+            predicate: #Predicate { metric in
+                metric.date >= start && metric.date <= end
+            }
+        )
+
+        let existing = (try? context.fetch(descriptor)) ?? []
+        guard !existing.contains(where: { $0.type == .weight }) else { return }
+
+        let weight = sample.quantity.doubleValue(for: .gramUnit(with: .kilo))
+        let newMetric = HealthMetric(date: sample.endDate, value: round(weight * 10) / 10, type: .weight)
+        context.insert(newMetric)
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+#endif
+
     // MARK: - 派生数据
     // The derived data functions (weightChange, averageWeight) will be
     // re-implemented directly in the UI layer using SwiftData's @Query property wrapper,

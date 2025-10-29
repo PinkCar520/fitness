@@ -4,6 +4,8 @@ import SwiftData
 struct ReportView: View {
     @ObservedObject var profileViewModel: ProfileViewModel
     @Query(sort: \HealthMetric.date, order: .reverse) private var records: [HealthMetric]
+    @Query(filter: #Predicate<Plan> { $0.status == "active" }, sort: \.startDate, order: .reverse)
+    private var activePlans: [Plan]
     
     let selectedTimeFrame: StatsView.TimeFrame
     let totalCalories: Double
@@ -69,17 +71,19 @@ struct ReportView: View {
     }
     
     private var goalAchievementPercentage: String {
-        let targetWeight = profileViewModel.userProfile.targetWeight
+        guard let planGoal = activePlans.first?.planGoal else {
+            return "--"
+        }
         guard let latestWeight = records.first?.value else {
             return "--"
         }
         
         var progress: Double = 0
-        if targetWeight > 0 {
-            if latestWeight <= targetWeight {
+        if planGoal.targetWeight > 0 {
+            if latestWeight <= planGoal.targetWeight {
                 progress = 1.0
             } else {
-                progress = targetWeight / latestWeight
+                progress = planGoal.targetWeight / latestWeight
             }
         }
         

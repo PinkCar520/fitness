@@ -5,6 +5,7 @@ struct SummaryDashboardView: View {
     // Environment Objects
     @EnvironmentObject var profileViewModel: ProfileViewModel
     @EnvironmentObject var recommendationManager: RecommendationManager
+    @EnvironmentObject var appState: AppState
 
     // State
     @Binding var showInputSheet: Bool
@@ -22,12 +23,27 @@ struct SummaryDashboardView: View {
 
     // Query for active plan
     @Query(filter: #Predicate<Plan> { $0.status == "active" }) private var activePlans: [Plan]
+    @Query(sort: \HealthMetric.date, order: .forward) private var allMetrics: [HealthMetric]
 
     init(showInputSheet: Binding<Bool>, healthKitManager: HealthKitManager, weightManager: WeightManager) {
         self._showInputSheet = showInputSheet
         self.healthKitManager = healthKitManager
         self.weightManager = weightManager
         self._dashboardViewModel = StateObject(wrappedValue: DashboardViewModel(healthKitManager: healthKitManager, weightManager: weightManager))
+    }
+
+    private var activePlan: Plan? {
+        activePlans.first
+    }
+
+    private var todaysTask: DailyTask? {
+        guard let plan = activePlan else { return nil }
+        let today = Calendar.current.startOfDay(for: Date())
+        return plan.dailyTasks.first { Calendar.current.isDate($0.date, inSameDayAs: today) }
+    }
+
+    private var weightMetrics: [HealthMetric] {
+        allMetrics.filter { $0.type == .weight }
     }
 
     // The dynamic content of the dashboard
@@ -54,7 +70,7 @@ struct SummaryDashboardView: View {
         case .fitnessRings:
             FitnessRingCard(activitySummary: dashboardViewModel.activitySummary)
         case .goalProgress:
-            GoalProgressCard(showInputSheet: $showInputSheet, latestWeightSample: dashboardViewModel.lastWeightSample)
+            GoalProgressCard(showInputSheet: $showInputSheet)
         case .stepsAndDistance:
             HStack(spacing: 16) {
                 StepsCard(stepCount: dashboardViewModel.stepCount, weeklyStepData: dashboardViewModel.weeklyStepData)
@@ -77,6 +93,14 @@ struct SummaryDashboardView: View {
                 
                 ScrollView {
                     VStack(spacing: 16) {
+
+                        if !dashboardViewModel.quickActions.isEmpty {
+                            quickActionsSection
+                        }
+
+                        if !dashboardViewModel.insights.isEmpty {
+                            insightsSection
+                        }
 
                         // Dynamically generate cards
                         ForEach(dashboardViewModel.cards) { card in
@@ -134,6 +158,16 @@ struct SummaryDashboardView: View {
             .task { // Add .task here
                 await dashboardViewModel.loadNonReactiveData()
             }
+            .onAppear(perform: refreshAuxiliaryData)
+            .onChange(of: activePlans.map(\.id)) { _ in
+                refreshAuxiliaryData()
+            }
+            .onChange(of: allMetrics.map(\.date)) { _ in
+                refreshAuxiliaryData()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .planDataDidChange)) { _ in
+                refreshAuxiliaryData()
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showSettingsSheet = true }) {
@@ -163,6 +197,73 @@ struct SummaryDashboardView: View {
                                     .environmentObject(dashboardViewModel) // Inject DashboardViewModel
                                     .presentationDetents([.fraction(0.85), .large])
                             }        }
+    }
+
+    private var quickActionsSection: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 16) {
+                ForEach(dashboardViewModel.quickActions) { action in
+                    QuickActionButton(
+                        title: action.title,
+                        subtitle: action.subtitle,
+                        icon: action.icon,
+                        tint: action.tint
+                    ) {
+                        perform(action.intent)
+                    }
+                    .frame(width: 220)
+                }
+            }
+            .padding(.horizontal, 4)
+        }
+    }
+
+    private var insightsSection: some View {
+        VStack(spacing: 12) {
+            ForEach(dashboardViewModel.insights) { item in
+                InsightCard(
+                    title: item.title,
+                    description: item.message,
+                    tone: item.tone,
+                    action: actionForInsight(item.intent)
+                )
+            }
+        }
+    }
+
+    private func actionForInsight(_ intent: DashboardInsightItem.Intent) -> InsightCard.Action? {
+        switch intent {
+        case .startWorkout:
+            return InsightCard.Action(title: "开始训练", icon: "play.fill") { perform(.startWorkout) }
+        case .logWeight:
+            return InsightCard.Action(title: "记录体重", icon: "scalemass.fill") { perform(.logWeight) }
+        case .openPlan:
+            return InsightCard.Action(title: "查看计划", icon: "target") { perform(.openPlan) }
+        case .none:
+            return nil
+        }
+    }
+
+    private func perform(_ intent: DashboardQuickAction.Intent) {
+        switch intent {
+        case .startWorkout:
+            appState.selectedTab = 1
+            // Additional routing could be added later (e.g., notification to open workout)
+        case .openPlan:
+            appState.selectedTab = 1
+        case .logWeight:
+            showInputSheet = true
+        case .openNutrition:
+            appState.selectedTab = 1
+        }
+    }
+
+    private func refreshAuxiliaryData() {
+        dashboardViewModel.refreshAuxiliaryData(
+            activePlan: activePlan,
+            todaysTask: todaysTask,
+            weightMetrics: weightMetrics
+        )
     }
 }
 

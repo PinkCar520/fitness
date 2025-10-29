@@ -55,7 +55,7 @@ class RecommendationManager: ObservableObject {
         self.recommendedContent = newRecommendations
     }
 
-    func generateInitialWorkoutPlan(userProfile: UserProfile) -> Plan {
+    func generateInitialWorkoutPlan(userProfile: UserProfile, planGoal: PlanGoal, planDuration: Int) -> Plan {
         var filteredExercises = allExercises
 
         // 1. Filter by Workout Location
@@ -152,7 +152,7 @@ class RecommendationManager: ObservableObject {
 
 
         // 5. Construct DailyTask and Plan Objects
-        let today = Calendar.current.startOfDay(for: Date())
+        let today = Calendar.current.startOfDay(for: planGoal.startDate)
         var dailyTasks: [DailyTask] = []
 
         // For MVP, create 3 workout days in a week
@@ -211,8 +211,8 @@ class RecommendationManager: ObservableObject {
             dailyTasks.append(task)
         }
 
-        let planName = "\(userProfile.name)的\(goal.rawValue)计划"
-        let plan = Plan(name: planName, goal: goal, startDate: today, duration: 7, tasks: dailyTasks)
+        let planName = "\(userProfile.name)的\(planGoal.fitnessGoal.rawValue)计划"
+        let plan = Plan(name: planName, planGoal: planGoal, startDate: today, duration: planDuration, tasks: dailyTasks)
 
         return plan
     }

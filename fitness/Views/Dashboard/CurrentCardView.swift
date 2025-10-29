@@ -3,8 +3,8 @@ import SwiftData
 
 struct CurrentCardView: View {
     @EnvironmentObject var weightManager: WeightManager // Still needed for the 'add' action via showInputSheet
+    @EnvironmentObject var appState: AppState
     @Binding var showInputSheet: Bool
-    @State private var showingBodyMetricsSheet = false
 
     @Query(sort: \HealthMetric.date, order: .forward) private var allMetrics: [HealthMetric]
 
@@ -13,9 +13,6 @@ struct CurrentCardView: View {
     }
 
     var body: some View {
-        Button(action: {
-            showingBodyMetricsSheet = true
-        }) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
@@ -62,10 +59,9 @@ struct CurrentCardView: View {
             }
             .padding()
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-        }
-        .buttonStyle(PlainButtonStyle()) // To remove default button styling
-        .sheet(isPresented: $showingBodyMetricsSheet) {
-            BodyMetricsView()
+        .contentShape(Rectangle())
+        .onTapGesture {
+            appState.selectedTab = 2
         }
     }
 

@@ -11,7 +11,7 @@ struct PlanDetailView: View {
                     .font(.largeTitle)
                     .fontWeight(.bold)
                 
-                Text("目标: " + plan.goal)
+                Text(plan.goalHeadline)
                     .font(.title2)
                     .foregroundColor(.secondary)
                 
@@ -75,7 +75,15 @@ struct PlanDetailView_Previews: PreviewProvider {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try! ModelContainer(for: Plan.self, configurations: config)
         
-        let mockPlan = Plan(name: "30天减脂计划", goal: .fatLoss, startDate: Date(), duration: 30, tasks: [], status: "active")
+        let planGoal = PlanGoal(
+            fitnessGoal: .fatLoss,
+            startWeight: 72.3,
+            targetWeight: 65.0,
+            startDate: Date(),
+            targetDate: Calendar.current.date(byAdding: .day, value: 30, to: Date())
+        )
+        
+        let mockPlan = Plan(name: "30天减脂计划", planGoal: planGoal, startDate: Date(), duration: 30, tasks: [], status: "active")
         
         let workout1 = Workout(name: "胸部训练", durationInMinutes: 60, caloriesBurned: 400, date: Date(), type: .strength)
         let meal1 = Meal(name: "鸡胸肉沙拉", calories: 350, date: Date(), mealType: .lunch) // Use .lunch

@@ -69,4 +69,5 @@ struct fitnessApp: App {
 // Define a custom notification name
 extension Notification.Name {
     static let showInputSheet = Notification.Name("showInputSheet")
+    static let planDataDidChange = Notification.Name("planDataDidChange")
 }

@@ -41,46 +41,7 @@ private extension TodaysWorkoutCard {
             Spacer()
         }
     }
-
-    @ViewBuilder
-    func completedContent() -> some View {
-        HStack {
-            Spacer()
-            Image(systemName: "flag.checkered.2.crossed")
-                .foregroundStyle(.green)
-        }
-
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.title)
-                .foregroundStyle(.green)
-            Text("今日训练已完成! 🎉")
-                .font(.title)
-                .fontWeight(.bold)
-                .foregroundStyle(.green)
-        }
-
-        Text("你真棒！继续保持，期待看到你长期的进步。")
-            .font(.body)
-            .foregroundStyle(.secondary)
-            .padding(.bottom, 10)
-
-        Button {
-            appState.workoutSummary = (show: true, workouts: dailyTask.workouts)
-        } label: {
-            HStack {
-                Image(systemName: "list.bullet.clipboard")
-                Text("查看总结")
-                    .font(.headline)
-            }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 16)
-            .background(Color.green.opacity(0.1), in: Capsule())
-            .foregroundStyle(.green)
-        }
-        .buttonStyle(.plain)
-    }
-
+    
     @ViewBuilder
     func noPlanContent() -> some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -90,7 +51,7 @@ private extension TodaysWorkoutCard {
             Text("请前往“计划”页面创建一个新的训练计划。")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-
+            
             Button {
                 appState.selectedTab = 1
             } label: {
@@ -106,7 +67,7 @@ private extension TodaysWorkoutCard {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-
+    
     @ViewBuilder
     func restDayContent() -> some View {
         HStack(spacing: 16) {
@@ -114,7 +75,7 @@ private extension TodaysWorkoutCard {
                 .font(.largeTitle)
                 .foregroundColor(.mint)
                 .frame(width: 40, height: 40)
-
+            
             VStack(alignment: .leading, spacing: 6) {
                 Text("休息日")
                     .font(.title2)
@@ -128,7 +89,7 @@ private extension TodaysWorkoutCard {
         .padding(20)
         .background(Color.mint.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
     }
-
+    
     @ViewBuilder
     func nextWorkoutContent(for task: DailyTask) -> some View {
         if let workout = task.workouts.first {
@@ -139,7 +100,7 @@ private extension TodaysWorkoutCard {
                         .padding(6)
                         .background(Color.accentColor.opacity(0.6))
                         .clipShape(Circle())
-
+                    
                     VStack(alignment: .leading, spacing: 4) {
                         Text("下一项训练")
                             .font(.caption)
@@ -149,9 +110,9 @@ private extension TodaysWorkoutCard {
                             .fontWeight(.semibold)
                             .foregroundStyle(.white)
                     }
-
+                    
                     Spacer()
-
+                    
                     Text("\(task.workouts.count) 项")
                         .font(.caption)
                         .fontWeight(.semibold)
@@ -160,24 +121,24 @@ private extension TodaysWorkoutCard {
                         .padding(.horizontal, 10)
                         .background(Color.white.opacity(0.15), in: Capsule())
                 }
-
+                
                 HStack(spacing: 8) {
                     if workout.type == .strength,
                        let sets = workout.sets,
                        !sets.isEmpty {
                         infoCapsule(text: "\(sets.count) 组", icon: "repeat")
                     }
-
+                    
                     if workout.type == .cardio,
                        let duration = workout.durationInMinutes {
                         infoCapsule(text: "\(duration) 分钟", icon: "stopwatch")
                     }
-
+                    
                     if workout.caloriesBurned > 0 {
                         infoCapsule(text: "\(workout.caloriesBurned) 千卡", icon: "flame.fill")
                     }
                 }
-
+                
                 Button {
                     appState.selectedTab = 1
                 } label: {
@@ -200,7 +161,10 @@ private extension TodaysWorkoutCard {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 LinearGradient(
-                    colors: [Color.accentColor.opacity(0.9), Color.accentColor.opacity(0.6)],
+                    colors: [
+                        Color.accentColor.opacity(0.85),
+                        Color.accentColor.opacity(0.45)
+                    ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -210,36 +174,66 @@ private extension TodaysWorkoutCard {
             restDayContent()
         }
     }
-}
-
-private extension TodaysWorkoutCard {
+    @ViewBuilder
+    func completedContent() -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "sparkles")
+                .font(.title3)
+                .foregroundStyle(.green)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("今日训练已完成！")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.green)
+                Text("恭喜你坚持到最后，继续保持节奏。")
+                    .font(.footnote)
+                    .foregroundStyle(.green.opacity(0.75))
+            }
+            Spacer()
+            summaryIconButton()
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.green.opacity(0.25),
+                            Color.clear
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+    }
+    
+    @ViewBuilder
+    func summaryIconButton() -> some View {
+        Button {
+            appState.workoutSummary = (show: true, workouts: dailyTask.workouts)
+        } label: {
+            Image(systemName: "list.bullet.clipboard")
+                .font(.body.weight(.semibold))
+                .padding(10)
+                .background(Color.green.opacity(0.18), in: Circle())
+                .foregroundStyle(.green)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("查看总结")
+    }
+    
     @ViewBuilder
     func infoCapsule(text: String, icon: String) -> some View {
-        Label {
-            Text(text)
-                .font(.caption)
-                .fontWeight(.semibold)
-        } icon: {
+        HStack(spacing: 6) {
             Image(systemName: icon)
+                .font(.caption.weight(.semibold))
+            Text(text)
+                .font(.caption.weight(.semibold))
         }
         .padding(.vertical, 6)
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 12)
+        .background(.ultraThinMaterial, in: Capsule())
         .foregroundStyle(.white)
-        .background(Color.white.opacity(0.18), in: Capsule())
-    }
-}
-
-struct TodaysWorkoutCard_Previews: PreviewProvider {
-    static var previews: some View {
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try! ModelContainer(for: Workout.self, configurations: config)
-
-        let mockWorkout1 = Workout(name: "哑铃深蹲", durationInMinutes: 5, caloriesBurned: 50, date: Date(), type: .strength, sets: [WorkoutSet(reps: 12, weight: 10)])
-        let mockDailyTask = DailyTask(date: Date(), workouts: [mockWorkout1])
-
-        TodaysWorkoutCard(dailyTask: mockDailyTask)
-            .padding()
-            .previewLayout(.sizeThatFits)
-            .modelContainer(container)
     }
 }

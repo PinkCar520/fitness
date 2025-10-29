@@ -37,7 +37,9 @@ enum HealthDataType {
 
 final class HealthKitManager: ObservableObject, HealthKitManagerProtocol, @unchecked Sendable {
     private let healthStore = HKHealthStore()
-    
+#if !os(watchOS)
+    private weak var weightManager: WeightManager?
+#endif
     @Published var lastWeightSample: HKQuantitySample?
     @Published var lastBodyFatSample: HKQuantitySample?
     @Published var lastWaistCircumferenceSample: HKQuantitySample?
@@ -250,7 +252,13 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol, @unche
             
             Task { @MainActor in
                 guard let self = self else { return }
-                self.lastWeightSample = await self.readMostRecentWeight()
+                let sample = await self.readMostRecentWeight()
+                self.lastWeightSample = sample
+#if !os(watchOS)
+                if let sample {
+                    self.weightManager?.syncHealthKitSample(sample)
+                }
+#endif
             }
             completionHandler()
         }
@@ -489,7 +497,9 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol, @unche
     #if !os(watchOS)
     // New method to encapsulate HealthKit setup and initial data import
     func setupHealthKitData(weightManager: WeightManager) async {
-        requestAuthorization { success in
+        self.weightManager = weightManager
+        requestAuthorization { [weak self] success in
+            guard let self = self else { return }
             if success {
                 self.startWeightObserver()
                 let hasPerformedInitialHealthKitImport = UserDefaults.standard.bool(forKey: "hasPerformedInitialHealthKitImport")
@@ -499,7 +509,7 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol, @unche
                     self.readAllWeightSamples { samples, error in
                         if let samples = samples {
                             Task { @MainActor in
-                                weightManager.importHealthKitSamples(samples)
+                                self.weightManager?.importHealthKitSamples(samples)
                                 UserDefaults.standard.set(true, forKey: "hasPerformedInitialHealthKitImport")
                             }
                         } else if let error = error {
@@ -509,6 +519,11 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol, @unche
                         // After import (or failure), proceed with regular data fetching
                         Task { @MainActor in
                             self.lastWeightSample = await self.readMostRecentWeight()
+#if !os(watchOS)
+                            if let sample = self.lastWeightSample {
+                                self.weightManager?.syncHealthKitSample(sample)
+                            }
+#endif
                             self.lastBodyFatSample = await self.readMostRecentBodyFat()
                             self.lastWaistCircumferenceSample = await self.readMostRecentWaistCircumference()
                             self.stepCount = await self.readStepCount()
@@ -522,6 +537,11 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol, @unche
                     // If import already performed, just do regular data fetching
                     Task { @MainActor in
                         self.lastWeightSample = await self.readMostRecentWeight()
+#if !os(watchOS)
+                        if let sample = self.lastWeightSample {
+                            self.weightManager?.syncHealthKitSample(sample)
+                        }
+#endif
                         self.lastBodyFatSample = await self.readMostRecentBodyFat()
                         self.lastWaistCircumferenceSample = await self.readMostRecentWaistCircumference()
                         self.stepCount = await self.readStepCount()

@@ -70,26 +70,24 @@ struct OnboardingFlowView: View {
 
     private func handleCompletion() {
         isGeneratingPlan = true
-        // Simulate network call with a delay
-        // DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            // Simulate a random failure
-            // if Bool.random() { // Success
-                let generatedPlan = recommendationManager.generateInitialWorkoutPlan(userProfile: onboardingData)
-                modelContext.insert(generatedPlan)
+        let planDuration = defaultPlanDuration
+        let planGoal = buildPlanGoal(for: onboardingData, planDuration: planDuration)
+        let generatedPlan = recommendationManager.generateInitialWorkoutPlan(
+            userProfile: onboardingData,
+            planGoal: planGoal,
+            planDuration: planDuration
+        )
+        modelContext.insert(generatedPlan)
 
-                onboardingData.hasCompletedOnboarding = true
-                profileViewModel.userProfile = onboardingData
-                profileViewModel.saveProfile()
-                Task {
-                    await healthKitManager.setupHealthKitData(weightManager: weightManager)
-                }
-                clearSavedProgress()
-                withAnimation { selection = 5 }
-            // } else { // Failure
-            //     showNetworkErrorAlert = true
-            // }
-            isGeneratingPlan = false
-        // }
+        onboardingData.hasCompletedOnboarding = true
+        profileViewModel.userProfile = onboardingData
+        profileViewModel.saveProfile()
+        Task {
+            await healthKitManager.setupHealthKitData(weightManager: weightManager)
+        }
+        clearSavedProgress()
+        withAnimation { selection = 5 }
+        isGeneratingPlan = false
     }
 
     private func saveProgress() {
@@ -177,6 +175,30 @@ struct OnboardingFlowView: View {
                 Text("请检查您的网络连接并重试。")
             }
         }
+    }
+
+    private var defaultPlanDuration: Int { 30 }
+
+    private func buildPlanGoal(for profile: UserProfile, planDuration: Int) -> PlanGoal {
+        let calendar = Calendar.current
+        let startDate = calendar.startOfDay(for: Date())
+        let targetDate = calendar.date(byAdding: .day, value: planDuration, to: startDate)
+        let startWeight = latestWeight() ?? profile.targetWeight
+        let goal = profile.goal ?? .healthImprovement
+
+        return PlanGoal(
+            fitnessGoal: goal,
+            startWeight: startWeight,
+            targetWeight: profile.targetWeight,
+            startDate: startDate,
+            targetDate: targetDate
+        )
+    }
+
+    private func latestWeight() -> Double? {
+        var descriptor = FetchDescriptor<HealthMetric>(sortBy: [SortDescriptor(\HealthMetric.date, order: .reverse)])
+        descriptor.fetchLimit = 20
+        return try? modelContext.fetch(descriptor).first(where: { $0.type == .weight })?.value
     }
 }
 

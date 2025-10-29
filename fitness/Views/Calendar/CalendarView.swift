@@ -7,104 +7,56 @@ struct CalendarView: View {
     @State private var currentWeekStartDate: Date = Date()
 
     private let calendar = Calendar.current
+    private var workingCalendar: Calendar {
+        var cal = calendar
+        cal.firstWeekday = 2
+        cal.minimumDaysInFirstWeek = 4
+        return cal
+    }
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM yyyy"
-        return formatter
-    }()
-
-    private let fullDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
         formatter.dateFormat = "MM月dd日 EEEE"
-        formatter.locale = Locale(identifier: "zh_CN") // Ensure Chinese locale for EEEE
+        formatter.locale = Locale(identifier: "zh_CN")
         return formatter
     }()
 
     // Brand Colors
     private let emeraldGreen = Color(red: 16/255, green: 185/255, blue: 129/255) // #10B981
-    private let energyOrange = Color(red: 249/255, green: 115/255, blue: 22/255) // #F97316
     private let systemBlue = Color(red: 59/255, green: 130/255, blue: 246/255) // #3B82F6
 
     var body: some View {
-        VStack(spacing: 0) { // Set spacing to 0 for tighter control
-            // Top Full Date and Today Button
-            HStack {
-                Text(selectedDate != nil ? fullDateFormatter.string(from: selectedDate!) : "请选择日期")
-                    .font(.system(size: 24, weight: .bold)) // Larger, bolder font
-                    .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2)) // Dark gray #333
-                    .kerning(-0.5) // Tight letter spacing
-                Spacer()
+        VStack(spacing: 18) {
+            headerSection
 
-                Button(action: { 
-                    selectedDate = Date()
-                    currentWeekStartDate = Date()
-                }) {
-                    Text("今天")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(systemBlue)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(systemBlue.opacity(0.1))
-                        .cornerRadius(8)
-                }
-                .padding(.leading, 8)
-            }
-            .padding(.horizontal)
-            .padding(.top, 15)
-            .padding(.bottom, 10)
-
-            // Weekday headers
-            HStack {
-                ForEach(0..<7) { index in
-                    Text(reorderedWeekdaySymbol(for: index))
-                        .font(.system(size: 13, weight: .light)) // Smaller, lighter font
-                        .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.6)) // Light gray #999
+            HStack(spacing: 0) {
+                ForEach(Array(weekdayLabels.enumerated()), id: \.offset) { _, label in
+                    Text(label)
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(Color.primary.opacity(0.45))
                         .frame(maxWidth: .infinity)
+                        .textCase(.uppercase)
                 }
             }
-            .padding(.horizontal)
-            .padding(.bottom, 5)
 
-                // Days grid (now only one week)
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 10) {
-                    ForEach(daysInWeek(), id: \.self) { date in
-                        // Mock workout details for demonstration
-                        let mockWorkoutDetails: [WorkoutDetail] = {
-                            var details: [WorkoutDetail] = []
-                            if calendar.isDate(date, inSameDayAs: Date()) {
-                                details.append(WorkoutDetail(type: .workout, time: .morning, intensity: .high))
-                                details.append(WorkoutDetail(type: .meal, time: .none, intensity: .none))
-                            } else if calendar.component(.day, from: date) % 3 == 0 {
-                                details.append(WorkoutDetail(type: .sleep, time: .none, intensity: .none))
-                                details.append(WorkoutDetail(type: .workout, time: .evening, intensity: .low))
-                            } else if calendar.component(.day, from: date) % 5 == 0 {
-                                details.append(WorkoutDetail(type: .water, time: .none, intensity: .none))
-                                details.append(WorkoutDetail(type: .steps, time: .none, intensity: .none))
-                                details.append(WorkoutDetail(type: .workout, time: .morning, intensity: .medium))
-                            } else if calendar.component(.day, from: date) % 7 == 0 {
-                                details.append(WorkoutDetail(type: .workout, time: .evening, intensity: .high))
-                            }
-                            return details
-                        }()
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 12) {
+                ForEach(weekDates, id: \.self) { date in
+                    let isCompleted = completedDates.contains { calendar.isDate($0, inSameDayAs: date) }
 
-                        let isCompleted = completedDates.contains { calendar.isDate($0, inSameDayAs: date) }
-
-                        DayView(date: date, 
-                                selectedDate: $selectedDate, 
-                                emeraldGreen: emeraldGreen, 
-                                energyOrange: energyOrange, 
-                                systemBlue: systemBlue, 
-                                isWeekend: calendar.isDateInWeekend(date), 
-                                workoutDetails: mockWorkoutDetails, 
-                                isRecordBreaking: calendar.component(.day, from: date) == 15 ? true : false, 
-                                isConsecutiveWorkout: calendar.component(.day, from: date) == 16 ? true : false,
-                                isCompleted: isCompleted)
-                    }
+                    DayView(
+                        date: date,
+                        selectedDate: $selectedDate,
+                        emeraldGreen: emeraldGreen,
+                        systemBlue: systemBlue,
+                        isWeekend: calendar.isDateInWeekend(date),
+                        isCompleted: isCompleted
+                    )
                 }
-                .padding(.horizontal)
-                .padding(.bottom, 15)
+            }
+            .padding(.horizontal, 4)
         }
-        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 20)
                 .fill(Color.white)
@@ -117,55 +69,125 @@ struct CalendarView: View {
         .gesture(
             DragGesture()
                 .onEnded { gesture in
-                    if gesture.translation.width < -50 { // Swipe left
+                    if gesture.translation.width < -50 {
                         changeWeek(by: 1)
-                    } else if gesture.translation.width > 50 { // Swipe right
+                    } else if gesture.translation.width > 50 {
                         changeWeek(by: -1)
                     }
                 }
         )
+        .onAppear {
+            syncWeekStart(with: selectedDate)
+        }
+        .onChange(of: selectedDate) { _, newValue in
+            syncWeekStart(with: newValue)
+        }
     }
 
-    private func weekdaySymbol(for index: Int) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        return formatter.shortWeekdaySymbols[index]
+    private var headerSection: some View {
+        let displayDate = selectedDate ?? Date()
+
+        return HStack(spacing: 12) {
+            Text(dateFormatter.string(from: displayDate))
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color.primary.opacity(0.92))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .layoutPriority(1)
+
+            Spacer(minLength: 8)
+
+            HStack(spacing: 10) {
+                navButton(systemName: "chevron.left") {
+                    changeWeek(by: -1)
+                }
+
+                todayButton
+
+                navButton(systemName: "chevron.right") {
+                    changeWeek(by: 1)
+                }
+            }
+            .layoutPriority(2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func reorderedWeekdaySymbol(for index: Int) -> String {
-        let symbols = calendar.shortWeekdaySymbols
-        let mondayIndex = (calendar.firstWeekday == 1) ? 1 : 0 // If firstWeekday is Sunday (1), Monday is at index 1. Otherwise, it's at index 0.
-        let reorderedSymbols = Array(symbols[mondayIndex..<symbols.count] + symbols[0..<mondayIndex])
-        return reorderedSymbols[index]
+    private func todayButtonTapped() {
+        let today = workingCalendar.startOfDay(for: Date())
+        selectedDate = today
+        syncWeekStart(with: today)
+    }
+
+    private var todayButton: some View {
+        Button(action: todayButtonTapped) {
+            Text("今天")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(
+                    LinearGradient(
+                        colors: [systemBlue, Color(red: 65/255, green: 92/255, blue: 255/255)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .shadow(color: systemBlue.opacity(0.25), radius: 6, x: 0, y: 4)
+    }
+
+    private func navButton(systemName: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(systemBlue)
+                .frame(width: 32, height: 32)
+                .background(
+                    Circle()
+                        .fill(systemBlue.opacity(0.12))
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var weekdayLabels: [String] {
+        workingCalendar.shortWeekdaySymbols
+    }
+
+    private var weekDates: [Date] {
+        daysInWeek()
+    }
+
+    private func syncWeekStart(with date: Date?) {
+        let target = date ?? Date()
+        if let interval = workingCalendar.dateInterval(of: .weekOfYear, for: target) {
+            currentWeekStartDate = workingCalendar.startOfDay(for: interval.start)
+        }
     }
 
     private func changeWeek(by amount: Int) {
-        if let newWeek = calendar.date(byAdding: .day, value: amount * 7, to: currentWeekStartDate) {
-            currentWeekStartDate = newWeek
+        if let newWeek = workingCalendar.date(byAdding: .day, value: amount * 7, to: currentWeekStartDate) {
+            currentWeekStartDate = workingCalendar.startOfDay(for: newWeek)
             // Also update selectedDate to be within the new week if it's outside
-            if let currentSelectedDate = selectedDate, !calendar.isDate(currentSelectedDate, equalTo: currentWeekStartDate, toGranularity: .weekOfYear) {
-                selectedDate = newWeek // Select the first day of the new week
+            if let currentSelectedDate = selectedDate,
+               !workingCalendar.isDate(currentSelectedDate, equalTo: currentWeekStartDate, toGranularity: .weekOfYear) {
+                selectedDate = workingCalendar.startOfDay(for: newWeek) // Select the first day of the new week
             }
         }
     }
 
     private func daysInWeek() -> [Date] {
-        var days: [Date] = []
-        let weekdayOfCurrentWeekStartDate = calendar.component(.weekday, from: currentWeekStartDate)
-        let adjustedFirstWeekday = 2 // Monday
-        let offset = (weekdayOfCurrentWeekStartDate - adjustedFirstWeekday + 7) % 7
-
-        guard let firstDayOfGrid = calendar.date(
-            byAdding: .day,
-            value: -offset,
-            to: currentWeekStartDate
-        ) else {
+        guard let interval = workingCalendar.dateInterval(of: .weekOfYear, for: currentWeekStartDate) else {
             return []
         }
 
-        for i in 0..<7 { // Only 7 days for a week view
-            if let dayDate = calendar.date(byAdding: .day, value: i, to: firstDayOfGrid) {
-                days.append(dayDate)
+        var days: [Date] = []
+        for offset in 0..<7 {
+            if let day = workingCalendar.date(byAdding: .day, value: offset, to: interval.start) {
+                days.append(workingCalendar.startOfDay(for: day))
             }
         }
         return days
@@ -351,12 +373,8 @@ struct DayView: View {
     let date: Date
     @Binding var selectedDate: Date?
     let emeraldGreen: Color
-    let energyOrange: Color
     let systemBlue: Color
     let isWeekend: Bool
-    var workoutDetails: [WorkoutDetail] = []
-    let isRecordBreaking: Bool
-    let isConsecutiveWorkout: Bool
     let isCompleted: Bool
 
     @State private var showTooltip = false // New state for tooltip visibility
@@ -369,75 +387,153 @@ struct DayView: View {
     }
 
     var body: some View {
-        let segments = mockSegments(for: date)
-
-        ZStack {
-            // Date number and selection background
-            Text(String(calendar.component(.day, from: date)))
-                .font(.system(size: 15, weight: .bold))
-                .kerning(-0.2)
-                .foregroundColor(isSelected ? .white : (isWeekend ? Color.gray.opacity(0.6) : Color(red: 0.2, green: 0.2, blue: 0.2)))
-                .frame(width: 32, height: 32)
-                .background(
-                    ZStack {
-                        if isSelected {
-                            LinearGradient(
-                                gradient: Gradient(colors: [systemBlue, Color(red: 100/255, green: 100/255, blue: 255/255)]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        } else {
-                            Color.clear
-                        }
+        card
+            .frame(width: 58, height: 64)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                let normalized = calendar.startOfDay(for: date)
+                selectedDate = normalized
+            }
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 0.35)
+                    .onEnded { _ in
+                        presentTooltip()
                     }
-                )
-                .clipShape(Circle())
-                .shadow(color: isSelected ? systemBlue.opacity(0.3) : .clear, radius: isSelected ? 5 : 0, x: 0, y: isSelected ? 3 : 0)
-
-            // Progress Ring surrounding the date
-            SegmentedProgressRingView(segments: segments, lineWidth: 2)
-                .frame(width: 38, height: 38)
-
-            // Completion Checkmark
-            if isCompleted {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
-                    .font(.system(size: 12))
-                    .frame(width: 12, height: 12)
-                    .background(Circle().fill(Color.white))
-                    .offset(x: 14, y: -14)
+            )
+            .overlay(tooltipOverlay)
+            .onChange(of: isSelected) { _, newValue in
+                handleSelectionChange(isSelected: newValue)
             }
+    }
+
+    private var card: some View {
+        ZStack {
+            ringLayer
+                .frame(width: 40, height: 40)
+
+            innerCircle
+                .frame(width: 30, height: 30)
+
+            Text(String(calendar.component(.day, from: date)))
+                .font(.system(size: 18, weight: .semibold))
+                .kerning(-0.3)
+                .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(0.95))
         }
-        .frame(width: 40, height: 40)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            self.selectedDate = date
+        .overlay(completionBadge, alignment: .topTrailing)
+    }
+
+    private var segments: [ProgressSegment] {
+        mockSegments(for: date)
+    }
+
+    private var categoryDescriptors: [(color: Color, intensity: Double)] {
+        let baseline: [Color] = [.green, .red, .indigo, .purple]
+        var descriptors: [(Color, Double)] = []
+
+        for (index, color) in baseline.enumerated() {
+            let progress = index < segments.count ? min(max(segments[index].progress, 0), 1) : 0
+            descriptors.append((color, progress))
         }
-        .overlay(
-            ZStack {
-                if showTooltip {
-                    TooltipView(segments: segments)
-                        .offset(y: -85)
-                        .transition(.opacity.combined(with: .scale))
-                }
-            }
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: showTooltip)
-        )
-        .onChange(of: isSelected) { _, isNowSelected in
-            if isNowSelected {
-                showTooltip = true
-                Task {
-                    try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
-                    showTooltip = false
-                }
+
+        return descriptors
+    }
+
+    private var isToday: Bool {
+        calendar.isDateInToday(date)
+    }
+
+    private var innerCircle: some View {
+        Group {
+            if isSelected {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                systemBlue.opacity(0.65),
+                                Color(red: 88/255, green: 110/255, blue: 255/255).opacity(0.85)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             } else {
-                showTooltip = false
+                Circle()
+                    .fill(Color.white.opacity(0.1))
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                    )
             }
         }
     }
 
-    private var isFutureDate: Bool {
-        calendar.compare(date, to: Date(), toGranularity: .day) == .orderedDescending
+    private var ringLayer: some View {
+        let totalSegments = max(categoryDescriptors.count, 1)
+        let span = 1.0 / Double(totalSegments)
+        let lineWidth: CGFloat = isSelected ? 6 : 5
+
+        return ZStack {
+            ForEach(Array(categoryDescriptors.enumerated()), id: \.offset) { index, descriptor in
+                let start = Double(index) * span + 0.02
+                let end = (Double(index) + 1) * span - 0.02
+                let progressEnd = start + (end - start) * min(descriptor.intensity, 1)
+
+                Circle()
+                    .trim(from: start, to: end)
+                    .stroke(
+                        descriptor.color.opacity(isSelected ? 0.18 : 0.12),
+                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+
+                if descriptor.intensity > 0 {
+                    Circle()
+                        .trim(from: start, to: progressEnd)
+                        .stroke(
+                            progressColor(for: descriptor.color, intensity: descriptor.intensity),
+                            style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(-90))
+                        .animation(.easeInOut(duration: 0.25), value: descriptor.intensity)
+                }
+            }
+        }
+    }
+
+    private func progressColor(for baseColor: Color, intensity: Double) -> Color {
+        let normalized = min(max(intensity, 0), 1)
+        let baseOpacity = isSelected ? 0.82 : 0.65
+        let bonus = 0.18 * normalized
+        return baseColor.opacity(baseOpacity + bonus)
+    }
+
+    private var completionBadge: some View {
+        EmptyView()
+    }
+
+    private var tooltipOverlay: some View {
+        Group {
+            if showTooltip {
+                TooltipView(segments: segments)
+                    .offset(y: -92)
+                    .transition(.opacity.combined(with: .scale))
+            }
+        }
+        .animation(.spring(response: 0.28, dampingFraction: 0.7), value: showTooltip)
+    }
+
+    private func handleSelectionChange(isSelected: Bool) {
+        if !isSelected {
+            showTooltip = false
+        }
+    }
+
+    private func presentTooltip() {
+        showTooltip = true
+        Task {
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            showTooltip = false
+        }
     }
 
     private func mockSegments(for date: Date) -> [ProgressSegment] {
