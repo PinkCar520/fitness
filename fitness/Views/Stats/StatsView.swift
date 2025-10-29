@@ -1,7 +1,6 @@
 import SwiftUI
 import SwiftData
 import Charts
-import HealthKit
 
 // Data structure for the pie chart
 struct WorkoutTypeDistribution: Identifiable {
@@ -34,8 +33,7 @@ struct StatsView: View {
     }
     @State private var selectedTimeFrame: TimeFrame = .thirtyDays
     @StateObject private var viewModel = StatsViewModel()
-    @State private var reportImage: UIImage? = nil
-    @State private var showShareSheet = false
+    
     @State private var showDayInfo: Bool = false
     @State private var dayInfoText: String = ""
 
@@ -45,10 +43,6 @@ struct StatsView: View {
     @Query(sort: \Workout.date, order: .reverse) private var workouts: [Workout]
     @Query(sort: \HealthMetric.date, order: .forward) private var allMetrics: [HealthMetric]
     @Query(filter: #Predicate<Plan> { $0.status == "active" }) private var activePlans: [Plan]
-
-    // Correlation metric selection
-    enum CorrelationMetric: String, CaseIterable, Identifiable { case weight = "体重", bodyFat = "体脂率"; var id: String { rawValue } }
-    @State private var selectedCorrelation: CorrelationMetric = .weight
 
     // State for fetched data
     @State private var totalCalories: Double = 0
@@ -158,54 +152,6 @@ struct StatsView: View {
                     // Type Efficiency Card
                     typeEfficiencySection
 
-                    // VO2max Trend
-                    if !healthKitManager.isVO2MaxAvailableOnThisDevice() {
-                        infoBanner(text: "VO2max 需要支持的设备（通常为 Apple Watch）")
-                    } else if viewModel.vo2MaxTrend.isEmpty {
-                        infoBanner(text: "暂无 VO2max 数据，佩戴 Apple Watch 进行户外步行/跑步以生成测量")
-                    }
-                    GenericLineChartView(
-                        title: "VO2max 趋势",
-                        data: viewModel.vo2MaxTrend,
-                        color: .teal,
-                        unit: "ml/kg/min"
-                    )
-
-                    // Weight and Body Fat Trends
-                    // Weight trend with average and goal line
-                    Group {
-                        let weightAvg: Double? = {
-                            let vals = viewModel.weightTrend.map { $0.value }
-                            guard !vals.isEmpty else { return nil }
-                            return vals.reduce(0,+) / Double(vals.count)
-                        }()
-                        let goal: Double? = activePlans.first?.planGoal.targetWeight
-                        GenericLineChartView(
-                            title: "体重趋势",
-                            data: viewModel.weightTrend,
-                            color: .blue,
-                            unit: "kg",
-                            averageValue: weightAvg,
-                            goalValue: goal
-                        )
-                    }
-                    // BodyFat with average line
-                    Group {
-                        let fatAvg: Double? = {
-                            let vals = viewModel.bodyFatTrend.map { $0.value }
-                            guard !vals.isEmpty else { return nil }
-                            return vals.reduce(0,+) / Double(vals.count)
-                        }()
-                        GenericLineChartView(
-                            title: "体脂率趋势",
-                            data: viewModel.bodyFatTrend,
-                            color: .orange,
-                            unit: "%",
-                            averageValue: fatAvg,
-                            goalValue: nil
-                        )
-                    }
-
                     // Weight vs Calories (stacked)
                     GenericLineChartView(
                         title: "每日消耗（卡路里）",
@@ -213,26 +159,6 @@ struct StatsView: View {
                         color: .pink,
                         unit: "kcal"
                     )
-
-                    // Correlation: Weight/BodyFat vs Calories
-                    correlationSection
-
-                    Button {
-                        let reportStack = VStack(alignment: .leading, spacing: 16) {
-                            Text("分析报告（\(selectedTimeFrame.rawValue)）").font(.headline)
-                            executionSummarySection
-                            WorkoutFrequencyChartView(data: workoutFrequencyData)
-                            WorkoutTypePieChartView(data: workoutTypeDistributionData)
-                        }
-                        .padding()
-                        self.reportImage = reportStack.snapshot()
-                        self.showShareSheet = true
-                    } label: {
-                        Label("分享分析报告", systemImage: "square.and.arrow.up")
-                            .font(.footnote.weight(.bold))
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
 
                     // Personal Records
                     PersonalRecordsView(records: personalRecords)
@@ -245,11 +171,6 @@ struct StatsView: View {
             .onAppear(perform: refreshAll)
             .onChange(of: selectedTimeFrame) { _ in
                 refreshAll()
-            }
-            .sheet(isPresented: $showShareSheet) {
-                if let image = reportImage {
-                    ShareSheet(items: [image])
-                }
             }
             .alert("当天执行详情", isPresented: $showDayInfo) {
                 Button("知道了", role: .cancel) {}
@@ -296,135 +217,6 @@ struct StatsView: View {
             self.viewModel.workoutDays = days
         }
         self.viewModel.execution = buildExecutionSummary(days: selectedTimeFrame.days)
-        // Prefer HealthKit VO2max series when available and authorized; fallback to local metrics
-        if healthKitManager.getPublishedAuthorizationStatus(for: .vo2Max) == .sharingAuthorized,
-           healthKitManager.isVO2MaxAvailableOnThisDevice() {
-            Task { @MainActor in
-                let samples = await healthKitManager.fetchVO2MaxSeries(for: selectedTimeFrame.days)
-                let unit = HKUnit(from: "mL/kg/min")
-                self.viewModel.vo2MaxTrend = samples.map { sample in
-                    DateValuePoint(date: sample.endDate, value: sample.quantity.doubleValue(for: unit))
-                }
-            }
-        } else {
-            self.viewModel.vo2MaxTrend = viewModel.buildTrend(from: allMetrics, type: .vo2Max, last: selectedTimeFrame.days)
-        }
-        self.viewModel.weightTrend = viewModel.buildTrend(from: allMetrics, type: .weight, last: selectedTimeFrame.days)
-        self.viewModel.bodyFatTrend = viewModel.buildTrend(from: allMetrics, type: .bodyFatPercentage, last: selectedTimeFrame.days)
-    }
-
-    // MARK: - Correlation Section (Weight vs Calories)
-    private var correlationSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("相关性（消耗 vs ")
-                Picker("Correlation", selection: $selectedCorrelation) {
-                    ForEach(CorrelationMetric.allCases) { m in Text(m.rawValue).tag(m) }
-                }
-                .pickerStyle(.segmented)
-                Text(")").opacity(0.6)
-                Spacer()
-            }
-            .font(.title3.bold())
-            
-            Chart(correlationPoints) { pt in
-                PointMark(
-                    x: .value("体重", pt.weight),
-                    y: .value("消耗", pt.calories)
-                )
-                .foregroundStyle(Color.purple)
-                // Trendline
-                if let line = correlationTrendline {
-                    LineMark(
-                        x: .value("x", line.0.x), y: .value("y", line.0.y)
-                    )
-                    .foregroundStyle(Color.purple.opacity(0.5))
-                    LineMark(
-                        x: .value("x", line.1.x), y: .value("y", line.1.y)
-                    )
-                    .foregroundStyle(Color.purple.opacity(0.5))
-                }
-            }
-            .frame(height: 220)
-            Text(correlationSubtitle)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding()
-        .background(Color.gray.opacity(0.1))
-        .cornerRadius(12)
-    }
-
-    private struct CorrelationPoint: Identifiable { let id = UUID(); let weight: Double; let calories: Double }
-
-    private var correlationPoints: [CorrelationPoint] {
-        // Build daily series for selected metric (latest on/before day)
-        let cal = Calendar.current
-        let now = cal.startOfDay(for: Date())
-        let start = cal.date(byAdding: .day, value: -selectedTimeFrame.days + 1, to: now) ?? now
-        // Pre-sort metrics ascending by selected type
-        let metricType: MetricType = (selectedCorrelation == .weight) ? .weight : .bodyFatPercentage
-        let metricSeries = allMetrics.filter { $0.type == metricType }.sorted { $0.date < $1.date }
-        let days = dateRange(from: start, to: now)
-        var idx = 0
-        var lastWeight: Double? = nil
-        var weightsByDay: [Date: Double] = [:]
-        for d in days {
-            // advance idx to last metric <= d
-            while idx < metricSeries.count && metricSeries[idx].date <= d { lastWeight = metricSeries[idx].value; idx += 1 }
-            if let w = lastWeight { weightsByDay[d] = w }
-        }
-        // Calories by day from existing series
-        let caloriesByDay = Dictionary(uniqueKeysWithValues: dailyCaloriesSeries.map { ($0.date, $0.value) })
-        // Merge
-        return days.compactMap { d in
-            if let w = weightsByDay[d], let c = caloriesByDay[d], w > 0, c >= 0 {
-                return CorrelationPoint(weight: w, calories: c)
-            }
-            return nil
-        }
-    }
-
-    private var correlationSubtitle: String {
-        let points = correlationPoints
-        guard points.count >= 3, let r = pearsonR(points: points) else {
-            return "提示：相关性仅供参考，饮食与训练强度等因素也会影响体重/体脂变化。"
-        }
-        return String(format: "相关系数 r = %.2f（仅供参考）", r)
-    }
-
-    // Simple Pearson correlation
-    private func pearsonR(points: [CorrelationPoint]) -> Double? {
-        let n = Double(points.count)
-        guard n >= 2 else { return nil }
-        let xs = points.map { $0.weight }
-        let ys = points.map { $0.calories }
-        let meanX = xs.reduce(0,+) / n
-        let meanY = ys.reduce(0,+) / n
-        let cov = zip(xs, ys).reduce(0.0) { $0 + (($1.0 - meanX) * ($1.1 - meanY)) }
-        let varX = xs.reduce(0) { $0 + pow($1 - meanX, 2) }
-        let varY = ys.reduce(0) { $0 + pow($1 - meanY, 2) }
-        let denom = sqrt(varX * varY)
-        guard denom > 0 else { return nil }
-        return cov / denom
-    }
-
-    // Regression line endpoints for scatter chart
-    private var correlationTrendline: ((x: Double, y: Double), (x: Double, y: Double))? {
-        let pts = correlationPoints
-        guard pts.count >= 2 else { return nil }
-        let xs = pts.map { $0.weight }
-        let ys = pts.map { $0.calories }
-        let n = Double(pts.count)
-        let meanX = xs.reduce(0,+) / n
-        let meanY = ys.reduce(0,+) / n
-        let sxy = zip(xs, ys).reduce(0.0) { $0 + (($1.0 - meanX) * ($1.1 - meanY)) }
-        let sxx = xs.reduce(0) { $0 + pow($1 - meanX, 2) }
-        guard sxx > 0 else { return nil }
-        let b = sxy / sxx
-        let a = meanY - b * meanX
-        guard let minX = xs.min(), let maxX = xs.max() else { return nil }
-        return ((x: minX, y: a + b * minX), (x: maxX, y: a + b * maxX))
     }
 
     private func buildExecutionSummary(days: Int) -> StatsViewModel.ExecutionSummary {
