@@ -112,6 +112,8 @@ struct StatsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    permissionBanner
+                    emptyStateBanner
                     // Time Frame Picker
                     Picker("Time Frame", selection: $selectedTimeFrame) {
                         ForEach(TimeFrame.allCases) { timeFrame in
@@ -203,6 +205,7 @@ struct StatsView: View {
             }
             .navigationTitle("统计")
             .onAppear(perform: refreshAll)
+            .onAppear { healthKitManager.updateAuthorizationStatuses() }
             .onChange(of: selectedTimeFrame) { _ in
                 refreshAll()
             }
@@ -273,6 +276,62 @@ struct StatsView: View {
             dateCursor = prev
         }
         return .init(completedDays: completed, skippedDays: skipped, streakDays: streak)
+    }
+
+    // MARK: - Permission & Empties
+    private var permissionBanner: some View {
+        let required: [HealthKitDataTypeOption] = [.activeEnergyBurned, .workout]
+        let unauthorized = required.filter { healthKitManager.getPublishedAuthorizationStatus(for: $0) != .sharingAuthorized }
+        return Group {
+            if !unauthorized.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        Text("未授权读取运动与能量数据").font(.headline)
+                    }
+                    Text("请在健康 App 中授权“体能训练、活动能量”，以便生成完整的分析与报告。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 12) {
+                        Button(action: openHealthApp) { Label("前往健康 App 授权", systemImage: "heart.fill") }.buttonStyle(.borderedProminent)
+                    }
+                }
+                .padding()
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(12)
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    private var emptyStateBanner: some View {
+        Group {
+            if relevantWorkouts.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("暂无训练记录")
+                        .font(.headline)
+                    Text("开始一次训练或从计划页选择今日任务，完成后这里会展示分析数据。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button {
+                        appState.selectedTab = 1
+                    } label: { Label("前往计划页", systemImage: "figure.run") }
+                    .buttonStyle(.bordered)
+                }
+                .padding()
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(12)
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    private func openHealthApp() {
+        if let url = URL(string: "x-apple-health://"), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        } else if let url = URL(string: UIApplication.openSettingsURLString), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        }
     }
 
     // MARK: - Heatmap Data

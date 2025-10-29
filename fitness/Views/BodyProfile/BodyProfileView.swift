@@ -13,6 +13,7 @@ enum ChartableMetric: String, CaseIterable, Identifiable {
 
 struct BodyProfileView: View {
     @EnvironmentObject var profileViewModel: ProfileViewModel
+    @EnvironmentObject var healthKitManager: HealthKitManager
     @Query(sort: \HealthMetric.date, order: .reverse) private var metrics: [HealthMetric]
     
     @State private var showInputSheet = false
@@ -83,6 +84,8 @@ struct BodyProfileView: View {
         ZStack(alignment: .bottomTrailing) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    permissionSection
+                    emptyDataHintSection
                     currentIndicatorsSection
                     vo2QuickSection
                     chartSection
@@ -235,6 +238,69 @@ struct BodyProfileView: View {
                 .shadow(radius: 10)
         }
         .padding()
+    }
+
+    // MARK: - Permission & Empty Data
+    @ViewBuilder private var permissionSection: some View {
+        // Check core read permissions for body data
+        let required: [HealthKitDataTypeOption] = [.bodyMass, .bodyFatPercentage, .heartRate, .vo2Max]
+        let unauthorized = required.filter { healthKitManager.getPublishedAuthorizationStatus(for: $0) != .sharingAuthorized }
+        if !unauthorized.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    Text("未授权读取健康数据")
+                        .font(.headline)
+                }
+                Text("请在健康 App 中授权“体重、体脂率、心率、VO2max”等数据，便于生成完整的身体档案与趋势。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 12) {
+                    Button(action: openHealthApp) {
+                        Label("前往健康 App 授权", systemImage: "heart.fill")
+                    }.buttonStyle(.borderedProminent)
+                    Button(action: { showInputSheet = true }) {
+                        Label("手动记录", systemImage: "plus")
+                    }.buttonStyle(.bordered)
+                }
+            }
+            .padding()
+            .background(Color.orange.opacity(0.1))
+            .cornerRadius(12)
+            .padding(.horizontal)
+        }
+    }
+
+    @ViewBuilder private var emptyDataHintSection: some View {
+        if metrics.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("还没有身体指标记录")
+                    .font(.headline)
+                Text("可以先手动添加一条体重或体脂记录，或在健康 App 中开启数据同步。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 12) {
+                    Button(action: { showInputSheet = true }) {
+                        Label("添加记录", systemImage: "plus")
+                    }.buttonStyle(.borderedProminent)
+                    Button(action: openHealthApp) {
+                        Label("打开健康 App", systemImage: "heart")
+                    }.buttonStyle(.bordered)
+                }
+            }
+            .padding()
+            .background(Color.gray.opacity(0.1))
+            .cornerRadius(12)
+            .padding(.horizontal)
+        }
+    }
+
+    private func openHealthApp() {
+        if let url = URL(string: "x-apple-health://"), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        } else if let url = URL(string: UIApplication.openSettingsURLString), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        }
     }
 
     // MARK: - Helpers
