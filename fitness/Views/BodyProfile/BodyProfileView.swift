@@ -20,8 +20,7 @@ struct BodyProfileView: View {
     @State private var selectedChartMetric: ChartableMetric = .weight
     @State private var selectedRange: BodyProfileViewModel.TimeRange = .thirty
     @StateObject private var vm = BodyProfileViewModel()
-    @State private var showAverageLine: Bool = true
-    @State private var showGoalLine: Bool = true
+    // Lines always shown by default (no toggles)
 
     // Computed properties to get latest values
     private var latestWeight: Double {
@@ -93,14 +92,12 @@ struct BodyProfileView: View {
                     chartSection
                     additionalMetricsSection
                     bodyCompositionSection
-                    insightsSection
                     visualRecordsSection
                     Spacer(minLength: 80)
                 }
                 .padding(.vertical)
             }
 
-            floatingActionButton
         }
         .onAppear { refreshVM() }
         .onChange(of: metrics.map(\.date)) { _ in refreshVM() }
@@ -111,9 +108,6 @@ struct BodyProfileView: View {
                 if metric == "weight" { selectedChartMetric = .weight }
                 if metric == "bodyFat" { selectedChartMetric = .bodyFat }
             }
-        }
-        .sheet(isPresented: $showInputSheet) {
-            InputSheetView()
         }
     }
 
@@ -163,25 +157,12 @@ struct BodyProfileView: View {
             .pickerStyle(.segmented)
             .padding(.horizontal)
 
-            HStack(spacing: 12) {
-                Toggle(isOn: $showAverageLine) {
-                    Text("均值")
-                }.toggleStyle(.switch)
-                if selectedChartMetric == .weight {
-                    Toggle(isOn: $showGoalLine) {
-                        Text("目标线")
-                    }.toggleStyle(.switch)
-                }
-                Spacer()
-            }
-            .padding(.horizontal)
-
             let title = chartTitle
             let data = chartData
             let color = chartColor
             let unit = chartUnit
-            let avg = showAverageLine ? vm.averageValue : nil
-            let goal = (showGoalLine && selectedChartMetric == .weight) ? vm.goalValue : nil
+            let avg = vm.averageValue
+            let goal = (selectedChartMetric == .weight) ? vm.goalValue : nil
             GenericLineChartView(title: title, data: data, color: color, unit: unit, averageValue: avg, goalValue: goal)
                 .frame(minHeight: 220)
         }
@@ -208,32 +189,10 @@ struct BodyProfileView: View {
             metricSection(title: "身体成分", items: items)
             BodyCompositionSummary(bmi: bmi, bodyFat: latestBodyFat)
                 .padding(.horizontal)
-            Text("标准来源：WHO；国标作为补充参考")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal)
         }
     }
 
-    @ViewBuilder private var insightsSection: some View {
-        if !vm.insights.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("建议与解读").font(.title3).bold().padding(.horizontal)
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(vm.insights, id: \.self) { line in
-                        HStack(spacing: 8) {
-                            Image(systemName: "lightbulb.fill").foregroundStyle(.yellow)
-                            Text(line).font(.footnote)
-                        }
-                    }
-                }
-                .padding()
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(12)
-                .padding(.horizontal)
-            }
-        }
-    }
+    // insightsSection removed per design requirements
 
     private var visualRecordsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -262,18 +221,7 @@ struct BodyProfileView: View {
         }
     }
 
-    private var floatingActionButton: some View {
-        Button(action: { showInputSheet = true }) {
-            Image(systemName: "plus")
-                .font(.title.weight(.semibold))
-                .padding()
-                .background(Color.accentColor)
-                .foregroundColor(.white)
-                .clipShape(Circle())
-                .shadow(radius: 10)
-        }
-        .padding()
-    }
+    // Floating action removed (no manual record entry here)
 
     // MARK: - Permission & Empty Data
     @ViewBuilder private var permissionSection: some View {
@@ -290,13 +238,8 @@ struct BodyProfileView: View {
                 Text("请在健康 App 中授权“体重、体脂率、心率、VO2max”等数据，便于生成完整的身体档案与趋势。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                HStack(spacing: 12) {
-                    Button(action: openHealthApp) {
-                        Label("前往健康 App 授权", systemImage: "heart.fill")
-                    }.buttonStyle(.borderedProminent)
-                    Button(action: { showInputSheet = true }) {
-                        Label("手动记录", systemImage: "plus")
-                    }.buttonStyle(.bordered)
+                Button(action: openHealthApp) {
+                    Label("前往健康 App 授权", systemImage: "heart.fill")
                 }
             }
             .padding()
@@ -311,16 +254,11 @@ struct BodyProfileView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("还没有身体指标记录")
                     .font(.headline)
-                Text("可以先手动添加一条体重或体脂记录，或在健康 App 中开启数据同步。")
+                Text("可在健康 App 中开启数据同步。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                HStack(spacing: 12) {
-                    Button(action: { showInputSheet = true }) {
-                        Label("添加记录", systemImage: "plus")
-                    }.buttonStyle(.borderedProminent)
-                    Button(action: openHealthApp) {
-                        Label("打开健康 App", systemImage: "heart")
-                    }.buttonStyle(.bordered)
+                Button(action: openHealthApp) {
+                    Label("打开健康 App", systemImage: "heart")
                 }
             }
             .padding()

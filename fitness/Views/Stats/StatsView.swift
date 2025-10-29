@@ -175,18 +175,39 @@ struct StatsView: View {
                     )
 
                     // Weight and Body Fat Trends
-                    GenericLineChartView(
-                        title: "体重趋势",
-                        data: viewModel.weightTrend,
-                        color: .blue,
-                        unit: "kg"
-                    )
-                    GenericLineChartView(
-                        title: "体脂率趋势",
-                        data: viewModel.bodyFatTrend,
-                        color: .orange,
-                        unit: "%"
-                    )
+                    // Weight trend with average and goal line
+                    Group {
+                        let weightAvg: Double? = {
+                            let vals = viewModel.weightTrend.map { $0.value }
+                            guard !vals.isEmpty else { return nil }
+                            return vals.reduce(0,+) / Double(vals.count)
+                        }()
+                        let goal: Double? = activePlans.first?.planGoal.targetWeight
+                        GenericLineChartView(
+                            title: "体重趋势",
+                            data: viewModel.weightTrend,
+                            color: .blue,
+                            unit: "kg",
+                            averageValue: weightAvg,
+                            goalValue: goal
+                        )
+                    }
+                    // BodyFat with average line
+                    Group {
+                        let fatAvg: Double? = {
+                            let vals = viewModel.bodyFatTrend.map { $0.value }
+                            guard !vals.isEmpty else { return nil }
+                            return vals.reduce(0,+) / Double(vals.count)
+                        }()
+                        GenericLineChartView(
+                            title: "体脂率趋势",
+                            data: viewModel.bodyFatTrend,
+                            color: .orange,
+                            unit: "%",
+                            averageValue: fatAvg,
+                            goalValue: nil
+                        )
+                    }
 
                     // Weight vs Calories (stacked)
                     GenericLineChartView(
