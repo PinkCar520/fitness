@@ -32,6 +32,9 @@ struct StatsView: View {
         }
     }
     @State private var selectedTimeFrame: TimeFrame = .thirtyDays
+    // View mode for single-container layout
+    enum ViewMode: String, CaseIterable, Identifiable { case overview = "概览", trend = "趋势", distribution = "分布"; var id: String { rawValue } }
+    @State private var selectedView: ViewMode = .overview
     @StateObject private var viewModel = StatsViewModel()
     
     
