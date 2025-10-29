@@ -111,7 +111,7 @@ struct StatsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 16) {
                     emptyStateBanner
                     // Time Frame Picker
                     Picker("Time Frame", selection: $selectedTimeFrame) {
@@ -121,38 +121,24 @@ struct StatsView: View {
                     }
                     .pickerStyle(.segmented)
 
-                    // Core Metrics Grid
-                    VStack(alignment: .leading) {
-                        Text("核心指标")
-                            .font(.title3).bold()
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                            MetricCard(title: "运动天数", value: "\(viewModel.workoutDays)", unit: "天", icon: "figure.walk", color: .orange)
-                            MetricCard(title: "总消耗", value: String(format: "%.0f", viewModel.totalCalories), unit: "千卡", icon: "flame.fill", color: .red)
+                    // View Mode Picker
+                    Picker("View Mode", selection: $selectedView) {
+                        ForEach(ViewMode.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
                         }
                     }
+                    .pickerStyle(.segmented)
 
-                    
-
-                    // Workout Frequency Chart
-                    WorkoutFrequencyChartView(data: workoutFrequencyData)
-                    
-                    // Workout Type Distribution
-                    WorkoutTypePieChartView(data: workoutTypeDistributionData)
-                    
-                    
-
-                    // Weight vs Calories (stacked)
-                    GenericLineChartView(
-                        title: "每日消耗（卡路里）",
-                        data: dailyCaloriesSeries,
-                        color: .pink,
-                        unit: "kcal"
-                    )
-
-                    // Personal Records
-                    PersonalRecordsView(records: personalRecords)
-
-
+                    Group {
+                        switch selectedView {
+                        case .overview:
+                            overviewSection
+                        case .trend:
+                            trendSection
+                        case .distribution:
+                            distributionSection
+                        }
+                    }
                 }
                 .padding()
             }
@@ -166,6 +152,53 @@ struct StatsView: View {
     }
 
     // execution summary section removed per request
+
+    // MARK: - Single-container Sections
+    private var overviewSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("核心指标").font(.title3).bold()
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                MetricCard(title: "运动天数", value: "\(viewModel.workoutDays)", unit: "天", icon: "figure.walk", color: .orange)
+                MetricCard(title: "总消耗", value: String(format: "%.0f", viewModel.totalCalories), unit: "千卡", icon: "flame.fill", color: .red)
+            }
+            GenericLineChartView(
+                title: "每日消耗（迷你）",
+                data: dailyCaloriesSeries,
+                color: .pink,
+                unit: "kcal"
+            )
+            .frame(height: 180)
+        }
+    }
+
+    private var trendSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("趋势").font(.title3).bold()
+            TabView {
+                GenericLineChartView(
+                    title: "每日消耗（卡路里）",
+                    data: dailyCaloriesSeries,
+                    color: .pink,
+                    unit: "kcal"
+                )
+                .padding(.vertical)
+                .tag(0)
+
+                WorkoutFrequencyChartView(data: workoutFrequencyData)
+                    .padding(.vertical)
+                    .tag(1)
+            }
+            .frame(height: 280)
+            .tabViewStyle(.page(indexDisplayMode: .always))
+        }
+    }
+
+    private var distributionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("分布").font(.title3).bold()
+            WorkoutTypePieChartView(data: workoutTypeDistributionData)
+        }
+    }
 
     private func refreshAll() {
         healthKitManager.fetchTotalActiveEnergy(for: selectedTimeFrame.days) { calories in
