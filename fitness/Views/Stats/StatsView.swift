@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import Charts
+import HealthKit
 
 // Data structure for the pie chart
 struct WorkoutTypeDistribution: Identifiable {
@@ -254,7 +255,19 @@ struct StatsView: View {
             self.viewModel.workoutDays = days
         }
         self.viewModel.execution = buildExecutionSummary(days: selectedTimeFrame.days)
-        self.viewModel.vo2MaxTrend = viewModel.buildTrend(from: allMetrics, type: .vo2Max, last: selectedTimeFrame.days)
+        // Prefer HealthKit VO2max series when available and authorized; fallback to local metrics
+        if healthKitManager.getPublishedAuthorizationStatus(for: .vo2Max) == .sharingAuthorized,
+           healthKitManager.isVO2MaxAvailableOnThisDevice() {
+            Task { @MainActor in
+                let samples = await healthKitManager.fetchVO2MaxSeries(for: selectedTimeFrame.days)
+                let unit = HKUnit(from: "mL/kg/min")
+                self.viewModel.vo2MaxTrend = samples.map { sample in
+                    DateValuePoint(date: sample.endDate, value: sample.quantity.doubleValue(for: unit))
+                }
+            }
+        } else {
+            self.viewModel.vo2MaxTrend = viewModel.buildTrend(from: allMetrics, type: .vo2Max, last: selectedTimeFrame.days)
+        }
         self.viewModel.weightTrend = viewModel.buildTrend(from: allMetrics, type: .weight, last: selectedTimeFrame.days)
         self.viewModel.bodyFatTrend = viewModel.buildTrend(from: allMetrics, type: .bodyFatPercentage, last: selectedTimeFrame.days)
     }

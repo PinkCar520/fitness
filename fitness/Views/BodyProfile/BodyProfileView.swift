@@ -121,7 +121,17 @@ struct BodyProfileView: View {
     }
 
     @ViewBuilder private var vo2QuickSection: some View {
-        if let latest = metrics.first(where: { $0.type == .vo2Max })?.value, latest > 0 {
+        if !healthKitManager.isVO2MaxAvailableOnThisDevice() {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle").foregroundStyle(.secondary)
+                    Text("VO2max 需要支持的设备（通常为 Apple Watch）")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal)
+        } else if let latest = metrics.first(where: { $0.type == .vo2Max })?.value, latest > 0 {
             let items = [MetricDisplay(title: "VO2max", value: formatted(latest, precision: 1), unit: "ml/kg/min", icon: "lungs.fill", color: .teal)]
             metricSection(title: "心肺耐力", items: items)
         }

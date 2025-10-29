@@ -199,6 +199,27 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol, @unche
         }
     }
 
+    // MARK: - VO2max Availability & Series
+    func isVO2MaxAvailableOnThisDevice() -> Bool {
+        guard HKHealthStore.isHealthDataAvailable() else { return false }
+        return HKQuantityType.quantityType(forIdentifier: .vo2Max) != nil
+    }
+
+    func fetchVO2MaxSeries(for days: Int) async -> [HKQuantitySample] {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .vo2Max) else { return [] }
+        let now = Date()
+        let startDate = Calendar.current.date(byAdding: .day, value: -days, to: now) ?? now
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: now, options: .strictStartDate)
+        let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: true)
+
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: [sort]) { _, results, _ in
+                continuation.resume(returning: (results as? [HKQuantitySample]) ?? [])
+            }
+            healthStore.execute(query)
+        }
+    }
+
     // 读取最近腰围
     func readMostRecentWaistCircumference() async -> HKQuantitySample? {
         guard let type = HKQuantityType.quantityType(forIdentifier: .waistCircumference) else { return nil }
