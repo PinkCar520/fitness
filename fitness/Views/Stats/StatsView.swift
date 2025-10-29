@@ -187,6 +187,9 @@ struct StatsView: View {
                         unit: "kcal"
                     )
 
+                    // Correlation: Weight vs Calories
+                    correlationSection
+
                     Button {
                         let reportStack = VStack(alignment: .leading, spacing: 16) {
                             Text("分析报告（\(selectedTimeFrame.rawValue)）").font(.headline)
@@ -277,6 +280,56 @@ struct StatsView: View {
         }
         self.viewModel.weightTrend = viewModel.buildTrend(from: allMetrics, type: .weight, last: selectedTimeFrame.days)
         self.viewModel.bodyFatTrend = viewModel.buildTrend(from: allMetrics, type: .bodyFatPercentage, last: selectedTimeFrame.days)
+    }
+
+    // MARK: - Correlation Section (Weight vs Calories)
+    private var correlationSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("体重 vs 消耗（相关性）").font(.title3).bold()
+            Chart(correlationPoints) { pt in
+                PointMark(
+                    x: .value("体重", pt.weight),
+                    y: .value("消耗", pt.calories)
+                )
+                .foregroundStyle(Color.purple)
+            }
+            .frame(height: 220)
+            Text("提示：相关性仅供参考，饮食与训练强度等因素也会影响体重变化。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(12)
+    }
+
+    private struct CorrelationPoint: Identifiable { let id = UUID(); let weight: Double; let calories: Double }
+
+    private var correlationPoints: [CorrelationPoint] {
+        // Build daily weight series (use latest weight on or before the day)
+        let cal = Calendar.current
+        let now = cal.startOfDay(for: Date())
+        let start = cal.date(byAdding: .day, value: -selectedTimeFrame.days + 1, to: now) ?? now
+        // Pre-sort weight metrics ascending
+        let weightMetrics = allMetrics.filter { $0.type == .weight }.sorted { $0.date < $1.date }
+        let days = dateRange(from: start, to: now)
+        var idx = 0
+        var lastWeight: Double? = nil
+        var weightsByDay: [Date: Double] = [:]
+        for d in days {
+            // advance idx to last metric <= d
+            while idx < weightMetrics.count && weightMetrics[idx].date <= d { lastWeight = weightMetrics[idx].value; idx += 1 }
+            if let w = lastWeight { weightsByDay[d] = w }
+        }
+        // Calories by day from existing series
+        let caloriesByDay = Dictionary(uniqueKeysWithValues: dailyCaloriesSeries.map { ($0.date, $0.value) })
+        // Merge
+        return days.compactMap { d in
+            if let w = weightsByDay[d], let c = caloriesByDay[d], w > 0, c >= 0 {
+                return CorrelationPoint(weight: w, calories: c)
+            }
+            return nil
+        }
     }
 
     private func buildExecutionSummary(days: Int) -> StatsViewModel.ExecutionSummary {

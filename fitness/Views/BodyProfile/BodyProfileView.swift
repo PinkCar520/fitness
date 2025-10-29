@@ -20,6 +20,8 @@ struct BodyProfileView: View {
     @State private var selectedChartMetric: ChartableMetric = .weight
     @State private var selectedRange: BodyProfileViewModel.TimeRange = .thirty
     @StateObject private var vm = BodyProfileViewModel()
+    @State private var showAverageLine: Bool = true
+    @State private var showGoalLine: Bool = true
 
     // Computed properties to get latest values
     private var latestWeight: Double {
@@ -155,12 +157,25 @@ struct BodyProfileView: View {
             .pickerStyle(.segmented)
             .padding(.horizontal)
 
+            HStack(spacing: 12) {
+                Toggle(isOn: $showAverageLine) {
+                    Text("均值")
+                }.toggleStyle(.switch)
+                if selectedChartMetric == .weight {
+                    Toggle(isOn: $showGoalLine) {
+                        Text("目标线")
+                    }.toggleStyle(.switch)
+                }
+                Spacer()
+            }
+            .padding(.horizontal)
+
             let title = chartTitle
             let data = chartData
             let color = chartColor
             let unit = chartUnit
-            let avg = vm.averageValue
-            let goal = vm.goalValue
+            let avg = showAverageLine ? vm.averageValue : nil
+            let goal = (showGoalLine && selectedChartMetric == .weight) ? vm.goalValue : nil
             GenericLineChartView(title: title, data: data, color: color, unit: unit, averageValue: avg, goalValue: goal)
                 .frame(minHeight: 220)
         }
