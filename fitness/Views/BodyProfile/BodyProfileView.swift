@@ -85,7 +85,6 @@ struct BodyProfileView: View {
         ZStack(alignment: .bottomTrailing) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    permissionSection
                     emptyDataHintSection
                     currentIndicatorsSection
                     vo2QuickSection
@@ -223,31 +222,7 @@ struct BodyProfileView: View {
 
     // Floating action removed (no manual record entry here)
 
-    // MARK: - Permission & Empty Data
-    @ViewBuilder private var permissionSection: some View {
-        // Check core read permissions for body data
-        let required: [HealthKitDataTypeOption] = [.bodyMass, .bodyFatPercentage, .heartRate, .vo2Max]
-        let unauthorized = required.filter { healthKitManager.getPublishedAuthorizationStatus(for: $0) != .sharingAuthorized }
-        if !unauthorized.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                    Text("未授权读取健康数据")
-                        .font(.headline)
-                }
-                Text("请在健康 App 中授权“体重、体脂率、心率、VO2max”等数据，便于生成完整的身体档案与趋势。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Button(action: openHealthApp) {
-                    Label("前往健康 App 授权", systemImage: "heart.fill")
-                }
-            }
-            .padding()
-            .background(Color.orange.opacity(0.1))
-            .cornerRadius(12)
-            .padding(.horizontal)
-        }
-    }
+    // MARK: - Empty Data (authorization banner removed by design)
 
     @ViewBuilder private var emptyDataHintSection: some View {
         if metrics.isEmpty {

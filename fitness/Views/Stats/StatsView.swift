@@ -119,7 +119,6 @@ struct StatsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    permissionBanner
                     emptyStateBanner
                     // Time Frame Picker
                     Picker("Time Frame", selection: $selectedTimeFrame) {
@@ -162,8 +161,6 @@ struct StatsView: View {
                     // VO2max Trend
                     if !healthKitManager.isVO2MaxAvailableOnThisDevice() {
                         infoBanner(text: "VO2max 需要支持的设备（通常为 Apple Watch）")
-                    } else if healthKitManager.getPublishedAuthorizationStatus(for: .vo2Max) != .sharingAuthorized {
-                        infoBanner(text: "未授权读取 VO2max，请在健康 App 中授权")
                     } else if viewModel.vo2MaxTrend.isEmpty {
                         infoBanner(text: "暂无 VO2max 数据，佩戴 Apple Watch 进行户外步行/跑步以生成测量")
                     }
@@ -246,7 +243,6 @@ struct StatsView: View {
             }
             .navigationTitle("统计")
             .onAppear(perform: refreshAll)
-            .onAppear { healthKitManager.updateAuthorizationStatuses() }
             .onChange(of: selectedTimeFrame) { _ in
                 refreshAll()
             }
@@ -451,30 +447,7 @@ struct StatsView: View {
     }
 
     // MARK: - Permission & Empties
-    private var permissionBanner: some View {
-        let required: [HealthKitDataTypeOption] = [.activeEnergyBurned, .workout]
-        let unauthorized = required.filter { healthKitManager.getPublishedAuthorizationStatus(for: $0) != .sharingAuthorized }
-        return Group {
-            if !unauthorized.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                        Text("未授权读取运动与能量数据").font(.headline)
-                    }
-                    Text("请在健康 App 中授权“体能训练、活动能量”，以便生成完整的分析与报告。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    HStack(spacing: 12) {
-                        Button(action: openHealthApp) { Label("前往健康 App 授权", systemImage: "heart.fill") }.buttonStyle(.borderedProminent)
-                    }
-                }
-                .padding()
-                .background(Color.orange.opacity(0.1))
-                .cornerRadius(12)
-            }
-        }
-        .padding(.horizontal)
-    }
+    // permissionBanner removed per design
 
     private var emptyStateBanner: some View {
         Group {
