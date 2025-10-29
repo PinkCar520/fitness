@@ -146,11 +146,18 @@ struct StatsView: View {
                     
                     // Workout Type Distribution
                     WorkoutTypePieChartView(data: workoutTypeDistributionData)
-
+                    
                     // Type Efficiency Card
                     typeEfficiencySection
 
                     // VO2max Trend
+                    if !healthKitManager.isVO2MaxAvailableOnThisDevice() {
+                        infoBanner(text: "VO2max 需要支持的设备（通常为 Apple Watch）")
+                    } else if healthKitManager.getPublishedAuthorizationStatus(for: .vo2Max) != .sharingAuthorized {
+                        infoBanner(text: "未授权读取 VO2max，请在健康 App 中授权")
+                    } else if viewModel.vo2MaxTrend.isEmpty {
+                        infoBanner(text: "暂无 VO2max 数据，佩戴 Apple Watch 进行户外步行/跑步以生成测量")
+                    }
                     GenericLineChartView(
                         title: "VO2max 趋势",
                         data: viewModel.vo2MaxTrend,
@@ -345,6 +352,18 @@ struct StatsView: View {
         } else if let url = URL(string: UIApplication.openSettingsURLString), UIApplication.shared.canOpenURL(url) {
             UIApplication.shared.open(url)
         }
+    }
+
+    @ViewBuilder private func infoBanner(text: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "info.circle")
+            Text(text).font(.caption)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(10)
+        .padding(.horizontal)
     }
 
     // MARK: - Heatmap Data
