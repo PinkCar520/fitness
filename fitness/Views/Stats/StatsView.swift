@@ -350,8 +350,8 @@ struct StatsView: View {
         let windowWorkouts = workouts.filter { $0.date >= start && $0.date <= end }
         var dict: [WorkoutType: (sessions: Int, minutes: Double, calories: Double)] = [:]
         for w in windowWorkouts {
-            let m = (w.durationInMinutes ?? 0)
-            let c = (w.caloriesBurned ?? 0)
+            let m = Double(w.durationInMinutes ?? 0)
+            let c = Double(w.caloriesBurned)
             let cur = dict[w.type] ?? (sessions: 0, minutes: 0, calories: 0)
             dict[w.type] = (sessions: cur.sessions + 1, minutes: cur.minutes + m, calories: cur.calories + c)
         }
@@ -367,8 +367,8 @@ struct StatsView: View {
         let grouped = Dictionary(grouping: relevant, by: { cal.startOfDay(for: $0.date) })
         let days = dateRange(from: start, to: now)
         return days.map { day in
-            let sum = (grouped[day] ?? []).reduce(0) { $0 + ($1.caloriesBurned ?? 0) }
-            return DateValuePoint(date: day, value: sum)
+            let sum = (grouped[day] ?? []).reduce(0) { $0 + $1.caloriesBurned }
+            return DateValuePoint(date: day, value: Double(sum))
         }
     }
 }
