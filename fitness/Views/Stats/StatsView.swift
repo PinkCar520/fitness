@@ -34,8 +34,7 @@ struct StatsView: View {
     @State private var selectedTimeFrame: TimeFrame = .thirtyDays
     @StateObject private var viewModel = StatsViewModel()
     
-    @State private var showDayInfo: Bool = false
-    @State private var dayInfoText: String = ""
+    
 
     // Environment & Data Sources
     @EnvironmentObject var healthKitManager: HealthKitManager
@@ -132,14 +131,7 @@ struct StatsView: View {
                         }
                     }
 
-                    // Daily Execution Heatmap
-                    DailyHeatmapView(days: dailyStatuses, onTap: { date in
-                        appState.selectedTab = 1
-                        NotificationCenter.default.post(name: .navigateToPlanDate, object: nil, userInfo: ["date": date])
-                    }, onLongPress: { status in
-                        dayInfoText = heatmapInfoText(for: status)
-                        showDayInfo = true
-                    })
+                    
 
                     // Workout Frequency Chart
                     WorkoutFrequencyChartView(data: workoutFrequencyData)
@@ -169,11 +161,7 @@ struct StatsView: View {
             .onChange(of: selectedTimeFrame) { _ in
                 refreshAll()
             }
-            .alert("当天执行详情", isPresented: $showDayInfo) {
-                Button("知道了", role: .cancel) {}
-            } message: {
-                Text(dayInfoText)
-            }
+            
         }
     }
 
@@ -236,34 +224,7 @@ struct StatsView: View {
         .padding(.horizontal)
     }
 
-    private func heatmapInfoText(for status: DailyStatus) -> String {
-        let dateText = status.date.formatted(date: .abbreviated, time: .omitted)
-        let stateText: String
-        switch status.state {
-        case .completed: stateText = "已完成"
-        case .skipped: stateText = "已跳过"
-        case .none: stateText = "无记录"
-        }
-        return "\(dateText)：\(stateText)"
-    }
-
-    // MARK: - Heatmap Data
-    private var dailyStatuses: [DailyStatus] {
-        let calendar = Calendar.current
-        let now = calendar.startOfDay(for: Date())
-        let start = calendar.date(byAdding: .day, value: -selectedTimeFrame.days + 1, to: now) ?? now
-        guard let plan = activePlans.first else {
-            return dateRange(from: start, to: now).map { DailyStatus(date: $0, state: .none) }
-        }
-        let index = Dictionary(grouping: plan.dailyTasks, by: { calendar.startOfDay(for: $0.date) })
-        return dateRange(from: start, to: now).map { day in
-            if let task = index[day]?.first {
-                return DailyStatus(date: day, state: task.isCompleted ? .completed : (task.isSkipped ? .skipped : .none))
-            } else {
-                return DailyStatus(date: day, state: .none)
-            }
-        }
-    }
+    // Heatmap section removed per request
 
     private func dateRange(from start: Date, to end: Date) -> [Date] {
         var days: [Date] = []
