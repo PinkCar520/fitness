@@ -13,11 +13,29 @@ struct GenericLineChartView: View {
     let data: [DateValuePoint]
     let color: Color
     let unit: String
-    let averageValue: Double? = nil
-    let goalValue: Double? = nil
+    let averageValue: Double?
+    let goalValue: Double?
 
     @State private var selectedPoint: DateValuePoint? // For tap gesture
     @State private var currentPoint: DateValuePoint?  // For drag gesture
+
+    init(
+        title: String,
+        data: [DateValuePoint],
+        color: Color,
+        unit: String,
+        averageValue: Double? = nil,
+        goalValue: Double? = nil
+    ) {
+        self.title = title
+        self.data = data
+        self.color = color
+        self.unit = unit
+        self.averageValue = averageValue
+        self.goalValue = goalValue
+        self._selectedPoint = State(initialValue: nil)
+        self._currentPoint = State(initialValue: nil)
+    }
 
     private var yAxisDomain: ClosedRange<Double> {
         let values = data.map { $0.value }
