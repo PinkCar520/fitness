@@ -112,26 +112,42 @@ struct StatsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 24) {
                     emptyStateBanner
-                    // View Mode Picker
-                    Picker("View Mode", selection: $selectedView) {
-                        ForEach(ViewMode.allCases) { mode in
-                            Text(mode.rawValue).tag(mode)
+                    // Time Frame Picker
+                    Picker("Time Frame", selection: $selectedTimeFrame) {
+                        ForEach(TimeFrame.allCases) { timeFrame in
+                            Text(timeFrame.rawValue).tag(timeFrame)
                         }
                     }
                     .pickerStyle(.segmented)
 
-                    Group {
-                        switch selectedView {
-                        case .overview:
-                            overviewSection
-                        case .trend:
-                            trendSection
-                        case .distribution:
-                            distributionSection
+                    // Core Metrics Grid
+                    VStack(alignment: .leading) {
+                        Text("核心指标")
+                            .font(.title3).bold()
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                            MetricCard(title: "运动天数", value: "\(viewModel.workoutDays)", unit: "天", icon: "figure.walk", color: .orange)
+                            MetricCard(title: "总消耗", value: String(format: "%.0f", viewModel.totalCalories), unit: "千卡", icon: "flame.fill", color: .red)
                         }
                     }
+
+                    // Workout Frequency Chart
+                    WorkoutFrequencyChartView(data: workoutFrequencyData)
+                    
+                    // Workout Type Distribution
+                    WorkoutTypePieChartView(data: workoutTypeDistributionData)
+                    
+                    // Daily Calories
+                    GenericLineChartView(
+                        title: "每日消耗（卡路里）",
+                        data: dailyCaloriesSeries,
+                        color: .pink,
+                        unit: "kcal"
+                    )
+
+                    // Personal Records
+                    PersonalRecordsView(records: personalRecords)
                 }
                 .padding()
             }
