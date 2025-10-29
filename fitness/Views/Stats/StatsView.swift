@@ -32,10 +32,15 @@ struct StatsView: View {
         }
     }
     @State private var selectedTimeFrame: TimeFrame = .thirtyDays
+    @StateObject private var viewModel = StatsViewModel()
+    @State private var reportImage: UIImage? = nil
+    @State private var showShareSheet = false
 
     // Environment & Data Sources
     @EnvironmentObject var healthKitManager: HealthKitManager
     @Query(sort: \Workout.date, order: .reverse) private var workouts: [Workout]
+    @Query(sort: \HealthMetric.date, order: .forward) private var allMetrics: [HealthMetric]
+    @Query(filter: #Predicate<Plan> { $0.status == "active" }) private var activePlans: [Plan]
 
     // State for fetched data
     @State private var totalCalories: Double = 0
@@ -119,10 +124,12 @@ struct StatsView: View {
                         Text("核心指标")
                             .font(.title3).bold()
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                            MetricCard(title: "运动天数", value: "\(workoutDays)", unit: "天", icon: "figure.walk", color: .orange)
-                            MetricCard(title: "总消耗", value: String(format: "%.0f", totalCalories), unit: "千卡", icon: "flame.fill", color: .red)
+                            MetricCard(title: "运动天数", value: "\(viewModel.workoutDays)", unit: "天", icon: "figure.walk", color: .orange)
+                            MetricCard(title: "总消耗", value: String(format: "%.0f", viewModel.totalCalories), unit: "千卡", icon: "flame.fill", color: .red)
                         }
                     }
+
+                    executionSummarySection
 
                     // Workout Frequency Chart
                     WorkoutFrequencyChartView(data: workoutFrequencyData)
@@ -130,6 +137,45 @@ struct StatsView: View {
                     // Workout Type Distribution
                     WorkoutTypePieChartView(data: workoutTypeDistributionData)
                     
+                    // VO2max Trend
+                    GenericLineChartView(
+                        title: "VO2max 趋势",
+                        data: viewModel.vo2MaxTrend,
+                        color: .teal,
+                        unit: "ml/kg/min"
+                    )
+
+                    // Weight and Body Fat Trends
+                    GenericLineChartView(
+                        title: "体重趋势",
+                        data: viewModel.weightTrend,
+                        color: .blue,
+                        unit: "kg"
+                    )
+                    GenericLineChartView(
+                        title: "体脂率趋势",
+                        data: viewModel.bodyFatTrend,
+                        color: .orange,
+                        unit: "%"
+                    )
+
+                    Button {
+                        let reportStack = VStack(alignment: .leading, spacing: 16) {
+                            Text("分析报告（\(selectedTimeFrame.rawValue)）").font(.headline)
+                            executionSummarySection
+                            WorkoutFrequencyChartView(data: workoutFrequencyData)
+                            WorkoutTypePieChartView(data: workoutTypeDistributionData)
+                        }
+                        .padding()
+                        self.reportImage = reportStack.snapshot()
+                        self.showShareSheet = true
+                    } label: {
+                        Label("分享分析报告", systemImage: "square.and.arrow.up")
+                            .font(.footnote.weight(.bold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+
                     // Personal Records
                     PersonalRecordsView(records: personalRecords)
 
@@ -138,20 +184,77 @@ struct StatsView: View {
                 .padding()
             }
             .navigationTitle("统计")
-            .onAppear(perform: fetchData)
-            .onChange(of: selectedTimeFrame) { 
-                fetchData()
+            .onAppear(perform: refreshAll)
+            .onChange(of: selectedTimeFrame) { _ in
+                refreshAll()
+            }
+            .sheet(isPresented: $showShareSheet) {
+                if let image = reportImage {
+                    ShareSheet(items: [image])
+                }
             }
         }
     }
 
-    private func fetchData() {
+    private var executionSummarySection: some View {
+        let ex = viewModel.execution
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("计划执行度").font(.title3).bold()
+            HStack(spacing: 12) {
+                badge("完成", value: "\(ex.completedDays)", color: .green)
+                badge("跳过", value: "\(ex.skippedDays)", color: .orange)
+                badge("连续", value: "\(ex.streakDays) 天", color: .blue)
+                Spacer()
+                Text("完成率 \(Int(ex.completionRate * 100))%")
+                    .font(.headline).foregroundColor(.accentColor)
+            }
+        }
+        .padding()
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(12)
+    }
+
+    private func badge(_ title: String, value: String, color: Color) -> some View {
+        HStack(spacing: 6) {
+            Circle().fill(color).frame(width: 8, height: 8)
+            Text("\(title) \(value)").font(.caption).fontWeight(.semibold)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(color.opacity(0.12))
+        .cornerRadius(8)
+    }
+
+    private func refreshAll() {
         healthKitManager.fetchTotalActiveEnergy(for: selectedTimeFrame.days) { calories in
-            self.totalCalories = calories
+            self.viewModel.totalCalories = calories
         }
         healthKitManager.fetchWorkoutDays(for: selectedTimeFrame.days) { days in
-            self.workoutDays = days
+            self.viewModel.workoutDays = days
         }
+        self.viewModel.execution = buildExecutionSummary(days: selectedTimeFrame.days)
+        self.viewModel.vo2MaxTrend = viewModel.buildTrend(from: allMetrics, type: .vo2Max, last: selectedTimeFrame.days)
+        self.viewModel.weightTrend = viewModel.buildTrend(from: allMetrics, type: .weight, last: selectedTimeFrame.days)
+        self.viewModel.bodyFatTrend = viewModel.buildTrend(from: allMetrics, type: .bodyFatPercentage, last: selectedTimeFrame.days)
+    }
+
+    private func buildExecutionSummary(days: Int) -> StatsViewModel.ExecutionSummary {
+        guard let plan = activePlans.first else { return .init(completedDays: 0, skippedDays: 0, streakDays: 0) }
+        let calendar = Calendar.current
+        let now = Date()
+        let start = calendar.date(byAdding: .day, value: -days, to: now) ?? now
+        let tasks = plan.dailyTasks.filter { $0.date >= start && $0.date <= now }.sorted { $0.date < $1.date }
+        let completed = tasks.filter { $0.isCompleted }.count
+        let skipped = tasks.filter { $0.isSkipped }.count
+        var streak = 0
+        var dateCursor = calendar.startOfDay(for: now)
+        let index = Dictionary(grouping: tasks, by: { calendar.startOfDay(for: $0.date) })
+        while let task = index[dateCursor]?.first, task.isCompleted {
+            streak += 1
+            guard let prev = calendar.date(byAdding: .day, value: -1, to: dateCursor) else { break }
+            dateCursor = prev
+        }
+        return .init(completedDays: completed, skippedDays: skipped, streakDays: streak)
     }
 }
 
