@@ -239,6 +239,15 @@ struct SummaryDashboardView: View {
             return InsightCard.Action(title: "记录体重", icon: "scalemass.fill") { perform(.logWeight) }
         case .openPlan:
             return InsightCard.Action(title: "查看计划", icon: "target") { perform(.openPlan) }
+        case .openBodyProfileWeight:
+            return InsightCard.Action(title: "查看体重趋势", icon: "chart.xyaxis.line") {
+                appState.selectedTab = 2
+                NotificationCenter.default.post(name: .navigateToBodyProfileMetric, object: nil, userInfo: ["metric": "weight"])
+            }
+        case .openStats:
+            return InsightCard.Action(title: "查看分析", icon: "chart.pie") {
+                appState.selectedTab = 3
+            }
         case .none:
             return nil
         }

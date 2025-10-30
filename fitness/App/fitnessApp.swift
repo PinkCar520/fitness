@@ -70,4 +70,6 @@ struct fitnessApp: App {
 extension Notification.Name {
     static let showInputSheet = Notification.Name("showInputSheet")
     static let planDataDidChange = Notification.Name("planDataDidChange")
+    static let navigateToPlanDate = Notification.Name("navigateToPlanDate")
+    static let navigateToBodyProfileMetric = Notification.Name("navigateToBodyProfileMetric")
 }

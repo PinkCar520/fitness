@@ -405,6 +405,12 @@ private var mainNavigationContent: some View {
             resumableTask: $resumableTask,
             resumableState: $resumableState
         ))
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToPlanDate)) { notif in
+            if let date = notif.userInfo?["date"] as? Date {
+                self.selectedDate = date
+                self.planViewModel.selectedDate = date
+            }
+        }
 }
 
 private struct WorkoutLaunchModifier: ViewModifier {

@@ -13,6 +13,7 @@ enum MetricType: String, Codable, CaseIterable {
     case bodyWaterPercentage = "身体水分率"
     case basalMetabolicRate = "基础代谢率"
     case waistToHipRatio = "腰臀比"
+    case vo2Max = "VO2max"
     // Future types can be added here, e.g.:
     // case height = "身高"
     // case bodyMassIndex = "BMI"
@@ -31,6 +32,8 @@ enum MetricType: String, Codable, CaseIterable {
             return "kcal"
         case .waistToHipRatio:
             return ""
+        case .vo2Max:
+            return "ml/kg/min"
         }
     }
 }
