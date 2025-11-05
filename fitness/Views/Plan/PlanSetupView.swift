@@ -32,7 +32,7 @@ struct PlanSetupView: View {
     @State private var isLoadingPlan = false // NEW STATE VARIABLE
     @State private var hasSeededExistingPlan = false
     
-    var onComplete: (PlanConfiguration) -> Void
+    var onComplete: @Sendable (PlanConfiguration) async -> Void
 
     private let totalSteps = 8
 
@@ -60,10 +60,11 @@ struct PlanSetupView: View {
                         LifestyleStepView(sleepTarget: $config.sleepDurationTarget).tag(4)
                         CycleStepView(planDuration: $config.planDuration).tag(5)
                         ScheduleStepView(frequency: $config.workoutFrequency, selectedDays: $config.trainingDays).tag(6)
-                        ConfirmationStepView(config: config, onComplete: {
-                            onComplete(config)
-                            dismiss()
-                        }, isLoadingPlan: $isLoadingPlan).tag(7) // PASS BINDING
+                        ConfirmationStepView(
+                            config: config,
+                            onComplete: completePlanGeneration,
+                            isLoadingPlan: $isLoadingPlan
+                        ).tag(7) // PASS BINDING
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
                 }
@@ -107,6 +108,14 @@ struct PlanSetupView: View {
             config.experienceLevel = experience
         }
         hasSeededExistingPlan = true
+    }
+
+    private func completePlanGeneration() async {
+        await onComplete(config)
+        await MainActor.run {
+            isLoadingPlan = false
+            dismiss()
+        }
     }
 }
 
@@ -313,7 +322,7 @@ private struct CycleStepView: View {
 
 private struct ConfirmationStepView: View {
     let config: PlanConfiguration
-    let onComplete: () -> Void
+    let onComplete: () async -> Void
     @Binding var isLoadingPlan: Bool // NEW BINDING
     
     private let columns = [GridItem(.flexible()), GridItem(.flexible())]
@@ -340,8 +349,9 @@ private struct ConfirmationStepView: View {
                     
                     Button(action: {
                         isLoadingPlan = true // Set loading state
-                        onComplete() // Trigger plan generation
-                        // isLoadingPlan will be set to false by the dismiss() in PlanSetupView's onComplete
+                        Task {
+                            await onComplete() // Trigger plan generation
+                        }
                     }) {
                         Text("生成计划")
                             .fontWeight(.bold)
@@ -604,7 +614,9 @@ struct PlanSetupView_Previews: PreviewProvider {
         let container = try! ModelContainer(for: Plan.self, configurations: config)
 
         return PlanSetupView { generatedConfig in
-            print("Preview: Plan Generated with config: \(generatedConfig)")
+            await MainActor.run {
+                print("Preview: Plan Generated with config: \(generatedConfig)")
+            }
         }
         .modelContainer(container)
         .environmentObject(ProfileViewModel())

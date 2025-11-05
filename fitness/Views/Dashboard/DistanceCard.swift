@@ -6,7 +6,7 @@ struct DistanceCard: View {
     let weeklyDistanceData: [DailyDistanceData] // New property for chart data
 
     var body: some View {
-        NavigationLink(destination: HealthDataDetailView(dataType: .distance)) {
+        // Tap handled by parent via Button/onTapGesture
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text(distance / 1000, format: .number.precision(.fractionLength(2)))
@@ -46,8 +46,6 @@ struct DistanceCard: View {
             .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
             .animation(.easeInOut, value: distance)
             
-        }
-        .buttonStyle(PlainButtonStyle()) // To remove default NavigationLink styling
     }
 }
 

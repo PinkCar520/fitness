@@ -3,14 +3,16 @@ import HealthKit
 import SwiftUI
 import Combine
 
-struct DailyStepData: Identifiable {
-    let id = UUID()
+struct DailyStepData: Identifiable, Equatable {
+    // 使用日期作为稳定的标识，避免视图切换时随机 UUID 导致重建闪烁
+    var id: Date { date }
     let date: Date
     let steps: Double
 }
 
-struct DailyDistanceData: Identifiable {
-    let id = UUID()
+struct DailyDistanceData: Identifiable, Equatable {
+    // 使用日期作为稳定的标识
+    var id: Date { date }
     let date: Date
     let distance: Double
 }
@@ -327,15 +329,16 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol, @unche
         }
     }
 
-    // 读取过去7天的每日步数
-    func readWeeklyStepCounts() async -> [DailyStepData] {
+    // 通用：读取过去 N 天的每日步数
+    func readDailySteps(days: Int) async -> [DailyStepData] {
         guard let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount) else { return [] }
 
         let calendar = Calendar.current
         var dailyStepData: [DailyStepData] = []
         let dispatchGroup = DispatchGroup() // Use DispatchGroup to wait for all queries
 
-        for i in 0..<7 {
+        let clamped = max(1, days)
+        for i in 0..<clamped {
             dispatchGroup.enter()
             guard let date = calendar.date(byAdding: .day, value: -i, to: Date()) else {
                 dispatchGroup.leave()
@@ -364,16 +367,22 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol, @unche
             }
         }
     }
+    
+    // 读取过去7天的每日步数（兼容原接口）
+    func readWeeklyStepCounts() async -> [DailyStepData] {
+        return await readDailySteps(days: 7)
+    }
 
-    // 读取过去7天的每日距离
-    func readWeeklyDistance() async -> [DailyDistanceData] {
+    // 通用：读取过去 N 天的每日距离
+    func readDailyDistance(days: Int) async -> [DailyDistanceData] {
         guard let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) else { return [] }
 
         let calendar = Calendar.current
         var dailyDistanceData: [DailyDistanceData] = []
-        let dispatchGroup = DispatchGroup() // Use DispatchGroup to wait for all queries
+        let dispatchGroup = DispatchGroup()
 
-        for i in 0..<7 {
+        let clamped = max(1, days)
+        for i in 0..<clamped {
             dispatchGroup.enter()
             guard let date = calendar.date(byAdding: .day, value: -i, to: Date()) else {
                 dispatchGroup.leave()
@@ -386,7 +395,6 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol, @unche
 
             let query = HKStatisticsQuery(quantityType: distanceType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
                 let distance = result?.sumQuantity()?.doubleValue(for: .meter()) ?? 0
-                // Ensure thread safety when appending to dailyDistanceData
                 DispatchQueue.main.async {
                     dailyDistanceData.append(DailyDistanceData(date: startOfDay, distance: distance))
                     dispatchGroup.leave()
@@ -401,6 +409,11 @@ final class HealthKitManager: ObservableObject, HealthKitManagerProtocol, @unche
                 continuation.resume(returning: dailyDistanceData.sorted { $0.date < $1.date })
             }
         }
+    }
+
+    // 读取过去7天的每日距离（兼容原接口）
+    func readWeeklyDistance() async -> [DailyDistanceData] {
+        return await readDailyDistance(days: 7)
     }
 
     // 读取当天距离

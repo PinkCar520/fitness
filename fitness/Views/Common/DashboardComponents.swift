@@ -99,6 +99,7 @@ struct QuickActionButton: View {
 }
 
 /// Data-driven card to surface insights, reminders, or guidance to the user.
+/// Note: InsightCard is deprecated on Dashboard; still used in Plan view.
 struct InsightCard: View {
     struct Action {
         let title: String

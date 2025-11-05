@@ -74,6 +74,12 @@ class PlanViewModel: ObservableObject {
         filterPlansForSelectedDate()
     }
 
+    func generatePlanAsync(config: PlanConfiguration, recommendationManager: RecommendationManager) async {
+        await MainActor.run {
+            generatePlan(config: config, recommendationManager: recommendationManager)
+        }
+    }
+
     func generatePlan(config: PlanConfiguration, recommendationManager: RecommendationManager) {
         archiveOldPlan() // Archive existing active plan
 
@@ -192,32 +198,7 @@ class PlanViewModel: ObservableObject {
         filterPlansForSelectedDate()
     }
 
-    func weeklySummary(for date: Date = Date()) -> PlanWeeklySummary? {
-        guard let plan = activePlan else { return nil }
-        let startOfWeek = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)) ?? date
-        let endOfWeek = calendar.date(byAdding: .day, value: 7, to: startOfWeek) ?? date
-
-        let tasksThisWeek = plan.dailyTasks.filter { task in
-            task.date >= startOfWeek && task.date < endOfWeek
-        }
-
-        guard !tasksThisWeek.isEmpty else { return nil }
-
-        let completed = tasksThisWeek.filter { $0.isCompleted }.count
-        let skipped = tasksThisWeek.filter { $0.isSkipped }.count
-        let pending = tasksThisWeek.count - completed - skipped
-        let completionRate = Double(completed) / Double(tasksThisWeek.count)
-        let streak = calculateStreak(from: plan.dailyTasks, upTo: date)
-
-        return PlanWeeklySummary(
-            completionRate: completionRate,
-            completedDays: completed,
-            pendingDays: max(pending, 0),
-            skippedDays: skipped,
-            streakDays: streak,
-            totalDays: tasksThisWeek.count
-        )
-    }
+    // Weekly summary calculation migrated to Shared/WeeklySummaryCalculator
 
     func refreshInsights(weightMetrics: [HealthMetric]) {
         insights = buildInsights(weightMetrics: weightMetrics)
@@ -293,27 +274,7 @@ class PlanViewModel: ObservableObject {
             items.append(weightInsight)
         }
 
-        if let summary = weeklySummary() {
-            if summary.completionRate >= 0.8 {
-                items.append(
-                    PlanInsightItem(
-                        title: "优秀的完成率",
-                        message: "本周完成率达到 \(Int(summary.completionRate * 100))%，继续保持势头！",
-                        tone: .positive,
-                        intent: .none
-                    )
-                )
-            } else if summary.pendingDays > 0 {
-                items.append(
-                    PlanInsightItem(
-                        title: "还有待完成的任务",
-                        message: "本周还有 \(summary.pendingDays) 天训练未完成，挑一项开始动起来吧。",
-                        tone: .warning,
-                        intent: .startWorkout
-                    )
-                )
-            }
-        }
+        // Removed weekly summary based insights; widget handles weekly summary presentation
 
         if items.isEmpty {
             items.append(

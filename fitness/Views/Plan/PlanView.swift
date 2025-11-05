@@ -38,9 +38,7 @@ struct PlanView: View {
         allMetrics.filter { $0.type == .weight }
     }
 
-    private var weeklySummary: PlanWeeklySummary? {
-        planViewModel.weeklySummary()
-    }
+    // Removed: weekly summary is now widget-only
 
     private var completedDates: Set<Date> {
         guard let plan = activePlans.first else { return [] }
@@ -72,43 +70,7 @@ struct PlanView: View {
         }
     }
 
-    @ViewBuilder
-    private var weeklySummarySection: some View {
-        if let summary = weeklySummary {
-            DashboardSurface {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(alignment: .center, spacing: 12) {
-                        Image(systemName: "calendar")
-                            .font(.title3.weight(.bold))
-                            .foregroundColor(.accentColor)
-                        Text("本周摘要")
-                            .font(.headline.weight(.bold))
-                        Spacer()
-                        Text("\(Int(summary.completionRate * 100))%")
-                            .font(.title3.weight(.heavy))
-                            .foregroundColor(.accentColor)
-                    }
-
-                    ProgressView(value: summary.completionRate)
-                        .progressViewStyle(.linear)
-
-                    HStack(spacing: 12) {
-                        InfoChip(icon: "checkmark.circle.fill", text: "已完成 \(summary.completedDays)", tint: .accentColor, backgroundColor: Color.accentColor.opacity(0.15))
-                        if summary.pendingDays > 0 {
-                            InfoChip(icon: "hourglass", text: "待完成 \(summary.pendingDays)", tint: .orange, backgroundColor: Color.orange.opacity(0.15))
-                        }
-                        if summary.skippedDays > 0 {
-                            InfoChip(icon: "arrow.uturn.left", text: "跳过 \(summary.skippedDays)", tint: .pink, backgroundColor: Color.pink.opacity(0.15))
-                        }
-                    }
-
-                    Text("连续完成 \(summary.streakDays) 天 · 本周共 \(summary.totalDays) 日安排")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
+    // Removed: weekly summary section (migrated to widget)
 
     @ViewBuilder
     private var planInsightsSection: some View {
@@ -481,7 +443,6 @@ private var content: some View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     planGoalSummarySection
-                    weeklySummarySection
                     planInsightsSection
                     CalendarView(selectedDate: $selectedDate, completedDates: completedDates)
                         .onChange(of: selectedDate) { oldValue, newValue in
@@ -513,9 +474,10 @@ private var toolbarContent: some ToolbarContent {
 
 private var planSetupSheet: some View {
     PlanSetupView { config in
-        planViewModel.generatePlan(config: config, recommendationManager: recommendationManager)
+        await planViewModel.generatePlanAsync(config: config, recommendationManager: recommendationManager)
     }
-    .presentationDetents([.fraction(0.85), .large])
+    .presentationDetents([.fraction(0.9)])
+    .presentationDragIndicator(.visible)
 }
 
 private func onAppear() {
