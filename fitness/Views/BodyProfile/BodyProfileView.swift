@@ -99,9 +99,9 @@ struct BodyProfileView: View {
 
         }
         .onAppear { refreshVM() }
-        .onChange(of: metrics.map(\.date)) { _ in refreshVM() }
-        .onChange(of: selectedChartMetric) { _ in refreshVM() }
-        .onChange(of: selectedRange) { _ in refreshVM() }
+        .onChange(of: metrics.map(\.date)) { _, _ in refreshVM() }
+        .onChange(of: selectedChartMetric) { refreshVM() }
+        .onChange(of: selectedRange) { refreshVM() }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToBodyProfileMetric)) { notif in
             if let metric = notif.userInfo?["metric"] as? String {
                 if metric == "weight" { selectedChartMetric = .weight }

@@ -153,9 +153,7 @@ struct StatsView: View {
             }
             .navigationTitle("统计")
             .onAppear(perform: refreshAll)
-            .onChange(of: selectedTimeFrame) { _ in
-                refreshAll()
-            }
+            .onChange(of: selectedTimeFrame) { _, _ in refreshAll() }
             
             
         }

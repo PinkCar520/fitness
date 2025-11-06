@@ -125,12 +125,8 @@ struct SummaryDashboardView: View {
                 await dashboardViewModel.loadNonReactiveData()
             }
             .onAppear(perform: refreshAuxiliaryData)
-            .onChange(of: activePlans.map(\.id)) { _ in
-                refreshAuxiliaryData()
-            }
-            .onChange(of: allMetrics.map(\.date)) { _ in
-                refreshAuxiliaryData()
-            }
+            .onChange(of: activePlans.map(\.id)) { _, _ in refreshAuxiliaryData() }
+            .onChange(of: allMetrics.map(\.date)) { _, _ in refreshAuxiliaryData() }
             .onReceive(NotificationCenter.default.publisher(for: .planDataDidChange)) { _ in
                 refreshAuxiliaryData()
             }

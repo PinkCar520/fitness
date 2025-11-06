@@ -88,7 +88,7 @@ struct DistanceDetailSheet: View {
             .pickerStyle(.segmented)
             .padding(.horizontal)
             .padding(.bottom, 12)
-            .onChange(of: range) { newRange in
+            .onChange(of: range) { _, newRange in
                 Task { await loadIfNeeded(newRange) }
             }
 
@@ -220,7 +220,7 @@ private extension DistanceDetailSheet {
         }
 
         return months.compactMap { m in
-            var comps = DateComponents(year: year, month: m)
+            let comps = DateComponents(year: year, month: m)
             guard let monthStart = cal.date(from: comps) else { return nil }
             let endOfMonth = cal.date(byAdding: DateComponents(month: 1, day: -1), to: monthStart) ?? monthStart
             return DailyDistanceData(date: endOfMonth, distance: map[m] ?? 0)

@@ -120,7 +120,7 @@ struct StepsDetailSheet: View {
             .pickerStyle(.segmented)
             .padding(.horizontal)
             .padding(.bottom, 12)
-            .onChange(of: range) { newRange in
+            .onChange(of: range) { _, newRange in
                 Task { await loadIfNeeded(newRange) }
             }
 
@@ -290,7 +290,7 @@ private extension StepsDetailSheet {
 
         // 生成 3 根柱，缺失补0
         return months.compactMap { m in
-            var comps = DateComponents(year: year, month: m)
+            let comps = DateComponents(year: year, month: m)
             guard let monthStart = cal.date(from: comps) else { return nil }
             let endOfMonth = cal.date(byAdding: DateComponents(month: 1, day: -1), to: monthStart) ?? monthStart
             return DailyStepData(date: endOfMonth, steps: map[m] ?? 0)

@@ -285,15 +285,24 @@ class DashboardViewModel: ObservableObject {
         let engineMetrics = weightMetrics
             .filter { $0.type == .weight }
             .map { InsightsEngine.WeightMetric(date: $0.date, value: $0.value) }
+        let taskContext = todaysTask.map { task in
+            InsightsEngine.Context.TaskContext(
+                isSkipped: task.isSkipped,
+                totalWorkouts: task.workouts.count,
+                completedWorkouts: task.workouts.filter { $0.isCompleted }.count,
+                totalMeals: task.meals.count,
+                pendingMeals: task.meals.filter { !$0.isCompleted }.count
+            )
+        }
+
         let context = InsightsEngine.Context(
             hasActivePlan: (activePlan != nil),
-            todaysHasWorkouts: todaysTask.map { !$0.workouts.isEmpty },
-            todaysCompletedWorkoutsCount: todaysTask.map { $0.workouts.filter { $0.isCompleted }.count },
+            task: taskContext,
             weightMetrics: engineMetrics
         )
         let sharedItems = InsightsEngine.generate(from: context)
         let snapshot = InsightsSnapshot(generatedAt: Date(), items: sharedItems)
-        let store = InsightsSnapshotStore(appGroup: "group.com.pineapple.fitness")
+        let store = InsightsSnapshotStore(appGroup: AppGroup.suiteName)
         store.write(snapshot)
         WidgetCenter.shared.reloadAllTimelines()
     }
@@ -365,12 +374,12 @@ class DashboardViewModel: ObservableObject {
         let engineMetrics = metrics
             .filter { $0.type == .weight }
             .map { InsightsEngine.WeightMetric(date: $0.date, value: $0.value) }
-        return InsightsEngine.generate(from: .init(
+        let context = InsightsEngine.Context(
             hasActivePlan: true,
-            todaysHasWorkouts: nil,
-            todaysCompletedWorkoutsCount: nil,
+            task: nil,
             weightMetrics: engineMetrics
-        )).first { item in
+        )
+        return InsightsEngine.generate(from: context).first { item in
             switch item.intent { case .openBodyProfileWeight: return true; default: return false }
         }
     }

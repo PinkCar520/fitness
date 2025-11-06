@@ -395,14 +395,16 @@ private struct PlanLifecycleModifier: ViewModifier {
     @Binding var resumableState: WorkoutSessionState?
 
     func body(content: Content) -> some View {
-        content
+        let refreshed = content
             .onAppear(perform: checkForResumableWorkout)
-            .onChange(of: planViewModel.selectedDate) { _ in refreshPlanInsights() }
-            .onChange(of: planViewModel.currentDailyTask?.isCompleted ?? false) { _ in refreshPlanInsights() }
-            .onChange(of: planViewModel.currentDailyTask?.isSkipped ?? false) { _ in refreshPlanInsights() }
-            .onChange(of: planViewModel.workouts.map { $0.isCompleted }) { _ in refreshPlanInsights() }
-            .onChange(of: allMetrics.map(\.date)) { _ in refreshPlanInsights() }
-            .onChange(of: activePlans.map(\.id)) { _ in refreshPlanInsights() }
+            .onChange(of: planViewModel.selectedDate) { _, _ in refreshPlanInsights() }
+            .onChange(of: planViewModel.currentDailyTask?.isCompleted ?? false) { _, _ in refreshPlanInsights() }
+            .onChange(of: planViewModel.currentDailyTask?.isSkipped ?? false) { _, _ in refreshPlanInsights() }
+            .onChange(of: planViewModel.workouts.map { $0.isCompleted }) { _, _ in refreshPlanInsights() }
+            .onChange(of: allMetrics.map(\.date)) { _, _ in refreshPlanInsights() }
+            .onChange(of: activePlans.map(\.id)) { _, _ in refreshPlanInsights() }
+
+        return refreshed
             .alert("继续上次的训练?", isPresented: $showResumeAlert) {
                 Button("继续") { continueResumableWorkout() }
                 Button("丢弃", role: .destructive) { WorkoutSessionManager.clearSavedState() }
@@ -428,7 +430,7 @@ private struct PlanLifecycleModifier: ViewModifier {
     }
 
     private func continueResumableWorkout() {
-        if let task = resumableTask, let state = resumableState {
+        if resumableTask != nil, resumableState != nil {
             // The parent view will handle this, but for safety include the code.
             // No-op here, as the parent handles the actual launch.
         }

@@ -20,13 +20,13 @@ struct WeeklySummaryProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (WeeklySummaryEntry) -> Void) {
-        let store = WeeklySummarySnapshotStore(appGroup: "group.com.pineapple.fitness")
+        let store = WeeklySummarySnapshotStore(appGroup: AppGroup.suiteName)
         let snap = store.load() ?? placeholder(in: context).snapshot
         completion(WeeklySummaryEntry(date: Date(), snapshot: snap))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<WeeklySummaryEntry>) -> Void) {
-        let store = WeeklySummarySnapshotStore(appGroup: "group.com.pineapple.fitness")
+        let store = WeeklySummarySnapshotStore(appGroup: AppGroup.suiteName)
         let snap = store.load() ?? placeholder(in: context).snapshot
         let entry = WeeklySummaryEntry(date: Date(), snapshot: snap)
         // Refresh periodically (e.g., hourly)

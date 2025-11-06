@@ -1,5 +1,9 @@
 import Foundation
 
+public enum AppGroup {
+    public static let suiteName = "group.com.pineapple.fitness.WeightWidgets"
+}
+
 public struct InsightsSnapshot: Codable, Hashable {
     public let generatedAt: Date
     public let items: [InsightItem]
@@ -34,4 +38,3 @@ public final class InsightsSnapshotStore {
         return snapshot
     }
 }
-

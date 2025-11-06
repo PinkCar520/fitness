@@ -17,7 +17,7 @@ struct Provider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
         healthKitManager.fetchMostRecentWeight { weight in
-            let userDefaults = UserDefaults(suiteName: "group.com.pineapple.fitness")
+            let userDefaults = UserDefaults(suiteName: AppGroup.suiteName)
             let goal = userDefaults?.double(forKey: "targetWeight") ?? 65.0
             let startWeight = userDefaults?.double(forKey: "startWeight") ?? 75.0
 

@@ -14,11 +14,11 @@ struct InsightsProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<InsightsEntry>) -> ()) {
-        let insightsStore = InsightsSnapshotStore(appGroup: "group.com.pineapple.fitness")
+        let insightsStore = InsightsSnapshotStore(appGroup: AppGroup.suiteName)
         var items: [InsightItem] = insightsStore.read()?.items ?? sampleItems
 
         // Merge Weekly Summary insight from snapshot if available
-        let weeklyStore = WeeklySummarySnapshotStore(appGroup: "group.com.pineapple.fitness")
+        let weeklyStore = WeeklySummarySnapshotStore(appGroup: AppGroup.suiteName)
         if let weekly = weeklyStore.load() {
             if let weeklyInsight = mapWeeklySummaryToInsight(weekly) {
                 // Insert at top to highlight weekly status
@@ -184,6 +184,7 @@ struct InsightsWidgetEntryView: View {
         switch intent {
         case .startWorkout: return "fitness://start-workout"
         case .logWeight: return "fitness://add-weight"
+        case .reviewMeals: return "fitness://plan"
         case .openPlan: return "fitness://plan"
         case .openBodyProfileWeight: return "fitness://body-profile/weight"
         case .openStats: return "fitness://stats"
@@ -202,6 +203,7 @@ struct InsightsWidgetEntryView: View {
         switch intent {
         case .startWorkout: return "play.fill"
         case .logWeight: return "scalemass.fill"
+        case .reviewMeals: return "fork.knife"
         case .openPlan: return "calendar.badge.clock"
         case .openBodyProfileWeight: return "chart.xyaxis.line"
         case .openStats: return "chart.pie"
@@ -214,6 +216,7 @@ struct InsightsWidgetEntryView: View {
         switch intent {
         case .startWorkout: return "play.fill"
         case .logWeight: return "scalemass.fill"
+        case .reviewMeals: return "fork.knife"
         case .openPlan: return "calendar.badge.clock"
         case .openBodyProfileWeight: return "chart.xyaxis.line"
         case .openStats: return "chart.pie"
@@ -225,6 +228,7 @@ struct InsightsWidgetEntryView: View {
         switch intent {
         case .startWorkout: return "开始训练"
         case .logWeight: return "记录体重"
+        case .reviewMeals: return "记录饮食"
         case .openPlan: return "查看计划"
         case .openBodyProfileWeight: return "查看体重"
         case .openStats: return "查看统计"
