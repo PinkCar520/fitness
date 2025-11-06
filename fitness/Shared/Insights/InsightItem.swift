@@ -10,6 +10,7 @@ public struct InsightItem: Identifiable, Codable, Hashable {
     public enum Intent: String, Codable, Hashable {
         case startWorkout
         case logWeight
+        case reviewMeals
         case openPlan
         case openBodyProfileWeight
         case openStats
@@ -30,4 +31,3 @@ public struct InsightItem: Identifiable, Codable, Hashable {
         self.intent = intent
     }
 }
-

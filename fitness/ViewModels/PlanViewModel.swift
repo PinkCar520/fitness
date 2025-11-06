@@ -12,6 +12,40 @@ struct PlanWeeklySummary {
     let totalDays: Int
 }
 
+private extension PlanInsightItem {
+    init(from insight: InsightItem) {
+        let tone: InsightCard.Tone
+        switch insight.tone {
+        case .informational:
+            tone = .informational
+        case .positive:
+            tone = .positive
+        case .warning:
+            tone = .warning
+        }
+
+        let intent: Intent
+        switch insight.intent {
+        case .startWorkout:
+            intent = .startWorkout
+        case .logWeight, .openBodyProfileWeight:
+            intent = .logWeight
+        case .reviewMeals:
+            intent = .reviewMeals
+        default:
+            intent = .none
+        }
+
+        self.init(
+            id: insight.id,
+            title: insight.title,
+            message: insight.message,
+            tone: tone,
+            intent: intent
+        )
+    }
+}
+
 struct PlanInsightItem: Identifiable, Equatable {
     enum Intent: Equatable {
         case startWorkout
@@ -20,11 +54,19 @@ struct PlanInsightItem: Identifiable, Equatable {
         case none
     }
 
-    let id = UUID()
+    let id: UUID
     let title: String
     let message: String
     let tone: InsightCard.Tone
     let intent: Intent
+
+    init(id: UUID = UUID(), title: String, message: String, tone: InsightCard.Tone, intent: Intent) {
+        self.id = id
+        self.title = title
+        self.message = message
+        self.tone = tone
+        self.intent = intent
+    }
 }
 
 class PlanViewModel: ObservableObject {
@@ -201,121 +243,46 @@ class PlanViewModel: ObservableObject {
     // Weekly summary calculation migrated to Shared/WeeklySummaryCalculator
 
     func refreshInsights(weightMetrics: [HealthMetric]) {
-        insights = buildInsights(weightMetrics: weightMetrics)
-    }
+        let weightItems = weightMetrics
+            .filter { $0.type == .weight }
+            .map { InsightsEngine.WeightMetric(date: $0.date, value: $0.value) }
 
-    private func buildInsights(weightMetrics: [HealthMetric]) -> [PlanInsightItem] {
-        var items: [PlanInsightItem] = []
+        let taskContext = currentDailyTask.map { task in
+            InsightsEngine.Context.TaskContext(
+                isSkipped: task.isSkipped,
+                totalWorkouts: task.workouts.count,
+                completedWorkouts: task.workouts.filter { $0.isCompleted }.count,
+                totalMeals: task.meals.count,
+                pendingMeals: task.meals.filter { !$0.isCompleted }.count
+            )
+        }
 
-        guard let plan = activePlan else {
-            items.append(
-                PlanInsightItem(
+        let context = InsightsEngine.Context(
+            hasActivePlan: activePlan != nil,
+            task: taskContext,
+            shouldPromptForMissingTask: (activePlan != nil && currentDailyTask == nil),
+            weightMetrics: weightItems
+        )
+
+        let generatedItems = InsightsEngine.generate(from: context).map { PlanInsightItem(from: $0) }
+
+        if generatedItems.isEmpty {
+            let fallback = activePlan == nil
+                ? PlanInsightItem(
                     title: "还没有训练计划",
                     message: "立即制定个人目标，系统会生成本周训练与饮食安排。",
                     tone: .informational,
                     intent: .none
                 )
-            )
-            return items
-        }
-
-        if let task = currentDailyTask {
-            if task.isSkipped {
-                items.append(
-                    PlanInsightItem(
-                        title: "今日任务已跳过",
-                        message: "如果状态恢复不错，可以重新安排轻量训练或进行伸展恢复。",
-                        tone: .warning,
-                        intent: .startWorkout
-                    )
-                )
-            } else if task.workouts.isEmpty {
-                items.append(
-                    PlanInsightItem(
-                        title: "今日是休息日",
-                        message: "休息同样重要，保持充足睡眠与营养补给，为下一次训练做好准备。",
-                        tone: .positive,
-                        intent: .none
-                    )
-                )
-            } else if !task.isCompleted {
-                items.append(
-                    PlanInsightItem(
-                        title: "今日训练待完成",
-                        message: "完成今日 \(task.workouts.count) 项训练，保持连续性让成果更稳固。",
-                        tone: .informational,
-                        intent: .startWorkout
-                    )
-                )
-            }
-
-            if !task.meals.isEmpty && task.meals.allSatisfy({ !$0.isCompleted }) {
-                items.append(
-                    PlanInsightItem(
-                        title: "别忘了记录饮食",
-                        message: "完成餐食计划有助于维持能量均衡，及时补记今天的饮食安排。",
-                        tone: .informational,
-                        intent: .reviewMeals
-                    )
-                )
-            }
-        } else {
-            items.append(
-                PlanInsightItem(
-                    title: "选择训练日期",
-                    message: "在日历中选择一个日期查看训练详情，保持每周的节奏。",
-                    tone: .informational,
-                    intent: .none
-                )
-            )
-        }
-
-        if let weightInsight = weightTrendInsight(from: weightMetrics) {
-            items.append(weightInsight)
-        }
-
-        // Removed weekly summary based insights; widget handles weekly summary presentation
-
-        if items.isEmpty {
-            items.append(
-                PlanInsightItem(
+                : PlanInsightItem(
                     title: "保持节奏",
                     message: "你的计划执行良好，继续按照节奏完成训练与饮食。",
                     tone: .positive,
                     intent: .none
                 )
-            )
-        }
-
-        return items
-    }
-
-    private func weightTrendInsight(from metrics: [HealthMetric]) -> PlanInsightItem? {
-        let weightMetrics = metrics.filter { $0.type == .weight }.sorted { $0.date < $1.date }
-        guard let latest = weightMetrics.last else { return nil }
-
-        let oneWeekAgo = calendar.date(byAdding: .day, value: -7, to: latest.date) ?? latest.date
-        let reference = weightMetrics.last(where: { $0.date <= oneWeekAgo }) ?? weightMetrics.dropLast().last
-
-        guard let baseline = reference else { return nil }
-        let delta = latest.value - baseline.value
-
-        if abs(delta) < 0.3 { return nil }
-
-        if delta > 0 {
-            return PlanInsightItem(
-                title: "体重上升提醒",
-                message: "比一周前增加了 \(String(format: "%.1f", delta)) kg，调整饮食结构或增加低强度运动。",
-                tone: .warning,
-                intent: .logWeight
-            )
+            insights = [fallback]
         } else {
-            return PlanInsightItem(
-                title: "体重下降",
-                message: "较一周前下降 \(String(format: "%.1f", abs(delta))) kg，保持充足睡眠帮助恢复。",
-                tone: .positive,
-                intent: .none
-            )
+            insights = generatedItems
         }
     }
 
@@ -338,7 +305,7 @@ class PlanViewModel: ObservableObject {
                 if taskDate == currentDate && task.isCompleted {
                     streak += 1
                     currentDate = calendar.date(byAdding: .day, value: -1, to: currentDate) ?? currentDate
-                } else if taskDate < currentDate {
+                } else {
                     break
                 }
             }
