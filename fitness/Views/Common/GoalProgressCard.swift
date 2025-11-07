@@ -28,6 +28,60 @@ struct GoalProgressCard: View {
         return goal.resolvedStartWeight(from: weightMetrics)
     }
 
+    private var progressEvaluation: GoalProgressEvaluation? {
+        guard
+            let goal = planGoal,
+            let baseline = resolvedStartWeight
+        else { return nil }
+        return GoalProgressEvaluator.evaluate(goal: goal, baselineWeight: baseline, currentWeight: weightMetrics.last?.value)
+    }
+
+    private var progressValue: Double {
+        progressEvaluation?.progress ?? 0.0
+    }
+
+    private var progressColor: Color {
+        guard let evaluation = progressEvaluation else {
+            return Color.gray.opacity(0.35)
+        }
+
+        switch evaluation.status {
+        case .onTrack:
+            return .green
+        case .ahead:
+            return .orange
+        case .behind:
+            return .red
+        case .inProgress:
+            return .accentColor
+        case .notStarted:
+            return Color.gray.opacity(0.5)
+        }
+    }
+
+    private var completionMessage: String {
+        guard let evaluation = progressEvaluation else { return "恭喜你目标达成" }
+        switch evaluation.direction {
+        case .gain:
+            return "已达成增重目标"
+        case .lose:
+            return "已达成减重目标"
+        case .maintain:
+            return "体重保持稳定"
+        }
+    }
+
+    private var goalDirection: PlanGoal.WeightGoalDirection? {
+        if let evaluation = progressEvaluation {
+            return evaluation.direction
+        }
+        guard let goal = planGoal else { return nil }
+        return goal.weightGoalDirection(
+            baseline: resolvedStartWeight,
+            tolerance: GoalProgressEvaluator.defaultTolerance
+        )
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             if planGoal == nil {
@@ -112,7 +166,7 @@ struct GoalProgressCard: View {
                 SemicircleShape(progress: progressValue)
                     .trim(from: 0, to: progressValue)
                     .stroke(style: StrokeStyle(lineWidth: 10, lineCap: .round, dash: [0, 12]))
-                    .foregroundStyle(progressValue >= 1.0 ? Color.orange : Color.green)
+                    .foregroundStyle(progressColor)
                     .frame(height: 100)
 
                 progressInnerContent
@@ -146,18 +200,19 @@ struct GoalProgressCard: View {
 
     private var progressInnerContent: some View {
         Group {
-            if progressValue >= 1.0 {
+            if let evaluation = progressEvaluation, evaluation.isCompleted {
                 VStack(spacing: 4) {
                     Image(systemName: "trophy.fill")
-                        .foregroundColor(.orange)
+                        .foregroundColor(progressColor)
                         .font(.title2)
-                    Text("目标已达成")
+                        .contentTransition(.numericText(countsDown: false))
+
+                    Text(completionMessage)
                         .font(.system(size: 20))
                         .fontWeight(.bold)
-                        .foregroundColor(.orange)
+                        .foregroundColor(progressColor)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.clear)
+                .offset(y: 20)
             } else if progressValue > 0 {
                 HStack(spacing: 0) {
                     Text("\(Int(progressValue * 100))")
@@ -172,16 +227,18 @@ struct GoalProgressCard: View {
                 }
                 .offset(y: 20)
             } else {
-                VStack(spacing: 4) {
-                    Image(systemName: "flame.fill")
-                        .foregroundColor(.red)
-                        .font(.title2)
-                    Text("继续加油")
-                        .font(.system(size: 18))
+                HStack(spacing: 0) {
+                    Text("0")
+                        .font(.system(size: 48))
                         .fontWeight(.bold)
-                        .foregroundColor(.red)
+                        .contentTransition(.numericText(countsDown: false))
+                        .foregroundColor(.gray)
+                    Text("%")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .offset(y: 10)
                 }
-                .frame(width: 100, height: 100)
+                .offset(y: 20)
             }
         }
     }
@@ -257,10 +314,19 @@ struct GoalProgressCard: View {
     }
 
     private var targetWeightLabel: String {
-        if let target = planGoal?.targetWeight {
-            return String(format: "%.1f kg", target)
+        guard let goal = planGoal else { return "--" }
+
+        let direction = goalDirection ?? goal.weightGoalDirection(
+            baseline: resolvedStartWeight,
+            tolerance: GoalProgressEvaluator.defaultTolerance
+        )
+
+        switch direction {
+        case .maintain:
+            return String(format: "%.1f kg ±%.1f kg", goal.targetWeight, GoalProgressEvaluator.defaultTolerance)
+        case .gain, .lose:
+            return String(format: "%.1f kg", goal.targetWeight)
         }
-        return "--"
     }
 
     private var latestDateText: String {
@@ -270,37 +336,65 @@ struct GoalProgressCard: View {
         return "暂无记录"
     }
 
-    private var progressValue: Double {
-        guard
-            let goal = planGoal,
-            let baseline = resolvedStartWeight,
-            let current = weightMetrics.last?.value
-        else {
-            return 0.0
-        }
-        let totalChange = goal.targetWeight - baseline
-        guard totalChange != 0 else { return current == goal.targetWeight ? 1.0 : 0.0 }
-        let progress = (current - baseline) / totalChange
-        return max(0, min(1, progress))
-    }
-
     private var comparisonChange: (change: String, color: Color, description: String) {
         guard weightMetrics.count >= 2 else { return ("--", .primary, "无历史数据对比") }
 
         let latest = weightMetrics.last!
         let previous = weightMetrics[weightMetrics.count - 2]
         let change = latest.value - previous.value
+        let formattedChange: String
 
         let dayDifference = Calendar.current.dateComponents([.day], from: previous.date, to: latest.date).day ?? 0
         let description = dayDifference <= 1 ? "对比上次" : "对比\(dayDifference)天前"
 
         if abs(change) < 0.01 {
-            return ("0.0 kg", .primary, description)
+            formattedChange = "0.0 kg"
         } else if change > 0 {
-            return (String(format: "+%.1f kg", change), .red, description)
+            formattedChange = String(format: "+%.1f kg", change)
         } else {
-            return (String(format: "%.1f kg", change), .green, description)
+            formattedChange = String(format: "%.1f kg", change)
         }
+
+        guard let goal = planGoal else {
+            return (formattedChange, .primary, description)
+        }
+
+        let direction = goalDirection ?? goal.weightGoalDirection(
+            baseline: resolvedStartWeight,
+            tolerance: GoalProgressEvaluator.defaultTolerance
+        )
+
+        let color: Color
+        switch direction {
+        case .gain:
+            if abs(change) < 0.01 {
+                color = .primary
+            } else {
+                color = change > 0 ? .green : .red
+            }
+        case .lose:
+            if abs(change) < 0.01 {
+                color = .primary
+            } else {
+                color = change < 0 ? .green : .red
+            }
+        case .maintain:
+            if abs(change) < 0.01 {
+                color = .primary
+            } else {
+                let latestDistance = abs(latest.value - goal.targetWeight)
+                let previousDistance = abs(previous.value - goal.targetWeight)
+                if latestDistance < previousDistance {
+                    color = .green
+                } else if latestDistance > previousDistance {
+                    color = .orange
+                } else {
+                    color = .primary
+                }
+            }
+        }
+
+        return (formattedChange, color, description)
     }
 }
 
@@ -319,7 +413,7 @@ struct GoalProgressCard_Previews: PreviewProvider {
                 type: .weight
             )
         )
-        context.insert(HealthMetric(date: Date(), value: 70.5, type: .weight))
+        context.insert(HealthMetric(date: Date(), value: 70, type: .weight))
 
         let planGoal = PlanGoal(
             fitnessGoal: .fatLoss,

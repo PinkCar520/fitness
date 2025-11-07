@@ -7,7 +7,7 @@ struct StepsCard: View {
     let weeklyStepData: [DailyStepData] // New property for chart data
 
     var body: some View {
-        NavigationLink(destination: HealthDataDetailView(dataType: .steps)) {
+        // Tap handled by parent via onTapGesture
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                 Text("\(Int(stepCount))")
@@ -46,9 +46,6 @@ struct StepsCard: View {
             .padding()
             .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
             .animation(.easeInOut, value: stepCount)
-            
-        }
-        .buttonStyle(PlainButtonStyle()) // To remove default NavigationLink styling
     }
 }
 

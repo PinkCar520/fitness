@@ -82,7 +82,13 @@
 				Managers/NotificationManager.swift,
 				Models/HealthKitDataTypeOption.swift,
 				Models/HealthMetric.swift,
+				Shared/Data/InsightsSnapshotStore.swift,
+				Shared/Data/WeeklySummarySnapshotStore.swift,
+				Shared/Insights/InsightItem.swift,
+				Shared/Insights/InsightsEngine.swift,
 				ViewModels/WeightManager.swift,
+				Views/Common/DashboardComponents.swift,
+				Views/Common/WeeklySummaryCard.swift,
 			);
 			target = E8ED201E2E717493005E9F3B /* WeightWidgetsExtension */;
 		};

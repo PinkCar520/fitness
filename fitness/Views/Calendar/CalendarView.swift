@@ -5,6 +5,7 @@ struct CalendarView: View {
     let completedDates: Set<Date>
     
     @State private var currentWeekStartDate: Date = Date()
+    @Environment(\.colorScheme) private var colorScheme
 
     private let calendar = Calendar.current
     private var workingCalendar: Calendar {
@@ -59,12 +60,12 @@ struct CalendarView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                .fill(containerBackground)
+                .shadow(color: containerShadow, radius: containerShadowRadius, x: 0, y: containerShadowY)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.gray.opacity(0.1), lineWidth: 1)
+                .stroke(containerStroke, lineWidth: containerStrokeWidth)
         )
         .gesture(
             DragGesture()
@@ -143,11 +144,11 @@ struct CalendarView: View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(systemBlue)
+                .foregroundStyle(navigationForeground)
                 .frame(width: 32, height: 32)
                 .background(
                     Circle()
-                        .fill(systemBlue.opacity(0.12))
+                        .fill(navigationBackground)
                 )
         }
         .buttonStyle(.plain)
@@ -191,6 +192,40 @@ struct CalendarView: View {
             }
         }
         return days
+    }
+}
+
+private extension CalendarView {
+    var containerBackground: Color {
+        colorScheme == .dark ? Color(uiColor: .secondarySystemBackground) : .white
+    }
+
+    var containerStroke: Color {
+        colorScheme == .dark ? Color.white.opacity(0.08) : Color.gray.opacity(0.1)
+    }
+
+    var containerStrokeWidth: CGFloat {
+        colorScheme == .dark ? 0.5 : 1
+    }
+
+    var containerShadow: Color {
+        colorScheme == .dark ? Color.black.opacity(0.35) : Color.black.opacity(0.05)
+    }
+
+    var containerShadowRadius: CGFloat {
+        colorScheme == .dark ? 14 : 5
+    }
+
+    var containerShadowY: CGFloat {
+        colorScheme == .dark ? 6 : 2
+    }
+
+    var navigationBackground: Color {
+        colorScheme == .dark ? Color.white.opacity(0.12) : systemBlue.opacity(0.12)
+    }
+
+    var navigationForeground: Color {
+        colorScheme == .dark ? Color.white.opacity(0.9) : systemBlue
     }
 }
 
@@ -378,6 +413,7 @@ struct DayView: View {
     let isCompleted: Bool
 
     @State private var showTooltip = false // New state for tooltip visibility
+    @Environment(\.colorScheme) private var colorScheme
 
     private let calendar = Calendar.current
 
@@ -417,7 +453,7 @@ struct DayView: View {
             Text(String(calendar.component(.day, from: date)))
                 .font(.system(size: 18, weight: .semibold))
                 .kerning(-0.3)
-                .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(0.95))
+                .foregroundStyle(isSelected ? Color.white : dayNumberColor)
         }
         .overlay(completionBadge, alignment: .topTrailing)
     }
@@ -442,6 +478,31 @@ struct DayView: View {
         calendar.isDateInToday(date)
     }
 
+    private var dayNumberColor: Color {
+        if isToday && !isSelected {
+            return colorScheme == .dark ? Color.cyan.opacity(0.85) : systemBlue
+        }
+        if colorScheme == .dark {
+            return isWeekend ? Color.white.opacity(0.75) : Color.white.opacity(0.9)
+        }
+        return isWeekend ? Color.primary.opacity(0.7) : Color.primary.opacity(0.95)
+    }
+
+    private var unselectedCircleFill: Color {
+        colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.1)
+    }
+
+    private var unselectedCircleStroke: Color {
+        colorScheme == .dark ? Color.white.opacity(0.2) : Color.white.opacity(0.15)
+    }
+
+    private var ringBaselineOpacity: Double {
+        if isSelected {
+            return colorScheme == .dark ? 0.26 : 0.18
+        }
+        return colorScheme == .dark ? 0.22 : 0.12
+    }
+
     private var innerCircle: some View {
         Group {
             if isSelected {
@@ -458,10 +519,10 @@ struct DayView: View {
                     )
             } else {
                 Circle()
-                    .fill(Color.white.opacity(0.1))
+                    .fill(unselectedCircleFill)
                     .overlay(
                         Circle()
-                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                            .stroke(unselectedCircleStroke, lineWidth: 1)
                     )
             }
         }
@@ -481,7 +542,7 @@ struct DayView: View {
                 Circle()
                     .trim(from: start, to: end)
                     .stroke(
-                        descriptor.color.opacity(isSelected ? 0.18 : 0.12),
+                        descriptor.color.opacity(ringBaselineOpacity),
                         style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
                     )
                     .rotationEffect(.degrees(-90))
@@ -502,7 +563,9 @@ struct DayView: View {
 
     private func progressColor(for baseColor: Color, intensity: Double) -> Color {
         let normalized = min(max(intensity, 0), 1)
-        let baseOpacity = isSelected ? 0.82 : 0.65
+        let baseOpacity = isSelected
+            ? (colorScheme == .dark ? 0.88 : 0.82)
+            : (colorScheme == .dark ? 0.72 : 0.65)
         let bonus = 0.18 * normalized
         return baseColor.opacity(baseOpacity + bonus)
     }

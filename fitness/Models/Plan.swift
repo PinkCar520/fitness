@@ -13,6 +13,19 @@ enum Weekday: String, Codable, CaseIterable, Identifiable {
     case saturday = "周六"
     case sunday = "周日"
     var id: String { self.rawValue }
+
+    /// Stable ordering value for sorting UI lists.
+    var displayOrder: Int {
+        switch self {
+        case .monday: return 0
+        case .tuesday: return 1
+        case .wednesday: return 2
+        case .thursday: return 3
+        case .friday: return 4
+        case .saturday: return 5
+        case .sunday: return 6
+        }
+    }
 }
 
 
@@ -25,6 +38,12 @@ struct PlanGoal: Codable, Hashable {
     var targetWeight: Double
     var startDate: Date
     var targetDate: Date?
+
+    enum WeightGoalDirection: Equatable {
+        case gain
+        case lose
+        case maintain
+    }
 
     var durationInDays: Int {
         guard let targetDate else { return 0 }
@@ -60,6 +79,17 @@ struct PlanGoal: Codable, Hashable {
         }
 
         return weightMetrics.last?.value ?? startWeight
+    }
+
+    func weightGoalDirection(baseline: Double?, tolerance: Double = 0.5) -> WeightGoalDirection {
+        let reference = baseline ?? startWeight
+        let delta = targetWeight - reference
+
+        if abs(delta) <= tolerance {
+            return .maintain
+        }
+
+        return delta > 0 ? .gain : .lose
     }
 }
 

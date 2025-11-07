@@ -8,40 +8,21 @@ struct TodaysWorkoutCard: View {
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            if dailyTask.isCompleted {
-                completedContent()
+        if dailyTask.isCompleted {
+            completedContent()
+        } else {
+            if isNoActivePlan {
+                noPlanContent()
+            } else if dailyTask.workouts.isEmpty {
+                restDayContent()
             } else {
-                header()
-
-                if isNoActivePlan {
-                    noPlanContent()
-                } else if dailyTask.workouts.isEmpty {
-                    restDayContent()
-                } else {
-                    nextWorkoutContent(for: dailyTask)
-                }
+                nextWorkoutContent(for: dailyTask)
             }
         }
-        .padding()
-        .background(
-            Color(UIColor.secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: 20)
-        )
     }
 }
 
-private extension TodaysWorkoutCard {
-    @ViewBuilder
-    func header() -> some View {
-        HStack {
-            Text("今日计划")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-    }
-    
+private extension TodaysWorkoutCard {    
     @ViewBuilder
     func noPlanContent() -> some View {
         VStack(alignment: .leading, spacing: 10) {

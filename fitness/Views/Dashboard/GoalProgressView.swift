@@ -10,10 +10,6 @@ struct GoalProgressView: View {
         activePlans.first?.planGoal
     }
 
-    private var targetWeight: Double? {
-        planGoal?.targetWeight
-    }
-
     private var weightMetrics: [HealthMetric] {
         allMetrics.filter { $0.type == .weight }
     }
@@ -23,33 +19,68 @@ struct GoalProgressView: View {
         return goal.resolvedStartWeight(from: weightMetrics)
     }
 
-    private var currentWeight: Double {
-        weightMetrics.last?.value ?? 0.0
+    private var currentWeightValue: Double? {
+        weightMetrics.last?.value
     }
 
-    private var startingWeight: Double {
-        startWeight ?? weightMetrics.first?.value ?? 0.0
+    private var currentWeightDisplay: String {
+        guard let value = currentWeightValue else { return "--" }
+        return String(format: "%.1f", value)
+    }
+
+    private var progressEvaluation: GoalProgressEvaluation? {
+        guard
+            let goal = planGoal,
+            let baseline = startWeight
+        else { return nil }
+        return GoalProgressEvaluator.evaluate(goal: goal, baselineWeight: baseline, currentWeight: currentWeightValue)
     }
 
     private var progress: Double {
-        guard
-            let goal = planGoal,
-            let target = targetWeight,
-            let baseline = startWeight
-        else { return 0.0 }
-        let delta = target - baseline
-        guard delta != 0 else { return currentWeight == target ? 1.0 : 0.0 }
-        let progress = (currentWeight - baseline) / delta
-        return max(0, min(1, progress))
+        progressEvaluation?.progress ?? 0.0
+    }
+
+    private var progressColor: Color {
+        guard let evaluation = progressEvaluation else {
+            return Color.gray.opacity(0.35)
+        }
+
+        switch evaluation.status {
+        case .onTrack:
+            return .green
+        case .ahead:
+            return .orange
+        case .behind:
+            return .red
+        case .inProgress:
+            return .accentColor
+        case .notStarted:
+            return Color.gray.opacity(0.5)
+        }
+    }
+
+    private var targetLabelText: String {
+        guard let goal = planGoal else { return "-- KG" }
+
+        let direction = progressEvaluation?.direction ?? goal.weightGoalDirection(
+            baseline: startWeight,
+            tolerance: GoalProgressEvaluator.defaultTolerance
+        )
+
+        switch direction {
+        case .maintain:
+            return String(format: "%.1f KG ±%.1f KG", goal.targetWeight, GoalProgressEvaluator.defaultTolerance)
+        case .gain, .lose:
+            return String(format: "%.1f KG", goal.targetWeight)
+        }
     }
 
     var body: some View {
         Group {
-            if let goal = planGoal, let target = targetWeight {
+            if let goal = planGoal {
                 let baseline = startWeight ?? goal.startWeight
                 let startLabel = String(format: "%.1f KG", baseline)
-                let targetLabel = String(format: "%.1f KG", target)
-                let progressColor: Color = currentWeight > target ? .orange : .green
+                let targetLabel = targetLabelText
 
                 VStack(alignment: .leading) {
                     Text("目标进度")
@@ -63,11 +94,12 @@ struct GoalProgressView: View {
                             .frame(height: 150)
 
                         SemicircleShape(progress: progress)
+                            .trim(from: 0, to: progress)
                             .stroke(progressColor, lineWidth: 10)
                             .frame(height: 150)
 
                         VStack {
-                            Text(String(format: "%.1f", currentWeight))
+                            Text(currentWeightDisplay)
                                 .font(.largeTitle)
                                 .fontWeight(.bold)
                             Text("KG")

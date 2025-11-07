@@ -6,16 +6,21 @@ enum ChartableMetric: String, CaseIterable, Identifiable {
     case bodyFat = "体脂率"
     case waist = "腰围"
     case heartRate = "心率"
+    case vo2Max = "VO2max"
 
     var id: String { self.rawValue }
 }
 
 struct BodyProfileView: View {
     @EnvironmentObject var profileViewModel: ProfileViewModel
+    @EnvironmentObject var healthKitManager: HealthKitManager
     @Query(sort: \HealthMetric.date, order: .reverse) private var metrics: [HealthMetric]
     
     @State private var showInputSheet = false
     @State private var selectedChartMetric: ChartableMetric = .weight
+    @State private var selectedRange: BodyProfileViewModel.TimeRange = .thirty
+    @StateObject private var vm = BodyProfileViewModel()
+    // Lines always shown by default (no toggles)
 
     // Computed properties to get latest values
     private var latestWeight: Double {
@@ -24,11 +29,7 @@ struct BodyProfileView: View {
     private var latestBodyFat: Double {
         metrics.first(where: { $0.type == .bodyFatPercentage })?.value ?? 0
     }
-    private var bmi: Double {
-        let height = profileViewModel.userProfile.height / 100 // in meters
-        guard height > 0, latestWeight > 0 else { return 0 }
-        return latestWeight / (height * height)
-    }
+    private var bmi: Double { vm.bmi }
     private var latestWaistCircumference: Double {
         latestValue(for: .waistCircumference) ?? 0
     }
@@ -54,25 +55,7 @@ struct BodyProfileView: View {
         latestValue(for: .waistToHipRatio) ?? 0
     }
 
-    // Computed property to prepare data for the chart based on selection
-    private var chartData: [DateValuePoint] {
-        let selectedType: MetricType
-        switch selectedChartMetric {
-        case .weight:
-            selectedType = .weight
-        case .bodyFat:
-            selectedType = .bodyFatPercentage
-        case .waist:
-            selectedType = .waistCircumference
-        case .heartRate:
-            selectedType = .heartRate
-        }
-        
-        return metrics
-            .filter { $0.type == selectedType }
-            .map { DateValuePoint(date: $0.date, value: $0.value) }
-            .sorted(by: { $0.date < $1.date })
-    }
+    private var chartData: [DateValuePoint] { vm.chartData }
     
     private var chartTitle: String {
         "\(selectedChartMetric.rawValue)趋势"
@@ -84,6 +67,7 @@ struct BodyProfileView: View {
         case .bodyFat: return .orange
         case .waist: return .purple
         case .heartRate: return .red
+        case .vo2Max: return .teal
         }
     }
     
@@ -93,6 +77,7 @@ struct BodyProfileView: View {
         case .bodyFat: return "%"
         case .waist: return "cm"
         case .heartRate: return "bpm"
+        case .vo2Max: return "ml/kg/min"
         }
     }
 
@@ -100,105 +85,169 @@ struct BodyProfileView: View {
         ZStack(alignment: .bottomTrailing) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    // Dashboard Section
-                    metricSection(
-                        title: "当前指标",
-                        items: [
-                            MetricDisplay(title: "体重", value: formatted(latestWeight, precision: 1), unit: "公斤", icon: "scalemass.fill", color: .blue),
-                            MetricDisplay(title: "BMI", value: formatted(bmi, precision: 1), unit: "", icon: "figure.walk", color: .green),
-                            MetricDisplay(title: "体脂率", value: formatted(latestBodyFat, precision: 1), unit: "%", icon: "flame.fill", color: .orange),
-                            MetricDisplay(title: "静息心率", value: formatted(latestHeartRate, precision: 0), unit: "bpm", icon: "heart.fill", color: .red)
-                        ]
-                    )
-
-                    // Chart Section
-                    VStack(spacing: 16) {
-                        Picker("Select Metric", selection: $selectedChartMetric) {
-                            ForEach(ChartableMetric.allCases) { metric in
-                                Text(metric.rawValue).tag(metric)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.horizontal)
-                        
-                        GenericLineChartView(
-                            title: chartTitle,
-                            data: chartData,
-                            color: chartColor,
-                            unit: chartUnit
-                        )
-                        .frame(minHeight: 220)
-                    }
-                    .padding(.horizontal)
-
-                    // Additional Metrics Section
-                    metricSection(
-                        title: "身体围度",
-                        items: [
-                            MetricDisplay(title: "腰围", value: formatted(latestWaistCircumference, precision: 1), unit: "cm", icon: "tape.measure", color: .purple),
-                            MetricDisplay(title: "胸围", value: formatted(latestChestCircumference, precision: 1), unit: "cm", icon: "figure.stand", color: .pink),
-                            MetricDisplay(title: "腰臀比", value: formatted(latestWaistToHipRatio, precision: 2), unit: "", icon: "circle.grid.cross", color: .teal)
-                        ]
-                    )
-
-                    metricSection(
-                        title: "身体成分",
-                        items: [
-                            MetricDisplay(title: "体脂肪量", value: formatted(latestBodyFatMass, precision: 1), unit: "kg", icon: "scalemass.fill", color: .orange),
-                            MetricDisplay(title: "骨骼肌量", value: formatted(latestSkeletalMuscleMass, precision: 1), unit: "kg", icon: "figure.strengthtraining.traditional", color: .purple),
-                            MetricDisplay(title: "身体水分率", value: formatted(latestBodyWaterPercentage, precision: 1), unit: "%", icon: "drop.fill", color: .blue),
-                            MetricDisplay(title: "基础代谢率", value: formatted(latestBasalMetabolicRate, precision: 0), unit: "kcal", icon: "flame.circle.fill", color: .red)
-                        ]
-                    )
-
-                    BodyCompositionSummary(bmi: bmi, bodyFat: latestBodyFat)
-                        .padding(.horizontal)
-
-                    // Visual Records Placeholder Section
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("视觉记录")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .padding(.horizontal)
-
-                        VStack(alignment: .center) {
-                            Image(systemName: "photo.on.rectangle.angled")
-                                .font(.largeTitle)
-                                .foregroundColor(.secondary)
-                                .padding(.bottom, 5)
-                            Text("记录你的蜕变，见证每一次进步")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            Text("点击添加照片 (即将推出)")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(12)
-                        .padding(.horizontal)
-                    }
-
-                    Spacer(minLength: 80) // Spacer to ensure content is above the FAB
+                    emptyDataHintSection
+                    currentIndicatorsSection
+                    vo2QuickSection
+                    chartSection
+                    additionalMetricsSection
+                    bodyCompositionSection
+                    visualRecordsSection
+                    Spacer(minLength: 80)
                 }
                 .padding(.vertical)
             }
 
-            // Floating Action Button
-            Button(action: { showInputSheet = true }) {
-                Image(systemName: "plus")
-                    .font(.title.weight(.semibold))
-                    .padding()
-                    .background(Color.accentColor)
-                    .foregroundColor(.white)
-                    .clipShape(Circle())
-                    .shadow(radius: 10)
+        }
+        .onAppear { refreshVM() }
+        .onChange(of: metrics.map(\.date)) { _, _ in refreshVM() }
+        .onChange(of: selectedChartMetric) { refreshVM() }
+        .onChange(of: selectedRange) { refreshVM() }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToBodyProfileMetric)) { notif in
+            if let metric = notif.userInfo?["metric"] as? String {
+                if metric == "weight" { selectedChartMetric = .weight }
+                if metric == "bodyFat" { selectedChartMetric = .bodyFat }
+            }
+        }
+    }
+
+    // MARK: - Subviews (split to reduce type-checking complexity)
+    private var currentIndicatorsSection: some View {
+        let items: [MetricDisplay] = [
+            .init(title: "体重", value: formatted(latestWeight, precision: 1), unit: "公斤", icon: "scalemass.fill", color: .blue),
+            .init(title: "BMI", value: formatted(bmi, precision: 1), unit: "", icon: "figure.walk", color: .green),
+            .init(title: "体脂率", value: formatted(latestBodyFat, precision: 1), unit: "%", icon: "flame.fill", color: .orange),
+            .init(title: "静息心率", value: formatted(latestHeartRate, precision: 0), unit: "bpm", icon: "heart.fill", color: .red)
+        ]
+        return metricSection(title: "当前指标", items: items)
+    }
+
+    @ViewBuilder private var vo2QuickSection: some View {
+        if !healthKitManager.isVO2MaxAvailableOnThisDevice() {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle").foregroundStyle(.secondary)
+                    Text("VO2max 需要支持的设备（通常为 Apple Watch）")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal)
+        } else if let latest = metrics.first(where: { $0.type == .vo2Max })?.value, latest > 0 {
+            let items = [MetricDisplay(title: "VO2max", value: formatted(latest, precision: 1), unit: "ml/kg/min", icon: "lungs.fill", color: .teal)]
+            metricSection(title: "心肺耐力", items: items)
+        }
+    }
+
+    private var chartSection: some View {
+        VStack(spacing: 16) {
+            Picker("Select Metric", selection: $selectedChartMetric) {
+                ForEach(ChartableMetric.allCases) { metric in
+                    Text(metric.rawValue).tag(metric)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+
+            Picker("Range", selection: $selectedRange) {
+                ForEach(BodyProfileViewModel.TimeRange.allCases) { range in
+                    Text(range.title).tag(range)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+
+            let title = chartTitle
+            let data = chartData
+            let color = chartColor
+            let unit = chartUnit
+            let avg = vm.averageValue
+            let goal = (selectedChartMetric == .weight) ? vm.goalValue : nil
+            GenericLineChartView(title: title, data: data, color: color, unit: unit, averageValue: avg, goalValue: goal)
+                .frame(minHeight: 220)
+        }
+        .padding(.horizontal)
+    }
+
+    private var additionalMetricsSection: some View {
+        let items: [MetricDisplay] = [
+            .init(title: "腰围", value: formatted(latestWaistCircumference, precision: 1), unit: "cm", icon: "tape.measure", color: .purple),
+            .init(title: "胸围", value: formatted(latestChestCircumference, precision: 1), unit: "cm", icon: "figure.stand", color: .pink),
+            .init(title: "腰臀比", value: formatted(latestWaistToHipRatio, precision: 2), unit: "", icon: "circle.grid.cross", color: .teal)
+        ]
+        return metricSection(title: "身体围度", items: items)
+    }
+
+    private var bodyCompositionSection: some View {
+        let items: [MetricDisplay] = [
+            .init(title: "体脂肪量", value: formatted(latestBodyFatMass, precision: 1), unit: "kg", icon: "scalemass.fill", color: .orange),
+            .init(title: "骨骼肌量", value: formatted(latestSkeletalMuscleMass, precision: 1), unit: "kg", icon: "figure.strengthtraining.traditional", color: .purple),
+            .init(title: "身体水分率", value: formatted(latestBodyWaterPercentage, precision: 1), unit: "%", icon: "drop.fill", color: .blue),
+            .init(title: "基础代谢率", value: formatted(latestBasalMetabolicRate, precision: 0), unit: "kcal", icon: "flame.circle.fill", color: .red)
+        ]
+        return Group {
+            metricSection(title: "身体成分", items: items)
+            BodyCompositionSummary(bmi: bmi, bodyFat: latestBodyFat)
+                .padding(.horizontal)
+        }
+    }
+
+    // insightsSection removed per design requirements
+
+    private var visualRecordsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("视觉记录")
+                .font(.title2)
+                .fontWeight(.bold)
+                .padding(.horizontal)
+
+            VStack(alignment: .center) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.largeTitle)
+                    .foregroundColor(.secondary)
+                    .padding(.bottom, 5)
+                Text("记录你的蜕变，见证每一次进步")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                Text("点击添加照片 (即将推出)")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.gray.opacity(0.1))
+            .cornerRadius(12)
+            .padding(.horizontal)
+        }
+    }
+
+    // Floating action removed (no manual record entry here)
+
+    // MARK: - Empty Data (authorization banner removed by design)
+
+    @ViewBuilder private var emptyDataHintSection: some View {
+        if metrics.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("还没有身体指标记录")
+                    .font(.headline)
+                Text("可在健康 App 中开启数据同步。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button(action: openHealthApp) {
+                    Label("打开健康 App", systemImage: "heart")
+                }
             }
             .padding()
+            .background(Color.gray.opacity(0.1))
+            .cornerRadius(12)
+            .padding(.horizontal)
         }
-        .sheet(isPresented: $showInputSheet) {
-            InputSheetView()
+    }
+
+    private func openHealthApp() {
+        if let url = URL(string: "x-apple-health://"), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        } else if let url = URL(string: UIApplication.openSettingsURLString), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
         }
     }
 
@@ -236,6 +285,14 @@ struct BodyProfileView: View {
             }
             .padding(.horizontal)
         }
+    }
+}
+
+private extension BodyProfileView {
+    func refreshVM() {
+        vm.selectedMetric = selectedChartMetric
+        vm.timeRange = selectedRange
+        vm.refresh(metrics: metrics, profile: profileViewModel.userProfile)
     }
 }
 

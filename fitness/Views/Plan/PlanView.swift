@@ -38,9 +38,7 @@ struct PlanView: View {
         allMetrics.filter { $0.type == .weight }
     }
 
-    private var weeklySummary: PlanWeeklySummary? {
-        planViewModel.weeklySummary()
-    }
+    // Removed: weekly summary is now widget-only
 
     private var completedDates: Set<Date> {
         guard let plan = activePlans.first else { return [] }
@@ -72,43 +70,7 @@ struct PlanView: View {
         }
     }
 
-    @ViewBuilder
-    private var weeklySummarySection: some View {
-        if let summary = weeklySummary {
-            DashboardSurface {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(alignment: .center, spacing: 12) {
-                        Image(systemName: "calendar")
-                            .font(.title3.weight(.bold))
-                            .foregroundColor(.accentColor)
-                        Text("本周摘要")
-                            .font(.headline.weight(.bold))
-                        Spacer()
-                        Text("\(Int(summary.completionRate * 100))%")
-                            .font(.title3.weight(.heavy))
-                            .foregroundColor(.accentColor)
-                    }
-
-                    ProgressView(value: summary.completionRate)
-                        .progressViewStyle(.linear)
-
-                    HStack(spacing: 12) {
-                        InfoChip(icon: "checkmark.circle.fill", text: "已完成 \(summary.completedDays)", tint: .accentColor, backgroundColor: Color.accentColor.opacity(0.15))
-                        if summary.pendingDays > 0 {
-                            InfoChip(icon: "hourglass", text: "待完成 \(summary.pendingDays)", tint: .orange, backgroundColor: Color.orange.opacity(0.15))
-                        }
-                        if summary.skippedDays > 0 {
-                            InfoChip(icon: "arrow.uturn.left", text: "跳过 \(summary.skippedDays)", tint: .pink, backgroundColor: Color.pink.opacity(0.15))
-                        }
-                    }
-
-                    Text("连续完成 \(summary.streakDays) 天 · 本周共 \(summary.totalDays) 日安排")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
+    // Removed: weekly summary section (migrated to widget)
 
     @ViewBuilder
     private var planInsightsSection: some View {
@@ -405,6 +367,12 @@ private var mainNavigationContent: some View {
             resumableTask: $resumableTask,
             resumableState: $resumableState
         ))
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToPlanDate)) { notif in
+            if let date = notif.userInfo?["date"] as? Date {
+                self.selectedDate = date
+                self.planViewModel.selectedDate = date
+            }
+        }
 }
 
 private struct WorkoutLaunchModifier: ViewModifier {
@@ -427,14 +395,16 @@ private struct PlanLifecycleModifier: ViewModifier {
     @Binding var resumableState: WorkoutSessionState?
 
     func body(content: Content) -> some View {
-        content
+        let refreshed = content
             .onAppear(perform: checkForResumableWorkout)
-            .onChange(of: planViewModel.selectedDate) { _ in refreshPlanInsights() }
-            .onChange(of: planViewModel.currentDailyTask?.isCompleted ?? false) { _ in refreshPlanInsights() }
-            .onChange(of: planViewModel.currentDailyTask?.isSkipped ?? false) { _ in refreshPlanInsights() }
-            .onChange(of: planViewModel.workouts.map { $0.isCompleted }) { _ in refreshPlanInsights() }
-            .onChange(of: allMetrics.map(\.date)) { _ in refreshPlanInsights() }
-            .onChange(of: activePlans.map(\.id)) { _ in refreshPlanInsights() }
+            .onChange(of: planViewModel.selectedDate) { _, _ in refreshPlanInsights() }
+            .onChange(of: planViewModel.currentDailyTask?.isCompleted ?? false) { _, _ in refreshPlanInsights() }
+            .onChange(of: planViewModel.currentDailyTask?.isSkipped ?? false) { _, _ in refreshPlanInsights() }
+            .onChange(of: planViewModel.workouts.map { $0.isCompleted }) { _, _ in refreshPlanInsights() }
+            .onChange(of: allMetrics.map(\.date)) { _, _ in refreshPlanInsights() }
+            .onChange(of: activePlans.map(\.id)) { _, _ in refreshPlanInsights() }
+
+        return refreshed
             .alert("继续上次的训练?", isPresented: $showResumeAlert) {
                 Button("继续") { continueResumableWorkout() }
                 Button("丢弃", role: .destructive) { WorkoutSessionManager.clearSavedState() }
@@ -460,7 +430,7 @@ private struct PlanLifecycleModifier: ViewModifier {
     }
 
     private func continueResumableWorkout() {
-        if let task = resumableTask, let state = resumableState {
+        if resumableTask != nil, resumableState != nil {
             // The parent view will handle this, but for safety include the code.
             // No-op here, as the parent handles the actual launch.
         }
@@ -475,7 +445,6 @@ private var content: some View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     planGoalSummarySection
-                    weeklySummarySection
                     planInsightsSection
                     CalendarView(selectedDate: $selectedDate, completedDates: completedDates)
                         .onChange(of: selectedDate) { oldValue, newValue in
@@ -507,9 +476,10 @@ private var toolbarContent: some ToolbarContent {
 
 private var planSetupSheet: some View {
     PlanSetupView { config in
-        planViewModel.generatePlan(config: config, recommendationManager: recommendationManager)
+        await planViewModel.generatePlanAsync(config: config, recommendationManager: recommendationManager)
     }
-    .presentationDetents([.fraction(0.85), .large])
+    .presentationDetents([.fraction(0.9)])
+    .presentationDragIndicator(.visible)
 }
 
 private func onAppear() {

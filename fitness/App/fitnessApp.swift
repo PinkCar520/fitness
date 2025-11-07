@@ -55,13 +55,30 @@ struct fitnessApp: App {
                 .environmentObject(recommendationManager)
                 .environmentObject(achievementManager)
                 .environmentObject(appState)
-                            .onOpenURL { url in
-                                // Handle the deep link from the widget
-                                if url.scheme == "fitness" && url.host == "add-weight" {
-                                    NotificationCenter.default.post(name: .showInputSheet, object: nil)
-                                }
-                            }
-                            .tint(appearanceViewModel.accentColor.color)        }
+                .onOpenURL { url in
+                    guard url.scheme == "fitness" else { return }
+                    switch url.host ?? "" {
+                    case "add-weight":
+                        NotificationCenter.default.post(name: .showInputSheet, object: nil)
+                    case "plan":
+                        appState.selectedTab = 1
+                    case "start-workout":
+                        appState.selectedTab = 1
+                        // Further routing to specific workout can be added via query items
+                    case "body-profile":
+                        appState.selectedTab = 2
+                        if url.pathComponents.contains("weight") {
+                            NotificationCenter.default.post(name: .navigateToBodyProfileMetric, object: nil, userInfo: ["metric": "weight"])
+                        }
+                    case "stats":
+                        appState.selectedTab = 3
+                    case "home":
+                        appState.selectedTab = 0
+                    default:
+                        break
+                    }
+                }
+                .tint(appearanceViewModel.accentColor.color)        }
                     .modelContainer(modelContainer) // Apply the SwiftData container to the whole app
     }
 }
@@ -70,4 +87,6 @@ struct fitnessApp: App {
 extension Notification.Name {
     static let showInputSheet = Notification.Name("showInputSheet")
     static let planDataDidChange = Notification.Name("planDataDidChange")
+    static let navigateToPlanDate = Notification.Name("navigateToPlanDate")
+    static let navigateToBodyProfileMetric = Notification.Name("navigateToBodyProfileMetric")
 }
