@@ -203,27 +203,28 @@ private extension DistanceDetailSheet {
         }
     }
 
-    // 确保该季度 3 个月都存在（缺失补0）
+    // 将最近三个月（含本月）的数据聚合成 3 根柱，缺失补0
     func ensureQuarterMonthsDistance(_ monthly: [DailyDistanceData]) -> [DailyDistanceData] {
         let cal = Calendar.current
-        let now = Date()
-        let comps = cal.dateComponents([.year, .month], from: now)
-        guard let year = comps.year, let month = comps.month else { return [] }
-        let q = (month - 1) / 3
-        let startMonth = q * 3 + 1
-        let months = [startMonth, startMonth + 1, startMonth + 2]
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM"
 
-        var map: [Int: Double] = [:]
+        guard let currentMonthStart = cal.date(from: cal.dateComponents([.year, .month], from: Date())) else { return [] }
+
+        let monthStarts: [Date] = (0..<3)
+            .compactMap { cal.date(byAdding: .month, value: -$0, to: currentMonthStart) }
+            .sorted()
+
+        var map: [String: Double] = [:]
         for item in monthly {
-            let c = cal.dateComponents([.year, .month], from: item.date)
-            if c.year == year, let m = c.month { map[m, default: 0] += item.distance }
+            let key = fmt.string(from: cal.date(from: cal.dateComponents([.year, .month], from: item.date)) ?? item.date)
+            map[key, default: 0] += item.distance
         }
 
-        return months.compactMap { m in
-            let comps = DateComponents(year: year, month: m)
-            guard let monthStart = cal.date(from: comps) else { return nil }
-            let endOfMonth = cal.date(byAdding: DateComponents(month: 1, day: -1), to: monthStart) ?? monthStart
-            return DailyDistanceData(date: endOfMonth, distance: map[m] ?? 0)
+        return monthStarts.compactMap { start in
+            let key = fmt.string(from: start)
+            let endOfMonth = cal.date(byAdding: DateComponents(month: 1, day: -1), to: start) ?? start
+            return DailyDistanceData(date: endOfMonth, distance: map[key] ?? 0)
         }
     }
 

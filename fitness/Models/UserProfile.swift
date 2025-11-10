@@ -103,6 +103,14 @@ enum WaterIntake: String, Codable, CaseIterable, Identifiable {
     case medium = "正常饮水 (1-2L)"
     case high = "饮水充足 (>2L)"
     var id: Self { self }
+
+    var recommendedLiters: Double {
+        switch self {
+        case .low: return 1.0
+        case .medium: return 1.6
+        case .high: return 2.3
+        }
+    }
 }
 
 enum SleepQuality: String, Codable, CaseIterable, Identifiable {

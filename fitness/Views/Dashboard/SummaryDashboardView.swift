@@ -11,8 +11,6 @@ struct SummaryDashboardView: View {
     @Binding var showInputSheet: Bool
     @State private var showSettingsSheet = false
     @State private var showEditSheet = false // For the new edit sheet
-    @State private var overviewImage: UIImage?
-    @State private var showShareSheet = false
     @State private var showStepsSheet = false
     @State private var showDistanceSheet = false
 
@@ -59,6 +57,18 @@ struct SummaryDashboardView: View {
         case .monthlyChallenge: cardMonthlyChallenge()
         case .recentActivity: cardRecentActivity()
         case .historyList: cardHistoryList()
+        case .hydration:
+            if shouldRenderHydrationMenstrualRow(for: .hydration) {
+                hydrationMenstrualRow()
+            } else {
+                EmptyView()
+            }
+        case .menstrualCycle:
+            if shouldRenderHydrationMenstrualRow(for: .menstrualCycle) {
+                hydrationMenstrualRow()
+            } else {
+                EmptyView()
+            }
         }
     }
 
@@ -94,11 +104,33 @@ struct SummaryDashboardView: View {
         }
     }
 
+    @ViewBuilder
+    private func hydrationMenstrualRow() -> some View {
+        HStack(spacing: 16) {
+            if isCardVisible(.hydration) {
+                cardHydration()
+                    .frame(maxWidth: .infinity)
+            }
+            if isCardVisible(.menstrualCycle) {
+                cardMenstrualCycle()
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
     // MARK: - Thin card wrappers to help type-checker
     private func cardTodaysWorkout() -> some View { todaysWorkoutView() }
     private func cardFitnessRings() -> some View { FitnessRingCard(activitySummary: dashboardViewModel.activitySummary) }
     private func cardGoalProgress() -> some View { GoalProgressCard(showInputSheet: $showInputSheet) }
     private func cardStepsAndDistance() -> some View { stepsAndDistanceRow() }
+    private func cardHydration() -> some View {
+        HydrationCard(
+            targetLiters: profileViewModel.userProfile.waterIntake?.recommendedLiters ?? 2.0
+        )
+    }
+    private func cardMenstrualCycle() -> some View {
+        MenstrualCycleCard(gender: profileViewModel.userProfile.gender)
+    }
     private func cardMonthlyChallenge() -> some View { MonthlyChallengeCard(monthlyChallengeCompletion: dashboardViewModel.monthlyChallengeCompletion) }
     private func cardRecentActivity() -> some View { RecentActivityCard(mostRecentWorkout: dashboardViewModel.mostRecentWorkout) }
     private func cardHistoryList() -> some View { HistoryListView() }
@@ -155,11 +187,7 @@ struct SummaryDashboardView: View {
             .sheet(isPresented: $showSettingsSheet) {
                 SettingsView()
             }
-            .sheet(isPresented: $showShareSheet) {
-                if let image = overviewImage {
-                    ShareSheet(items: [image])
-                }
-            }
+            // removed share sheet per new design
             .sheet(isPresented: $showDistanceSheet) {
                 DistanceDetailSheet(distanceKM: dashboardViewModel.distance, weeklyData: dashboardViewModel.weeklyDistanceData)
                     .environmentObject(dashboardViewModel)
@@ -182,7 +210,8 @@ struct SummaryDashboardView: View {
                         title: action.title,
                         subtitle: action.subtitle,
                         icon: action.icon,
-                        tint: action.tint
+                        tint: action.tint,
+                        chips: action.chips
                     ) {
                         perform(action.intent)
                     }
@@ -218,30 +247,6 @@ struct SummaryDashboardView: View {
                     .foregroundColor(.primary)
             }
             .buttonStyle(PlainButtonStyle())
-
-            Button(action: {
-                let viewToSnapshot = VStack(spacing: 16) {
-                    ForEach(dashboardViewModel.cards.filter { $0.isVisible }) { card in
-                        dashboardContent(card: card)
-                    }
-                }
-                .padding()
-                .environmentObject(weightManager)
-                .environmentObject(profileViewModel)
-                .environmentObject(healthKitManager)
-
-                self.overviewImage = viewToSnapshot.snapshot()
-                self.showShareSheet = true
-            }) {
-                Text("分享今日成就")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color(UIColor.secondarySystemGroupedBackground))
-                    .cornerRadius(32)
-                    .foregroundColor(.primary)
-            }
-            .buttonStyle(PlainButtonStyle())
         }
         .padding(.vertical)
     }
@@ -266,6 +271,23 @@ struct SummaryDashboardView: View {
             todaysTask: todaysTask,
             weightMetrics: weightMetrics
         )
+    }
+}
+
+private extension SummaryDashboardView {
+    func shouldRenderHydrationMenstrualRow(for cardType: DashboardCard.CardType) -> Bool {
+        guard cardType == .hydration || cardType == .menstrualCycle else { return false }
+        return firstVisibleHydrationMenstrualCard == cardType
+    }
+
+    var firstVisibleHydrationMenstrualCard: DashboardCard.CardType? {
+        dashboardViewModel.cards
+            .filter { $0.isVisible && ($0.id == .hydration || $0.id == .menstrualCycle) }
+            .first?.id
+    }
+
+    func isCardVisible(_ type: DashboardCard.CardType) -> Bool {
+        dashboardViewModel.cards.first(where: { $0.id == type })?.isVisible ?? false
     }
 }
 

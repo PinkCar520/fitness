@@ -19,6 +19,8 @@ struct DashboardCard: Identifiable, Codable, Hashable {
         case fitnessRings = "FitnessRings"
         case goalProgress = "GoalProgress"
         case stepsAndDistance = "StepsAndDistance"
+        case hydration = "Hydration"
+        case menstrualCycle = "MenstrualCycle"
         case monthlyChallenge = "MonthlyChallenge"
         case recentActivity = "RecentActivity"
         case historyList = "HistoryList"
@@ -38,7 +40,17 @@ struct DashboardQuickAction: Identifiable, Equatable {
     let subtitle: String?
     let icon: String
     let tint: Color
+    let chips: [QuickActionChip]? // Optional metadata chips (e.g., 3组 / 120千卡)
     let intent: Intent
+
+    init(title: String, subtitle: String?, icon: String, tint: Color, chips: [QuickActionChip]? = nil, intent: Intent) {
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+        self.tint = tint
+        self.chips = chips
+        self.intent = intent
+    }
 }
 
 typealias DashboardInsightItem = InsightItem
@@ -192,7 +204,8 @@ class DashboardViewModel: ObservableObject {
     func loadCardOrder() {
         if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
            let decoded = try? JSONDecoder().decode([DashboardCard].self, from: data) {
-            self.cards = decoded
+            // Migration: remove deprecated 'todaysWorkout' card from stored layout
+            self.cards = decoded.filter { $0.id != .todaysWorkout }
             addNewCardTypes(to: &self.cards)
         } else {
             self.cards = defaultCards
@@ -201,10 +214,11 @@ class DashboardViewModel: ObservableObject {
     
     private var defaultCards: [DashboardCard] {
         [
-            DashboardCard(id: .todaysWorkout, name: "今日训练"), // Add this
             DashboardCard(id: .fitnessRings, name: "健身圆环"),
             DashboardCard(id: .goalProgress, name: "目标进度"),
             DashboardCard(id: .stepsAndDistance, name: "步数与距离"),
+            DashboardCard(id: .hydration, name: "喝水提醒"),
+            DashboardCard(id: .menstrualCycle, name: "经期"),
             DashboardCard(id: .monthlyChallenge, name: "每月挑战"),
             DashboardCard(id: .recentActivity, name: "最近活动"),
             DashboardCard(id: .historyList, name: "历史记录", isVisible: false) // Hidden by default
@@ -310,37 +324,32 @@ class DashboardViewModel: ObservableObject {
     private func buildQuickActions(activePlan: Plan?, todaysTask: DailyTask?) -> [DashboardQuickAction] {
         var actions: [DashboardQuickAction] = []
 
-        if let task = todaysTask, !(task.workouts.isEmpty) {
+        // 新增：将“下一项训练”作为顶部快捷卡片
+        if let task = todaysTask, let first = task.workouts.first {
+            var chips: [QuickActionChip] = []
+            if let sets = first.sets, !sets.isEmpty { chips.append(QuickActionChip(icon: "repeat", text: "\(sets.count)组")) }
+            let subtitle = first.name
+            let iconName: String = {
+                switch first.type {
+                case .strength: return "dumbbell.fill"
+                case .cardio: return "figure.run"
+                case .flexibility: return "figure.cooldown"
+                case .other: return "target"
+                }
+            }()
             actions.append(
                 DashboardQuickAction(
-                    title: "开始今日训练",
-                    subtitle: "专注完成当前计划",
-                    icon: "play.fill",
+                    title: "下一项训练",
+                    subtitle: subtitle,
+                    icon: iconName,
                     tint: .accentColor,
+                    chips: chips,
                     intent: .startWorkout
                 )
             )
-        } else if activePlan != nil {
-            actions.append(
-                DashboardQuickAction(
-                    title: "查看训练计划",
-                    subtitle: "查看本周安排与摘要",
-                    icon: "calendar.badge.clock",
-                    tint: .blue,
-                    intent: .openPlan
-                )
-            )
-        } else {
-            actions.append(
-                DashboardQuickAction(
-                    title: "制定新计划",
-                    subtitle: "让系统为你生成专属训练",
-                    icon: "target",
-                    tint: .blue,
-                    intent: .openPlan
-                )
-            )
         }
+
+        // 计划相关快捷卡已按新设计移除
 
         actions.append(
             DashboardQuickAction(

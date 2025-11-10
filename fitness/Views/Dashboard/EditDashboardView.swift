@@ -83,6 +83,10 @@ private struct DraggableCardRow: View {
             Image(systemName: "flag.checkered")
         case .stepsAndDistance:
             Image(systemName: "figure.walk")
+        case .hydration:
+            Image(systemName: "drop.fill")
+        case .menstrualCycle:
+            Image(systemName: "heart.circle")
         case .monthlyChallenge:
             Image(systemName: "trophy.fill")
         case .recentActivity:

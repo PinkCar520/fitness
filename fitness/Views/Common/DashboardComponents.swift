@@ -31,6 +31,12 @@ struct DashboardSurface<Content: View>: View {
     }
 }
 
+/// Lightweight chip model for QuickAction metadata
+struct QuickActionChip: Equatable, Hashable {
+    let icon: String?
+    let text: String
+}
+
 /// Capsule-style chip used for inline metadata (e.g., status, type badges).
 struct InfoChip: View {
     let icon: String?
@@ -46,6 +52,7 @@ struct InfoChip: View {
             }
             Text(text)
                 .font(.caption.weight(.semibold))
+                .lineLimit(1)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -60,6 +67,7 @@ struct QuickActionButton: View {
     let subtitle: String?
     let icon: String
     var tint: Color = .accentColor
+    var chips: [QuickActionChip]? = nil
     var action: () -> Void
 
     var body: some View {
@@ -71,7 +79,7 @@ struct QuickActionButton: View {
                     .background(tint.opacity(0.15), in: Circle())
                     .foregroundColor(tint)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.headline.weight(.semibold))
                         .foregroundColor(.primary)
@@ -79,6 +87,13 @@ struct QuickActionButton: View {
                         Text(subtitle)
                             .font(.caption)
                             .foregroundColor(.secondary)
+                    }
+                    if let chips, !chips.isEmpty {
+                        HStack(spacing: 6) {
+                            ForEach(chips, id: \.self) { chip in
+                                InfoChip(icon: chip.icon, text: chip.text, tint: .secondary, backgroundColor: Color.primary.opacity(0.06))
+                            }
+                        }
                     }
                 }
 

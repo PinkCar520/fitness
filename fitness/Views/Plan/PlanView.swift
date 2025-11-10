@@ -70,23 +70,7 @@ struct PlanView: View {
         }
     }
 
-    // Removed: weekly summary section (migrated to widget)
-
-    @ViewBuilder
-    private var planInsightsSection: some View {
-        if !planViewModel.insights.isEmpty {
-            VStack(spacing: 12) {
-                ForEach(planViewModel.insights) { item in
-                    InsightCard(
-                        title: item.title,
-                        description: item.message,
-                        tone: item.tone,
-                        action: planInsightAction(for: item.intent)
-                    )
-                }
-            }
-        }
-    }
+    // Removed: weekly summary & insights sections (migrated to widget)
 
     private var latestRecordedWeight: Double? {
         weightMetrics.last?.value
@@ -102,29 +86,6 @@ struct PlanView: View {
         return max(0, min(1, progress))
     }
 
-    private func planInsightAction(for intent: PlanInsightItem.Intent) -> InsightCard.Action? {
-        switch intent {
-        case .startWorkout:
-            return InsightCard.Action(title: "开始训练", icon: "play.fill") {
-                if let task = planViewModel.currentDailyTask {
-                    workoutContext = WorkoutLaunchContext(task: task, resumableState: nil)
-                } else {
-                    appState.selectedTab = 1
-                }
-            }
-        case .logWeight:
-            return InsightCard.Action(title: "记录体重", icon: "scalemass.fill") {
-                appState.selectedTab = 0
-                NotificationCenter.default.post(name: .showInputSheet, object: nil)
-            }
-        case .reviewMeals:
-            return InsightCard.Action(title: "查看饮食", icon: "fork.knife") {
-                appState.selectedTab = 2
-            }
-        case .none:
-            return nil
-        }
-    }
 
     private func goalSummaryCard(plan: Plan, goal: PlanGoal, startWeight: Double, currentWeight: Double, progress: Double) -> some View {
         let clampedProgress = max(0, min(1, progress))
@@ -197,7 +158,7 @@ struct PlanView: View {
                 )
                 .shadow(color: Color.accentColor.opacity(0.25), radius: 16, x: 0, y: 10)
 
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 18) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(plan.name)
@@ -213,29 +174,28 @@ struct PlanView: View {
                         }
                     }
                     Spacer()
-                    VStack(alignment: .trailing, spacing: 12) {
-                        Button {
-                            showPlanSetup = true
-                        } label: {
-                            Image(systemName: "slider.horizontal.3")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .padding(10)
-                                .background(Color.white.opacity(0.16), in: Circle())
+                    VStack(alignment: .trailing, spacing: 8) {
+                        HStack(spacing: 12) {
+                            VStack(spacing: 2) {
+                                Text(progressText)
+                                    .font(.system(size: 30, weight: .heavy, design: .rounded))
+                                    .foregroundColor(.white)
+                            }
+                            Button {
+                                showPlanSetup = true
+                            } label: {
+                                Image(systemName: "slider.horizontal.3")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .padding(10)
+                                    .background(Color.white.opacity(0.16), in: Circle())
+                            }
                         }
                         statusBadge(icon: statusIcon, text: statusText)
-                        VStack(spacing: 2) {
-                            Text(progressText)
-                                .font(.system(size: 34, weight: .heavy, design: .rounded))
-                                .foregroundColor(.white)
-                            Text("完成度")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.75))
-                        }
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 12) {
                     ProgressView(value: clampedProgress)
                         .progressViewStyle(.linear)
                         .tint(.white)
@@ -397,12 +357,6 @@ private struct PlanLifecycleModifier: ViewModifier {
     func body(content: Content) -> some View {
         let refreshed = content
             .onAppear(perform: checkForResumableWorkout)
-            .onChange(of: planViewModel.selectedDate) { _, _ in refreshPlanInsights() }
-            .onChange(of: planViewModel.currentDailyTask?.isCompleted ?? false) { _, _ in refreshPlanInsights() }
-            .onChange(of: planViewModel.currentDailyTask?.isSkipped ?? false) { _, _ in refreshPlanInsights() }
-            .onChange(of: planViewModel.workouts.map { $0.isCompleted }) { _, _ in refreshPlanInsights() }
-            .onChange(of: allMetrics.map(\.date)) { _, _ in refreshPlanInsights() }
-            .onChange(of: activePlans.map(\.id)) { _, _ in refreshPlanInsights() }
 
         return refreshed
             .alert("继续上次的训练?", isPresented: $showResumeAlert) {
@@ -425,10 +379,6 @@ private struct PlanLifecycleModifier: ViewModifier {
         }
     }
 
-    private func refreshPlanInsights() {
-        planViewModel.refreshInsights(weightMetrics: allMetrics.filter { $0.type == .weight })
-    }
-
     private func continueResumableWorkout() {
         if resumableTask != nil, resumableState != nil {
             // The parent view will handle this, but for safety include the code.
@@ -445,7 +395,6 @@ private var content: some View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     planGoalSummarySection
-                    planInsightsSection
                     CalendarView(selectedDate: $selectedDate, completedDates: completedDates)
                         .onChange(of: selectedDate) { oldValue, newValue in
                             planViewModel.selectedDate = newValue ?? Date()
@@ -482,11 +431,6 @@ private var planSetupSheet: some View {
     .presentationDragIndicator(.visible)
 }
 
-private func onAppear() {
-    checkForResumableWorkout()
-    refreshPlanInsights()
-}
-
 private func continueResumableWorkout() {
     if let task = resumableTask, let state = resumableState {
         self.workoutContext = WorkoutLaunchContext(task: task, resumableState: state)
@@ -517,10 +461,6 @@ private func continueResumableWorkout() {
                                     LazyVStack(spacing: 14) {
                                         ForEach(currentDailyTask.workouts) { workout in
                                             WorkoutPlanCardView(workout: workout)
-                                                .onTapGesture {
-                                                    planViewModel.toggleWorkoutCompletion(workout)
-                                                    refreshPlanInsights()
-                                                }
                                         }
                                     }
                                 }
@@ -558,10 +498,6 @@ private func continueResumableWorkout() {
                     }
                 }
 
-                private func refreshPlanInsights() {
-                    planViewModel.refreshInsights(weightMetrics: weightMetrics)
-                }
-
                 private func taskActionRow(for task: DailyTask) -> some View {
                     HStack(spacing: 12) {
                         if !task.workouts.isEmpty {
@@ -577,7 +513,6 @@ private func continueResumableWorkout() {
                         Button {
                             let newValue = !task.isCompleted
                             planViewModel.markTask(task, completed: newValue)
-                            refreshPlanInsights()
                         } label: {
                             Label(task.isCompleted ? "撤销完成" : "标记完成", systemImage: task.isCompleted ? "arrow.uturn.left" : "checkmark.circle.fill")
                                 .font(.footnote.weight(.bold))
@@ -586,7 +521,6 @@ private func continueResumableWorkout() {
 
                         Button {
                             planViewModel.toggleSkip(for: task)
-                            refreshPlanInsights()
                         } label: {
                             Label(task.isSkipped ? "取消跳过" : "跳过今天", systemImage: "moon.zzz.fill")
                                 .font(.footnote.weight(.bold))

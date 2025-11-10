@@ -12,63 +12,6 @@ struct PlanWeeklySummary {
     let totalDays: Int
 }
 
-private extension PlanInsightItem {
-    init(from insight: InsightItem) {
-        let tone: InsightCard.Tone
-        switch insight.tone {
-        case .informational:
-            tone = .informational
-        case .positive:
-            tone = .positive
-        case .warning:
-            tone = .warning
-        }
-
-        let intent: Intent
-        switch insight.intent {
-        case .startWorkout:
-            intent = .startWorkout
-        case .logWeight, .openBodyProfileWeight:
-            intent = .logWeight
-        case .reviewMeals:
-            intent = .reviewMeals
-        default:
-            intent = .none
-        }
-
-        self.init(
-            id: insight.id,
-            title: insight.title,
-            message: insight.message,
-            tone: tone,
-            intent: intent
-        )
-    }
-}
-
-struct PlanInsightItem: Identifiable, Equatable {
-    enum Intent: Equatable {
-        case startWorkout
-        case logWeight
-        case reviewMeals
-        case none
-    }
-
-    let id: UUID
-    let title: String
-    let message: String
-    let tone: InsightCard.Tone
-    let intent: Intent
-
-    init(id: UUID = UUID(), title: String, message: String, tone: InsightCard.Tone, intent: Intent) {
-        self.id = id
-        self.title = title
-        self.message = message
-        self.tone = tone
-        self.intent = intent
-    }
-}
-
 class PlanViewModel: ObservableObject {
     @Published var selectedDate: Date = Date() {
         didSet {
@@ -78,7 +21,6 @@ class PlanViewModel: ObservableObject {
     @Published var workouts: [Workout] = []
     @Published var meals: [Meal] = []
     @Published var currentDailyTask: DailyTask? = nil
-    @Published var insights: [PlanInsightItem] = []
 
     private var activePlan: Plan?
     
@@ -238,52 +180,6 @@ class PlanViewModel: ObservableObject {
         }
         persistChanges()
         filterPlansForSelectedDate()
-    }
-
-    // Weekly summary calculation migrated to Shared/WeeklySummaryCalculator
-
-    func refreshInsights(weightMetrics: [HealthMetric]) {
-        let weightItems = weightMetrics
-            .filter { $0.type == .weight }
-            .map { InsightsEngine.WeightMetric(date: $0.date, value: $0.value) }
-
-        let taskContext = currentDailyTask.map { task in
-            InsightsEngine.Context.TaskContext(
-                isSkipped: task.isSkipped,
-                totalWorkouts: task.workouts.count,
-                completedWorkouts: task.workouts.filter { $0.isCompleted }.count,
-                totalMeals: task.meals.count,
-                pendingMeals: task.meals.filter { !$0.isCompleted }.count
-            )
-        }
-
-        let context = InsightsEngine.Context(
-            hasActivePlan: activePlan != nil,
-            task: taskContext,
-            shouldPromptForMissingTask: (activePlan != nil && currentDailyTask == nil),
-            weightMetrics: weightItems
-        )
-
-        let generatedItems = InsightsEngine.generate(from: context).map { PlanInsightItem(from: $0) }
-
-        if generatedItems.isEmpty {
-            let fallback = activePlan == nil
-                ? PlanInsightItem(
-                    title: "还没有训练计划",
-                    message: "立即制定个人目标，系统会生成本周训练与饮食安排。",
-                    tone: .informational,
-                    intent: .none
-                )
-                : PlanInsightItem(
-                    title: "保持节奏",
-                    message: "你的计划执行良好，继续按照节奏完成训练与饮食。",
-                    tone: .positive,
-                    intent: .none
-                )
-            insights = [fallback]
-        } else {
-            insights = generatedItems
-        }
     }
 
     private func calculateStreak(from tasks: [DailyTask], upTo date: Date) -> Int {
