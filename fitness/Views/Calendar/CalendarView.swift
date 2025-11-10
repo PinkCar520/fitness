@@ -55,18 +55,9 @@ struct CalendarView: View {
             }
             .padding(.horizontal, 4)
         }
-        .padding(.vertical, 20)
-        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 0) // rely on parent padding for edge spacing
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(containerBackground)
-                .shadow(color: containerShadow, radius: containerShadowRadius, x: 0, y: containerShadowY)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(containerStroke, lineWidth: containerStrokeWidth)
-        )
         .gesture(
             DragGesture()
                 .onEnded { gesture in
@@ -124,32 +115,21 @@ struct CalendarView: View {
         Button(action: todayButtonTapped) {
             Text("今天")
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
-                .background(
-                    LinearGradient(
-                        colors: [systemBlue, Color(red: 65/255, green: 92/255, blue: 255/255)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .clipShape(Capsule())
+                .background(Color.primary.opacity(0.06), in: Capsule())
         }
         .buttonStyle(.plain)
-        .shadow(color: systemBlue.opacity(0.25), radius: 6, x: 0, y: 4)
     }
 
     private func navButton(systemName: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(navigationForeground)
+                .foregroundStyle(.primary)
                 .frame(width: 32, height: 32)
-                .background(
-                    Circle()
-                        .fill(navigationBackground)
-                )
+                .background(Circle().fill(Color.primary.opacity(0.06)))
         }
         .buttonStyle(.plain)
     }
