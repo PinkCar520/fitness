@@ -14,6 +14,7 @@ struct PlanView: View {
     @State private var selectedDate: Date? = Calendar.current.startOfDay(for: Date())
     @State private var showPlanSetup = false // Restored
     @State private var showPlanHistory = false
+    @State private var selectedPlanTab: PlanTab = .workout
     
     // State for launching the workout view
     @State private var workoutContext: WorkoutLaunchContext?
@@ -314,7 +315,7 @@ private var mainContent: some View {
 @ViewBuilder
 private var mainNavigationContent: some View {
     content
-        .navigationTitle("训练计划")
+//        .navigationTitle("训练计划")
         .toolbar { toolbarContent }
         .sheet(isPresented: $showPlanSetup) { planSetupSheet }
         .sheet(isPresented: $showPlanHistory) { PlanHistoryView() }
@@ -394,19 +395,32 @@ private var content: some View {
         } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    planGoalSummarySection
                     CalendarView(selectedDate: $selectedDate, completedDates: completedDates)
                         .onChange(of: selectedDate) { oldValue, newValue in
                             planViewModel.selectedDate = newValue ?? Date()
                         }
-                    workoutPlanSection
-                    mealPlanSection
+
+                    planGoalSummarySection
+
+                    Picker("", selection: $selectedPlanTab) {
+                        Text("今日锻炼").tag(PlanTab.workout)
+                        Text("今日饮食").tag(PlanTab.meal)
+                    }
+                    .pickerStyle(.segmented)
+
+                    if selectedPlanTab == .workout {
+                        workoutPlanSection
+                    } else {
+                        mealPlanSection
+                    }
                 }
                 .padding()
             }
         }
     }
 }
+
+private enum PlanTab { case workout, meal }
 
 private var toolbarContent: some ToolbarContent {
     ToolbarItemGroup(placement: .navigationBarTrailing) {

@@ -16,7 +16,7 @@ struct CalendarView: View {
     }
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "MM月dd日 EEEE"
+        formatter.dateFormat = "M月d日"
         formatter.locale = Locale(identifier: "zh_CN")
         return formatter
     }()
@@ -26,19 +26,9 @@ struct CalendarView: View {
     private let systemBlue = Color(red: 59/255, green: 130/255, blue: 246/255) // #3B82F6
 
     var body: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 12) {
             headerSection
-
-            HStack(spacing: 0) {
-                ForEach(Array(weekdayLabels.enumerated()), id: \.offset) { _, label in
-                    Text(label)
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(Color.primary.opacity(0.45))
-                        .frame(maxWidth: .infinity)
-                        .textCase(.uppercase)
-                }
-            }
-
+            weekdayLabelSection
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 12) {
                 ForEach(weekDates, id: \.self) { date in
                     let isCompleted = completedDates.contains { calendar.isDate($0, inSameDayAs: date) }
@@ -53,10 +43,8 @@ struct CalendarView: View {
                     )
                 }
             }
-            .padding(.horizontal, 4)
         }
         .padding(.vertical, 12)
-        .padding(.horizontal, 0) // rely on parent padding for edge spacing
         .frame(maxWidth: .infinity, alignment: .leading)
         .gesture(
             DragGesture()
@@ -87,19 +75,8 @@ struct CalendarView: View {
                 .truncationMode(.tail)
                 .layoutPriority(1)
 
-            Spacer(minLength: 8)
-
-            HStack(spacing: 10) {
-                navButton(systemName: "chevron.left") {
-                    changeWeek(by: -1)
-                }
-
-                todayButton
-
-                navButton(systemName: "chevron.right") {
-                    changeWeek(by: 1)
-                }
-            }
+            Spacer()
+            todayButton
             .layoutPriority(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -113,12 +90,11 @@ struct CalendarView: View {
 
     private var todayButton: some View {
         Button(action: todayButtonTapped) {
-            Text("今天")
-                .font(.system(size: 15, weight: .semibold))
+            Text("今")
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.primary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(Color.primary.opacity(0.06), in: Capsule())
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(Color.primary.opacity(0.06)))
         }
         .buttonStyle(.plain)
     }
@@ -132,6 +108,18 @@ struct CalendarView: View {
                 .background(Circle().fill(Color.primary.opacity(0.06)))
         }
         .buttonStyle(.plain)
+    }
+    
+    private var weekdayLabelSection: some View {
+        return HStack(spacing: 12) {
+            ForEach(Array(weekdayLabels.enumerated()), id: \.offset) { _, label in
+                Text(label)
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(Color.primary.opacity(0.45))
+                    .frame(maxWidth: .infinity)
+                    .textCase(.uppercase)
+            }
+        }
     }
 
     private var weekdayLabels: [String] {
