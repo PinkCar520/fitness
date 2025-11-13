@@ -3,20 +3,21 @@ import SwiftUI
 
 final class BodyProfileViewModel: ObservableObject {
     enum TimeRange: Int, CaseIterable, Identifiable {
-        case seven = 7, thirty = 30, ninety = 90
+        case week = 7, month = 30, quarter = 90, year = 365
         var id: Int { rawValue }
         var days: Int { rawValue }
         var title: String {
             switch self {
-            case .seven: return "7天"
-            case .thirty: return "30天"
-            case .ninety: return "90天"
+            case .week: return "周"
+            case .month: return "月"
+            case .quarter: return "季"
+            case .year: return "年"
             }
         }
     }
 
     @Published var selectedMetric: ChartableMetric = .weight
-    @Published var timeRange: TimeRange = .thirty
+    @Published var timeRange: TimeRange = .month
     @Published var chartData: [DateValuePoint] = []
     @Published var averageValue: Double?
     @Published var goalValue: Double?

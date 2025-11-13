@@ -10,6 +10,14 @@ struct StepsDetailSheet: View {
 
     @State private var range: Range = .week
 
+    // MARK: - Range navigation helpers
+    private var orderedRanges: [Range] { Range.allCases }
+    private var currentIndex: Int { orderedRanges.firstIndex(of: range) ?? 0 }
+    private var canGoLeft: Bool { currentIndex > 0 }
+    private var canGoRight: Bool { currentIndex < orderedRanges.count - 1 }
+    private func prevRange() -> Range { orderedRanges[max(0, currentIndex - 1)] }
+    private func nextRange() -> Range { orderedRanges[min(orderedRanges.count - 1, currentIndex + 1)] }
+
     // Placeholder datasets for month/quarter/year. Replace with real sources when available.
     private var monthData: [DailyStepData] {
         // Expand weekly data to 30 days by repeating/averaging as a placeholder
@@ -111,19 +119,44 @@ struct StepsDetailSheet: View {
 
             Spacer()
 
-            // iOS 16+ segmented picker for range selection
-            Picker("范围", selection: $range) {
-                ForEach(Range.allCases) { r in
-                    Text(r.rawValue).tag(r)
+            
+            HStack(spacing: 12) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        if canGoLeft { range = prevRange() }
+                    }
+                } label: {
+                    LeftBadgesLabel()
+                        .frame(width: 24, height: 32)
                 }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.bottom, 12)
-            .onChange(of: range) { _, newRange in
-                Task { await loadIfNeeded(newRange) }
-            }
+                .buttonStyle(.glass)
+                .disabled(!canGoLeft)
+                
+                // iOS 16+ segmented picker for range selection
+                Picker("范围", selection: $range) {
+                    ForEach(Range.allCases) { r in
+                        Text(r.rawValue).tag(r)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .controlSize(.large)
+                .glassEffect(.regular,in: .rect(cornerRadius: 24.0))
+                .onChange(of: range) { _, newRange in
+                    Task { await loadIfNeeded(newRange) }
+                }
 
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        if canGoRight { range = nextRange() }
+                    }
+                } label: {
+                    RightBadgesLabel()
+                        .frame(width: 24, height: 32)
+                }
+                .buttonStyle(.glass)
+                .disabled(!canGoRight)
+            }
+        
             HStack {
                 Spacer();
             HStack {
@@ -367,5 +400,29 @@ private extension StepsDetailSheet {
         case .year:
             await dashboardViewModel.loadStepsSeriesIfNeeded(.year)
         }
+    }
+}
+
+private struct LeftBadgesLabel: View {
+    var body: some View {
+        Label("Left Badges",
+            systemImage: "chevron.left")
+        .foregroundStyle(Color.black)
+        .labelStyle(.iconOnly)
+        .font(.system(size: 17))
+        .fontWeight(.bold)
+        .imageScale(.large)
+    }
+}
+
+private struct RightBadgesLabel: View {
+    var body: some View {
+        Label("Right Badges",
+            systemImage: "chevron.right")
+        .foregroundStyle(Color.black)
+        .labelStyle(.iconOnly)
+        .font(.system(size: 17))
+        .fontWeight(.bold)
+        .imageScale(.large)
     }
 }

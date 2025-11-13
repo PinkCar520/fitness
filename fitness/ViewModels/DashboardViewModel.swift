@@ -23,7 +23,6 @@ struct DashboardCard: Identifiable, Codable, Hashable {
         case menstrualCycle = "MenstrualCycle"
         case monthlyChallenge = "MonthlyChallenge"
         case recentActivity = "RecentActivity"
-        case historyList = "HistoryList"
     }
 }
 
@@ -202,14 +201,29 @@ class DashboardViewModel: ObservableObject {
     }
 
     func loadCardOrder() {
-        if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
-           let decoded = try? JSONDecoder().decode([DashboardCard].self, from: data) {
-            // Migration: remove deprecated 'todaysWorkout' card from stored layout
-            self.cards = decoded.filter { $0.id != .todaysWorkout }
-            addNewCardTypes(to: &self.cards)
-        } else {
+        guard let data = UserDefaults.standard.data(forKey: userDefaultsKey) else {
             self.cards = defaultCards
+            return
         }
+
+        if let decoded = try? JSONDecoder().decode([DashboardCard].self, from: data) {
+            self.cards = sanitizedCards(from: decoded)
+            addNewCardTypes(to: &self.cards)
+            return
+        }
+
+        // Legacy fallback: decode using raw identifiers to skip removed card types gracefully
+        if let legacyDecoded = try? JSONDecoder().decode([StoredDashboardCard].self, from: data) {
+            let mapped = legacyDecoded.compactMap { stored -> DashboardCard? in
+                guard let type = DashboardCard.CardType(rawValue: stored.id) else { return nil }
+                return DashboardCard(id: type, name: stored.name, isVisible: stored.isVisible ?? true)
+            }
+            self.cards = sanitizedCards(from: mapped)
+            addNewCardTypes(to: &self.cards)
+            return
+        }
+
+        self.cards = defaultCards
     }
     
     private var defaultCards: [DashboardCard] {
@@ -220,8 +234,7 @@ class DashboardViewModel: ObservableObject {
             DashboardCard(id: .hydration, name: "喝水提醒"),
             DashboardCard(id: .menstrualCycle, name: "经期"),
             DashboardCard(id: .monthlyChallenge, name: "每月挑战"),
-            DashboardCard(id: .recentActivity, name: "最近活动"),
-            DashboardCard(id: .historyList, name: "历史记录", isVisible: false) // Hidden by default
+            DashboardCard(id: .recentActivity, name: "最近活动")
         ]
     }
     
@@ -236,6 +249,16 @@ class DashboardViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    private func sanitizedCards(from cards: [DashboardCard]) -> [DashboardCard] {
+        cards.filter { $0.id != .todaysWorkout }
+    }
+
+    private struct StoredDashboardCard: Codable {
+        let id: String
+        let name: String
+        let isVisible: Bool?
     }
 
     // MARK: - Data Loading

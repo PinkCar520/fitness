@@ -9,6 +9,14 @@ struct DistanceDetailSheet: View {
 
     @State private var range: Range = .week
 
+    // MARK: - Range navigation helpers
+    private var orderedRanges: [Range] { Range.allCases }
+    private var currentIndex: Int { orderedRanges.firstIndex(of: range) ?? 0 }
+    private var canGoLeft: Bool { currentIndex > 0 }
+    private var canGoRight: Bool { currentIndex < orderedRanges.count - 1 }
+    private func prevRange() -> Range { orderedRanges[max(0, currentIndex - 1)] }
+    private func nextRange() -> Range { orderedRanges[min(orderedRanges.count - 1, currentIndex + 1)] }
+
     private var monthData: [DailyDistanceData] { synthesize(from: weeklyData, days: 30) }
     private var quarterData: [DailyDistanceData] { synthesize(from: weeklyData, days: 90) }
     private var yearData: [DailyDistanceData] { synthesize(from: weeklyData, days: 365) }
@@ -82,14 +90,40 @@ struct DistanceDetailSheet: View {
 
             Spacer()
 
-            Picker("范围", selection: $range) {
-                ForEach(Range.allCases) { r in Text(r.rawValue).tag(r) }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.bottom, 12)
-            .onChange(of: range) { _, newRange in
-                Task { await loadIfNeeded(newRange) }
+            HStack(spacing: 12) {
+                // 左按钮（向前切换范围）
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        if canGoLeft { range = prevRange() }
+                    }
+                } label: {
+                    DistanceLeftButtonLabel()
+                        .frame(width: 24, height: 32)
+                }
+                .buttonStyle(.glass)
+                .disabled(!canGoLeft)
+                // 范围选择器
+                Picker("范围", selection: $range) {
+                    ForEach(Range.allCases) { r in Text(r.rawValue).tag(r) }
+                }
+                .pickerStyle(.segmented)
+                .controlSize(.large)
+                .glassEffect(.regular,in: .rect(cornerRadius: 24.0))
+                .onChange(of: range) { _, newRange in
+                    Task { await loadIfNeeded(newRange) }
+                }
+
+                // 右按钮（向后切换范围）
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        if canGoRight { range = nextRange() }
+                    }
+                } label: {
+                    DistanceRightButtonLabel()
+                        .frame(width: 24, height: 32)
+                }
+                .buttonStyle(.glass)
+                .disabled(!canGoRight)
             }
 
             HStack { Spacer(); Text("数据来源：Apple健康").font(.footnote).foregroundStyle(.secondary) }
@@ -97,6 +131,28 @@ struct DistanceDetailSheet: View {
         .padding()
         .presentationDragIndicator(.visible)
         .task { await loadIfNeeded(range) }
+    }
+}
+
+private struct DistanceLeftButtonLabel: View {
+    var body: some View {
+        Label("Left", systemImage: "chevron.left")
+            .foregroundStyle(Color.black)
+            .labelStyle(.iconOnly)
+            .font(.system(size: 17))
+            .fontWeight(.bold)
+            .imageScale(.large)
+    }
+}
+
+private struct DistanceRightButtonLabel: View {
+    var body: some View {
+        Label("Right", systemImage: "chevron.right")
+            .foregroundStyle(Color.black)
+            .labelStyle(.iconOnly)
+            .font(.system(size: 17))
+            .fontWeight(.bold)
+            .imageScale(.large)
     }
 }
 

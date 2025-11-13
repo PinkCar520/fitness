@@ -121,7 +121,8 @@ struct StatsView: View {
                         }
                     }
                     .pickerStyle(.segmented)
-
+                    .controlSize(.large)
+        
                     // Core Metrics Grid
                     VStack(alignment: .leading) {
                         Text("核心指标")
@@ -295,6 +296,13 @@ struct StatsView: View {
             let sum = (grouped[day] ?? []).reduce(0) { $0 + $1.caloriesBurned }
             return DateValuePoint(date: day, value: Double(sum))
         }
+    }
+
+    private func shiftTimeFrame(by offset: Int) {
+        guard let currentIndex = TimeFrame.allCases.firstIndex(of: selectedTimeFrame) else { return }
+        let newIndex = currentIndex + offset
+        guard TimeFrame.allCases.indices.contains(newIndex) else { return }
+        selectedTimeFrame = TimeFrame.allCases[newIndex]
     }
 }
 

@@ -315,8 +315,11 @@ private var mainContent: some View {
 @ViewBuilder
 private var mainNavigationContent: some View {
     content
-//        .navigationTitle("训练计划")
-        .toolbar { toolbarContent }
+        .toolbar {
+            toolbarContent
+        }
+            .toolbar(removing: .title)
+//            .ignoresSafeArea(edges: .top)
         .sheet(isPresented: $showPlanSetup) { planSetupSheet }
         .sheet(isPresented: $showPlanHistory) { PlanHistoryView() }
         .modifier(WorkoutLaunchModifier(context: $workoutContext, modelContext: modelContext))
@@ -404,9 +407,12 @@ private var content: some View {
 
                     Picker("", selection: $selectedPlanTab) {
                         Text("今日锻炼").tag(PlanTab.workout)
+                            .glassEffect()
                         Text("今日饮食").tag(PlanTab.meal)
+                            .glassEffect()
                     }
                     .pickerStyle(.segmented)
+                    .controlSize(.large)
 
                     if selectedPlanTab == .workout {
                         workoutPlanSection
@@ -453,29 +459,21 @@ private func continueResumableWorkout() {
                 
                 private var workoutPlanSection: some View {
                     VStack(alignment: .leading, spacing: 16) {
-                        sectionHeader(
-                            title: "今日锻炼",
-                            subtitle: workoutSectionSubtitle(for: planViewModel.currentDailyTask),
-                            icon: "figure.strengthtraining.traditional"
-                        )
-
                         if let currentDailyTask = planViewModel.currentDailyTask {
-                            VStack(spacing: 16) {
-                                taskActionRow(for: currentDailyTask)
+                            taskActionRow(for: currentDailyTask)
 
-                                if currentDailyTask.workouts.isEmpty {
-                                    restStateCard(
-                                        title: "休息日也很重要",
-                                        message: "调整状态、补充营养，为下一次训练打好基础。",
-                                        icon: "powerplug.fill"
-                                    )
-                                } else {
-                                    workoutSummaryCard(for: currentDailyTask)
+                            if currentDailyTask.workouts.isEmpty {
+                                restStateCard(
+                                    title: "休息日也很重要",
+                                    message: "调整状态、补充营养，为下一次训练打好基础。",
+                                    icon: "powerplug.fill"
+                                )
+                            } else {
+                                workoutSummaryCard(for: currentDailyTask)
 
-                                    LazyVStack(spacing: 14) {
-                                        ForEach(currentDailyTask.workouts) { workout in
-                                            WorkoutPlanCardView(workout: workout)
-                                        }
+                                LazyVStack(spacing: 14) {
+                                    ForEach(currentDailyTask.workouts) { workout in
+                                        WorkoutPlanCardView(workout: workout)
                                     }
                                 }
                             }
@@ -488,11 +486,9 @@ private func continueResumableWorkout() {
                         }
                     }
                 }
-            
+
                 private var mealPlanSection: some View {
                     VStack(alignment: .leading, spacing: 16) {
-                        sectionHeader(title: "今日饮食", subtitle: mealSectionSubtitle(for: planViewModel.meals), icon: "fork.knife")
-
                         if planViewModel.meals.isEmpty {
                             restStateCard(
                                 title: "还没有饮食安排",
@@ -565,30 +561,7 @@ private func continueResumableWorkout() {
                     }
                 }
                 
-                @ViewBuilder
-                private func sectionHeader(title: String, subtitle: String, icon: String) -> some View {
-                    HStack(spacing: 12) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.accentColor.opacity(0.12))
-                                .frame(width: 44, height: 44)
-                            Image(systemName: icon)
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(Color.accentColor)
-                        }
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(title)
-                                .font(.title2)
-                                .fontWeight(.bold)
-                            Text(subtitle)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                        Spacer()
-                    }
-                }
+                
 
                 private func workoutSectionSubtitle(for task: DailyTask?) -> String {
                     return "安排你的训练节奏"

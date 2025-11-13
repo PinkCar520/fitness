@@ -14,11 +14,14 @@ enum ChartableMetric: String, CaseIterable, Identifiable {
 struct BodyProfileView: View {
     @EnvironmentObject var profileViewModel: ProfileViewModel
     @EnvironmentObject var healthKitManager: HealthKitManager
+    @EnvironmentObject var weightManager: WeightManager
     @Query(sort: \HealthMetric.date, order: .reverse) private var metrics: [HealthMetric]
+    private let zhLocale = Locale(identifier: "zh-Hans")
     
     @State private var showInputSheet = false
+    @State private var showTrajectorySheet = false
     @State private var selectedChartMetric: ChartableMetric = .weight
-    @State private var selectedRange: BodyProfileViewModel.TimeRange = .thirty
+    @State private var selectedRange: BodyProfileViewModel.TimeRange = .month
     @StateObject private var vm = BodyProfileViewModel()
     // Lines always shown by default (no toggles)
 
@@ -60,6 +63,49 @@ struct BodyProfileView: View {
     private var chartTitle: String {
         "\(selectedChartMetric.rawValue)趋势"
     }
+
+    private var chartXAxisRange: ClosedRange<Date>? {
+        guard supportsCustomXAxis(for: selectedRange) else { return nil }
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfToday = calendar.startOfDay(for: now)
+        guard let start = calendar.date(byAdding: .day, value: -(selectedRange.days - 1), to: startOfToday) else {
+            return nil
+        }
+        return start...now
+    }
+
+    private var chartXAxisTicks: [Date]? {
+        guard let range = chartXAxisRange else { return nil }
+        let calendar = Calendar.current
+        switch selectedRange {
+        case .week:
+            return (0..<selectedRange.days).compactMap { offset in
+                calendar.date(byAdding: .day, value: offset, to: calendar.startOfDay(for: range.lowerBound))
+            }
+        case .month:
+            return centeredTicks(lowerBound: range.lowerBound, upperBound: range.upperBound, segments: 4)
+        case .quarter, .year:
+            let start = calendar.date(from: calendar.dateComponents([.year, .month], from: range.lowerBound)) ?? calendar.startOfDay(for: range.lowerBound)
+            return strideTicks(
+                startCandidate: start,
+                lowerBound: range.lowerBound,
+                upperBound: range.upperBound,
+                component: .month,
+                step: 1,
+                calendar: calendar
+            )
+        }
+    }
+
+    private func supportsCustomXAxis(for range: BodyProfileViewModel.TimeRange) -> Bool {
+        switch range {
+        case .week, .month, .quarter, .year:
+            return true
+        default:
+            return false
+        }
+    }
     
     private var chartColor: Color {
         switch selectedChartMetric {
@@ -79,6 +125,35 @@ struct BodyProfileView: View {
         case .heartRate: return "bpm"
         case .vo2Max: return "ml/kg/min"
         }
+    }
+
+    private var chartXAxisFormat: Date.FormatStyle? {
+        let base = Date.FormatStyle.dateTime.locale(zhLocale)
+        switch selectedRange {
+        case .week, .month:
+            return base.month(.twoDigits).day(.twoDigits)
+        case .quarter, .year:
+            return nil
+        }
+    }
+
+    private var chartXAxisLabelProvider: ((Date) -> Text)? {
+        switch selectedRange {
+        case .quarter, .year:
+            let formatter = zhMonthFormatter
+            return { date in
+                Text(formatter.string(from: date))
+            }
+        default:
+            return nil
+        }
+    }
+
+    private var zhMonthFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.locale = zhLocale
+        formatter.dateFormat = "M月"
+        return formatter
     }
 
     var body: some View {
@@ -108,6 +183,12 @@ struct BodyProfileView: View {
                 if metric == "bodyFat" { selectedChartMetric = .bodyFat }
             }
         }
+        .sheet(isPresented: $showTrajectorySheet) {
+            HistoryListView()
+                .environmentObject(weightManager)
+                .presentationDetents([.fraction(0.9)])
+                .presentationDragIndicator(.visible)
+        }
     }
 
     // MARK: - Subviews (split to reduce type-checking complexity)
@@ -118,7 +199,7 @@ struct BodyProfileView: View {
             .init(title: "体脂率", value: formatted(latestBodyFat, precision: 1), unit: "%", icon: "flame.fill", color: .orange),
             .init(title: "静息心率", value: formatted(latestHeartRate, precision: 0), unit: "bpm", icon: "heart.fill", color: .red)
         ]
-        return metricSection(title: "当前指标", items: items)
+        return metricSection(title: nil, items: items)
     }
 
     @ViewBuilder private var vo2QuickSection: some View {
@@ -162,7 +243,18 @@ struct BodyProfileView: View {
             let unit = chartUnit
             let avg = vm.averageValue
             let goal = (selectedChartMetric == .weight) ? vm.goalValue : nil
-            GenericLineChartView(title: title, data: data, color: color, unit: unit, averageValue: avg, goalValue: goal)
+            GenericLineChartView(
+                title: title,
+                data: data,
+                color: color,
+                unit: unit,
+                averageValue: avg,
+                goalValue: goal,
+                xAxisRange: chartXAxisRange,
+                xAxisTicks: chartXAxisTicks,
+                axisDateFormat: chartXAxisFormat,
+                axisLabelProvider: chartXAxisLabelProvider
+            )
                 .frame(minHeight: 220)
         }
         .padding(.horizontal)
@@ -170,7 +262,7 @@ struct BodyProfileView: View {
 
     private var additionalMetricsSection: some View {
         let items: [MetricDisplay] = [
-            .init(title: "腰围", value: formatted(latestWaistCircumference, precision: 1), unit: "cm", icon: "tape.measure", color: .purple),
+            .init(title: "腰围", value: formatted(latestWaistCircumference, precision: 1), unit: "cm", icon: "figure", color: .purple),
             .init(title: "胸围", value: formatted(latestChestCircumference, precision: 1), unit: "cm", icon: "figure.stand", color: .pink),
             .init(title: "腰臀比", value: formatted(latestWaistToHipRatio, precision: 2), unit: "", icon: "circle.grid.cross", color: .teal)
         ]
@@ -263,14 +355,16 @@ struct BodyProfileView: View {
     }
 
     @ViewBuilder
-    private func metricSection(title: String, items: [MetricDisplay]) -> some View {
+    private func metricSection(title: String?, items: [MetricDisplay]) -> some View {
         let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
         VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.title2)
-                .fontWeight(.bold)
-                .padding(.horizontal)
+            if let title, !title.isEmpty {
+                Text(title)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .padding(.horizontal)
+            }
 
             LazyVGrid(columns: columns, spacing: 10) {
                 ForEach(items) { item in
@@ -281,9 +375,45 @@ struct BodyProfileView: View {
                         icon: item.icon,
                         color: item.color
                     )
+                    .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .onTapGesture {
+                        handleMetricTap(item)
+                    }
                 }
             }
             .padding(.horizontal)
+        }
+    }
+
+    func strideTicks(
+        startCandidate: Date,
+        lowerBound: Date,
+        upperBound: Date,
+        component: Calendar.Component,
+        step: Int,
+        calendar: Calendar
+    ) -> [Date] {
+        var current = startCandidate
+        while current < lowerBound {
+            guard let next = calendar.date(byAdding: component, value: step, to: current) else { break }
+            current = next
+        }
+        var ticks: [Date] = []
+        while current <= upperBound {
+            ticks.append(current)
+            guard let next = calendar.date(byAdding: component, value: step, to: current) else { break }
+            current = next
+        }
+        return ticks
+    }
+
+    func centeredTicks(lowerBound: Date, upperBound: Date, segments: Int) -> [Date] {
+        guard segments > 0 else { return [] }
+        let duration = upperBound.timeIntervalSince(lowerBound)
+        guard duration > 0 else { return [lowerBound] }
+        let step = duration / Double(segments)
+        return (0..<segments).map { idx in
+            lowerBound.addingTimeInterval((Double(idx) + 0.5) * step)
         }
     }
 }
@@ -293,6 +423,12 @@ private extension BodyProfileView {
         vm.selectedMetric = selectedChartMetric
         vm.timeRange = selectedRange
         vm.refresh(metrics: metrics, profile: profileViewModel.userProfile)
+    }
+
+    func handleMetricTap(_ item: MetricDisplay) {
+        if item.title == "体重" {
+            showTrajectorySheet = true
+        }
     }
 }
 

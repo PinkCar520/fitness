@@ -91,10 +91,9 @@ struct CalendarView: View {
     private var todayButton: some View {
         Button(action: todayButtonTapped) {
             Text("今")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.primary)
-                .frame(width: 32, height: 32)
-                .background(Circle().fill(Color.primary.opacity(0.06)))
+                .font(.system(size: 16))
+                .padding()
+                .glassEffect()
         }
         .buttonStyle(.plain)
     }

@@ -91,8 +91,6 @@ private struct DraggableCardRow: View {
             Image(systemName: "trophy.fill")
         case .recentActivity:
             Image(systemName: "clock.fill")
-        case .historyList:
-            Image(systemName: "list.bullet")
         }
     }
 }

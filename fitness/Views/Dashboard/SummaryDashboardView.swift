@@ -56,7 +56,6 @@ struct SummaryDashboardView: View {
         case .stepsAndDistance: cardStepsAndDistance()
         case .monthlyChallenge: cardMonthlyChallenge()
         case .recentActivity: cardRecentActivity()
-        case .historyList: cardHistoryList()
         case .hydration:
             if shouldRenderHydrationMenstrualRow(for: .hydration) {
                 hydrationMenstrualRow()
@@ -133,7 +132,6 @@ struct SummaryDashboardView: View {
     }
     private func cardMonthlyChallenge() -> some View { MonthlyChallengeCard(monthlyChallengeCompletion: dashboardViewModel.monthlyChallengeCompletion) }
     private func cardRecentActivity() -> some View { RecentActivityCard(mostRecentWorkout: dashboardViewModel.mostRecentWorkout) }
-    private func cardHistoryList() -> some View { HistoryListView() }
 
     var body: some View {
         NavigationStack {

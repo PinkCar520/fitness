@@ -36,6 +36,8 @@ struct InputSheetView: View {
                         }
                     }
                     .pickerStyle(SegmentedPickerStyle())
+                    .controlSize(.regular)
+                    .glassEffect(.regular,in: .rect(cornerRadius: 24.0))
                     
                     switch selectedMetric {
                     case .weight:
