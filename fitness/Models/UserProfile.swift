@@ -146,6 +146,7 @@ struct UserProfile: Codable, Identifiable, Equatable {
     var gender: Gender
     var dateOfBirth: Date
     var height: Double // in cm by default
+    var currentWeight: Double?
     var targetWeight: Double // in kg by default
     var targetDate: Date?
     var weightUnit: WeightUnit
@@ -179,6 +180,7 @@ struct UserProfile: Codable, Identifiable, Equatable {
          gender: Gender = .preferNotToSay,
          dateOfBirth: Date = Calendar.current.date(byAdding: .year, value: -25, to: Date())!,
          height: Double = 170.0,
+         currentWeight: Double? = nil,
          targetWeight: Double = 60.0,
          weightUnit: WeightUnit = .kg,
          heightUnit: HeightUnit = .cm,
@@ -206,6 +208,7 @@ struct UserProfile: Codable, Identifiable, Equatable {
         self.gender = gender
         self.dateOfBirth = dateOfBirth
         self.height = height
+        self.currentWeight = currentWeight
         self.targetWeight = targetWeight
         self.weightUnit = weightUnit
         self.heightUnit = heightUnit

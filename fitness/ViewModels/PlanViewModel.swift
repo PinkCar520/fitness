@@ -77,7 +77,8 @@ class PlanViewModel: ObservableObject {
             startWeight: latestWeight,
             targetWeight: config.targetWeight,
             startDate: startOfToday,
-            targetDate: targetDate
+            targetDate: targetDate,
+            isProfessionalMode: config.professionalModeEnabled
         )
 
         // Sync profile state so other features (widgets, onboarding summaries) stay aligned

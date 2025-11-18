@@ -9,12 +9,16 @@ struct WorkoutLaunchContext: Identifiable {
     let resumableState: WorkoutSessionState?
 }
 
+private enum PlanTab {
+    case workout, meal
+}
+
 struct PlanView: View {
     @StateObject private var planViewModel: PlanViewModel
     @State private var selectedDate: Date? = Calendar.current.startOfDay(for: Date())
+    @State private var selectedPlanTab: PlanTab = .workout
     @State private var showPlanSetup = false // Restored
     @State private var showPlanHistory = false
-    @State private var selectedPlanTab: PlanTab = .workout
     
     // State for launching the workout view
     @State private var workoutContext: WorkoutLaunchContext?
@@ -93,11 +97,6 @@ struct PlanView: View {
         let isGoalComplete = clampedProgress >= 0.999
         let progressText = "\(Int(clampedProgress * 100))%"
         let headline = "\(goal.fitnessGoal.rawValue) · \(String(format: "%.1fkg", startWeight)) → \(String(format: "%.1fkg", goal.targetWeight))"
-        let gradient = LinearGradient(colors: [
-            Color.accentColor.opacity(0.95),
-            Color.accentColor.opacity(0.6)
-        ], startPoint: .topLeading, endPoint: .bottomTrailing)
-
         let todaysTask = planViewModel.currentDailyTask
         let todaysWorkouts = todaysTask?.workouts.count ?? 0
         let hasWorkoutsToday = !(todaysTask?.workouts.isEmpty ?? true)
@@ -150,86 +149,82 @@ struct PlanView: View {
             }
         }()
 
-        return ZStack {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(gradient)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                )
-                .shadow(color: Color.accentColor.opacity(0.25), radius: 16, x: 0, y: 10)
+        let cardBackground = Color.white
+        let accentColor = Color(red: 0.35, green: 0.58, blue: 0.92)
+        let primaryText = Color(red: 0.12, green: 0.18, blue: 0.28)
+        let secondaryText = primaryText.opacity(0.65)
 
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(plan.name)
-                            .font(.title3.weight(.bold))
-                            .foregroundColor(.white)
-                        Text(headline)
-                            .font(.footnote)
-                            .foregroundColor(.white.opacity(0.8))
-                        if let targetDate = goal.targetDate {
-                            Text("目标截止 \(targetDate.formatted(date: .abbreviated, time: .omitted))")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
-                        }
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 8) {
-                        HStack(spacing: 12) {
-                            VStack(spacing: 2) {
-                                Text(progressText)
-                                    .font(.system(size: 30, weight: .heavy, design: .rounded))
-                                    .foregroundColor(.white)
-                            }
-                            Button {
-                                showPlanSetup = true
-                            } label: {
-                                Image(systemName: "slider.horizontal.3")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .padding(10)
-                                    .background(Color.white.opacity(0.16), in: Circle())
-                            }
-                        }
-                        statusBadge(icon: statusIcon, text: statusText)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 12) {
-                    ProgressView(value: clampedProgress)
-                        .progressViewStyle(.linear)
-                        .tint(.white)
-                        .padding(.vertical, 4)
-                        .background(Color.white.opacity(0.12), in: Capsule())
-
-                    if let remainingDaysText {
-                        Text(remainingDaysText)
+        return VStack(alignment: .leading, spacing: 20) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(plan.name)
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(primaryText)
+                    Text(headline)
+                        .font(.footnote)
+                        .foregroundStyle(secondaryText)
+                    if let targetDate = goal.targetDate {
+                        Text("目标截止 \(targetDate.formatted(date: .abbreviated, time: .omitted))")
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.75))
-                    }
-
-                    HStack(spacing: 16) {
-                        metricBadge(icon: "figure.walk", title: "起点", value: startText)
-                        metricBadge(icon: "scalemass.fill", title: "当前", value: currentText)
-                        metricBadge(icon: "flag.checkered", title: "目标", value: targetText)
+                            .foregroundStyle(secondaryText)
                     }
                 }
+                Spacer()
+                ProgressRing(progress: clampedProgress, accentColor: accentColor, label: progressText)
+            }
 
-                Rectangle()
-                    .fill(Color.white.opacity(0.2))
-                    .frame(height: 1)
-
-                HStack(spacing: 12) {
-                    infoChip(icon: trainingIcon, text: trainingText)
-                    infoChip(icon: mealIcon, text: mealText)
+            HStack(spacing: 10) {
+                statusBadge(
+                    icon: statusIcon,
+                    text: statusText,
+                    foreground: accentColor,
+                    background: accentColor.opacity(0.12)
+                )
+                if goal.isProfessionalMode {
+                    professionalModeBadge()
+                }
+                Spacer()
+                if let remainingDaysText {
+                    Text(remainingDaysText)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(accentColor)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(accentColor.opacity(0.12), in: Capsule())
                 }
             }
-            .padding(24)
+
+            VStack(alignment: .leading, spacing: 12) {
+                ProgressView(value: clampedProgress)
+                    .progressViewStyle(.linear)
+                    .tint(accentColor)
+                    .padding(.vertical, 4)
+                    .background(accentColor.opacity(0.08), in: Capsule())
+
+                HStack(spacing: 16) {
+                    metricBadge(icon: "figure.walk", title: "起点", value: startText, textColor: primaryText, accentColor: secondaryText)
+                    metricBadge(icon: "scalemass.fill", title: "当前", value: currentText, textColor: primaryText, accentColor: secondaryText)
+                    metricBadge(icon: "flag.checkered", title: "目标", value: targetText, textColor: primaryText, accentColor: secondaryText)
+                }
+            }
+
+            HStack(spacing: 12) {
+                infoChip(icon: trainingIcon, text: trainingText, textColor: primaryText, background: Color.white.opacity(0.08))
+                infoChip(icon: mealIcon, text: mealText, textColor: primaryText, background: Color.white.opacity(0.08))
+            }
         }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
     }
 
-    private func metricBadge(icon: String, title: String, value: String) -> some View {
+    private func metricBadge(icon: String, title: String, value: String, textColor: Color = .primary, accentColor: Color = .secondary) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
                 Image(systemName: icon)
@@ -238,29 +233,42 @@ struct PlanView: View {
                     .font(.caption2)
                     .fontWeight(.semibold)
             }
-            .foregroundColor(.white.opacity(0.75))
+            .foregroundStyle(accentColor)
             Text(value)
                 .font(.headline)
                 .fontWeight(.semibold)
-                .foregroundColor(.white)
+                .foregroundStyle(textColor)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func statusBadge(icon: String, text: String) -> some View {
+    private func statusBadge(icon: String, text: String, foreground: Color = .white, background: Color = Color.white.opacity(0.18)) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(.caption)
             Text(text)
                 .font(.caption.weight(.semibold))
         }
-        .foregroundColor(.white)
+        .foregroundStyle(foreground)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(Color.white.opacity(0.18), in: Capsule())
+        .background(background, in: Capsule())
     }
 
-    private func infoChip(icon: String, text: String) -> some View {
+    private func professionalModeBadge() -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "cross.case.fill")
+                .font(.caption)
+            Text("专业模式")
+                .font(.caption.weight(.semibold))
+        }
+        .foregroundStyle(Color.red)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.red.opacity(0.12), in: Capsule())
+    }
+
+    private func infoChip(icon: String, text: String, textColor: Color = .white, background: Color = Color.white.opacity(0.14)) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.caption)
@@ -268,10 +276,41 @@ struct PlanView: View {
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
         }
-        .foregroundColor(.white)
+        .foregroundStyle(textColor)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color.white.opacity(0.14), in: Capsule())
+        .background(background, in: Capsule())
+    }
+
+    private struct ProgressRing: View {
+        let progress: Double
+        let accentColor: Color
+        let label: String
+
+        private var clamped: Double {
+            max(0, min(1, progress))
+        }
+
+        var body: some View {
+            ZStack {
+                Circle()
+                    .stroke(Color.black.opacity(0.06), lineWidth: 8)
+                Circle()
+                    .trim(from: 0, to: clamped)
+                    .stroke(accentColor, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                Text(label)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(accentColor)
+            }
+            .frame(width: 68, height: 68)
+            .padding(6)
+            .background(
+                Circle()
+                    .fill(Color.white)
+                    .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
+            )
+        }
     }
 
     @ViewBuilder
@@ -309,6 +348,7 @@ var body: some View {
 private var mainContent: some View {
     NavigationStack {
         mainNavigationContent
+            .background(Color(UIColor.systemGroupedBackground))
     }
 }
 
@@ -316,10 +356,23 @@ private var mainContent: some View {
 private var mainNavigationContent: some View {
     content
         .toolbar {
-            toolbarContent
+            ToolbarItemGroup {
+                Button {
+                    showPlanHistory = true
+                } label: {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .foregroundStyle(Color.black)
+                }
+
+                Button {
+                    showPlanSetup = true
+                } label: {
+                    Image(systemName: "plus")
+                        .foregroundStyle(Color.black)
+                }
+            }
         }
-            .toolbar(removing: .title)
-//            .ignoresSafeArea(edges: .top)
+        .toolbar(removing: .title)
         .sheet(isPresented: $showPlanSetup) { planSetupSheet }
         .sheet(isPresented: $showPlanHistory) { PlanHistoryView() }
         .modifier(WorkoutLaunchModifier(context: $workoutContext, modelContext: modelContext))
@@ -407,12 +460,11 @@ private var content: some View {
 
                     Picker("", selection: $selectedPlanTab) {
                         Text("今日锻炼").tag(PlanTab.workout)
-                            .glassEffect()
                         Text("今日饮食").tag(PlanTab.meal)
-                            .glassEffect()
                     }
                     .pickerStyle(.segmented)
                     .controlSize(.large)
+                    .glassEffect()
 
                     if selectedPlanTab == .workout {
                         workoutPlanSection
@@ -422,23 +474,6 @@ private var content: some View {
                 }
                 .padding()
             }
-        }
-    }
-}
-
-private enum PlanTab { case workout, meal }
-
-private var toolbarContent: some ToolbarContent {
-    ToolbarItemGroup(placement: .navigationBarTrailing) {
-        Button {
-            showPlanHistory = true
-        } label: {
-            Image(systemName: "clock.arrow.circlepath")
-        }
-        Button {
-            showPlanSetup = true
-        } label: {
-            Image(systemName: "plus")
         }
     }
 }
@@ -457,35 +492,38 @@ private func continueResumableWorkout() {
     }
 }
                 
-                private var workoutPlanSection: some View {
-                    VStack(alignment: .leading, spacing: 16) {
-                        if let currentDailyTask = planViewModel.currentDailyTask {
-                            taskActionRow(for: currentDailyTask)
+    private var workoutPlanSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if let currentDailyTask = planViewModel.currentDailyTask {
+                if currentDailyTask.isCompleted {
+                    completedTrainingCard(for: currentDailyTask)
+                    recoveryTipsSection
+                } else {
+                    taskActionRow(for: currentDailyTask)
 
-                            if currentDailyTask.workouts.isEmpty {
-                                restStateCard(
-                                    title: "休息日也很重要",
-                                    message: "调整状态、补充营养，为下一次训练打好基础。",
-                                    icon: "powerplug.fill"
-                                )
-                            } else {
-                                workoutSummaryCard(for: currentDailyTask)
-
-                                LazyVStack(spacing: 14) {
-                                    ForEach(currentDailyTask.workouts) { workout in
-                                        WorkoutPlanCardView(workout: workout)
-                                    }
-                                }
+                    if currentDailyTask.workouts.isEmpty {
+                        restStateCard(
+                            title: "休息日也很重要",
+                            message: "调整状态、补充营养，为下一次训练打好基础。",
+                            icon: "powerplug.fill"
+                        )
+                    } else {
+                        LazyVStack(spacing: 14) {
+                            ForEach(currentDailyTask.workouts) { workout in
+                                WorkoutPlanCardView(workout: workout)
                             }
-                        } else {
-                            restStateCard(
-                                title: "今日暂无计划",
-                                message: "在计划页中选择一个日期或创建新的训练计划。",
-                                icon: "calendar.badge.plus"
-                            )
                         }
                     }
                 }
+            } else {
+                restStateCard(
+                    title: "今日暂无计划",
+                    message: "在计划页中选择一个日期或创建新的训练计划。",
+                    icon: "calendar.badge.plus"
+                )
+            }
+        }
+    }
 
                 private var mealPlanSection: some View {
                     VStack(alignment: .leading, spacing: 16) {
@@ -519,15 +557,6 @@ private func continueResumableWorkout() {
                             }
                             .buttonStyle(.borderedProminent)
                         }
-
-                        Button {
-                            let newValue = !task.isCompleted
-                            planViewModel.markTask(task, completed: newValue)
-                        } label: {
-                            Label(task.isCompleted ? "撤销完成" : "标记完成", systemImage: task.isCompleted ? "arrow.uturn.left" : "checkmark.circle.fill")
-                                .font(.footnote.weight(.bold))
-                        }
-                        .buttonStyle(.bordered)
 
                         Button {
                             planViewModel.toggleSkip(for: task)
@@ -567,89 +596,6 @@ private func continueResumableWorkout() {
                     return "安排你的训练节奏"
                 }
 
-                private func workoutSummaryCard(for task: DailyTask) -> some View {
-                    let workouts = task.workouts
-                    let completedCount = workouts.filter { $0.isCompleted }.count
-                    let totalCount = workouts.count
-                    let remainingCount = max(totalCount - completedCount, 0)
-                    let progress = totalCount > 0 ? Double(completedCount) / Double(totalCount) : 0
-                    let nextWorkout = workouts.first { !$0.isCompleted } ?? workouts.first
-                    let isTaskCompleted = task.isCompleted || remainingCount == 0
-
-                    return VStack(alignment: .leading, spacing: 16) {
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("今日进度")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.white.opacity(0.75))
-                                Text("\(completedCount)/\(workouts.count) 已完成")
-                                    .font(.title3)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(.white)
-                            }
-                            Spacer()
-                            infoPill(
-                                text: remainingCount == 0 ? "全部完成" : "待训练 \(remainingCount) 项",
-                                systemImage: "bolt.fill",
-                                foreground: .white,
-                                background: .white
-                            )
-                        }
-
-                        ProgressView(value: progress)
-                            .progressViewStyle(.linear)
-                            .tint(.white)
-
-                        if let nextWorkout {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text("下一项训练")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.white.opacity(0.75))
-
-                                HStack(alignment: .center, spacing: 12) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(Color.white.opacity(0.15))
-                                            .frame(width: 46, height: 46)
-                                        Image(systemName: nextWorkout.type.symbolName)
-                                            .font(.title2)
-                                            .foregroundStyle(.white)
-                                    }
-
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(nextWorkout.name)
-                                            .font(.headline)
-                                            .foregroundStyle(.white)
-                                        Text(nextWorkout.type.displayName)
-                                            .font(.caption)
-                                            .foregroundStyle(.white.opacity(0.75))
-                                    }
-                                    Spacer()
-
-                                    if isTaskCompleted {
-                                        summaryButton(for: task)
-                                    } else {
-                                        playButton(for: task)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .padding(20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        LinearGradient(
-                            colors: [
-                                Color.accentColor.opacity(0.85),
-                                Color.accentColor.opacity(0.45)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                }
-
                 private func mealSummaryCard(meals: [Meal]) -> some View {
                     let totalCalories = meals.reduce(0) { $0 + $1.calories }
                     let mealCount = meals.count
@@ -682,44 +628,122 @@ private func continueResumableWorkout() {
                     }
                     .padding(20)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        LinearGradient(
-                            colors: [
-                                Color.orange.opacity(0.95),
-                                Color.pink.opacity(0.8)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .background(Color(red: 0.99, green: 0.98, blue: 0.95))
                     .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 }
 
-                private func playButton(for task: DailyTask) -> some View {
-                    Button {
-                        workoutContext = WorkoutLaunchContext(task: task, resumableState: nil)
-                    } label: {
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundStyle(Color.accentColor)
-                            .padding(10)
-                            .background(Color.white, in: Circle())
+                private func completedTrainingCard(for task: DailyTask) -> some View {
+                    let metrics = completionMetrics(for: task)
+                    return VStack(alignment: .leading, spacing: 16) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("今日训练完成 🎉")
+                                    .font(.headline)
+                                Text("用时 \(metrics.duration) 分 · 消耗 \(metrics.calories) 千卡")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "medal.fill")
+                                .font(.title2)
+                                .foregroundStyle(.yellow)
+                        }
+
+                        Button {
+                            appState.workoutSummary = (show: true, workouts: task.workouts)
+                        } label: {
+                            HStack {
+                                Text("回顾训练记录")
+                                Spacer()
+                                Image(systemName: "arrow.forward.circle.fill")
+                                    .font(.headline)
+                            }
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding()
+                            .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        }
                     }
-                    .buttonStyle(.plain)
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .fill(Color(UIColor.secondarySystemBackground))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .stroke(Color.primary.opacity(0.04), lineWidth: 1)
+                    )
                 }
 
-                private func summaryButton(for task: DailyTask) -> some View {
-                    Button {
-                        appState.workoutSummary = (show: true, workouts: task.workouts)
-                    } label: {
-                        Image(systemName: "list.bullet.clipboard")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(Color.accentColor)
-                            .padding(10)
-                            .background(Color.white, in: Circle())
-                            .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 2)
+                private var recoveryTipsSection: some View {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("恢复提醒")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        VStack(spacing: 12) {
+                            tipCard(
+                                icon: "fork.knife",
+                                title: "补充营养",
+                                message: "训练后 30 分钟补充优质蛋白质和碳水，帮助修复与补水。",
+                                buttonTitle: "记录饮食"
+                            ) {
+                                appState.selectedTab = 0
+                                NotificationCenter.default.post(name: .showInputSheet, object: nil)
+                            }
+                            tipCard(
+                                icon: "figure.cooldown",
+                                title: "拉伸放松",
+                                message: "花 5 分钟进行拉伸或泡沫轴放松，缓解肌肉酸痛。"
+                            )
+                        }
                     }
-                    .buttonStyle(.plain)
+                }
+
+                private func tipCard(icon: String, title: String, message: String, buttonTitle: String? = nil, action: (() -> Void)? = nil) -> some View {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 12) {
+                            Image(systemName: icon)
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(Color.accentColor)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(title)
+                                    .font(.subheadline.weight(.semibold))
+                                Text(message)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        if let title = buttonTitle, let action {
+                            Button(action: action) {
+                                Text(title)
+                                    .font(.caption.weight(.bold))
+                                    .padding(.vertical, 6)
+                                    .padding(.horizontal, 12)
+                                    .background(Color.accentColor.opacity(0.15), in: Capsule())
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(Color(UIColor.secondarySystemGroupedBackground))
+                    )
+                }
+
+                private func completionMetrics(for task: DailyTask) -> (duration: Int, calories: Int) {
+                    let duration = task.workouts.reduce(0) { partial, workout in
+                        if let minutes = workout.durationInMinutes {
+                            return partial + minutes
+                        } else if let seconds = workout.duration {
+                            return partial + Int(seconds / 60)
+                        }
+                        return partial
+                    }
+                    let calories = task.workouts.reduce(0) { $0 + $1.caloriesBurned }
+                    return (duration, calories)
                 }
 
                 private func mealSectionSubtitle(for meals: [Meal]) -> String {

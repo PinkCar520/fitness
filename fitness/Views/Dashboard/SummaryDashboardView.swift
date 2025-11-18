@@ -196,6 +196,7 @@ struct SummaryDashboardView: View {
                 EditDashboardView()
                     .environmentObject(dashboardViewModel) // Inject DashboardViewModel
                     .presentationDetents([.fraction(0.85)])
+                    .presentationDragIndicator(.visible)
             }
         }
     }
@@ -238,13 +239,10 @@ struct SummaryDashboardView: View {
             Button(action: { showEditSheet = true }) {
                 Text("编辑卡片")
                     .font(.headline)
-                    .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color(UIColor.secondarySystemGroupedBackground))
                     .cornerRadius(32)
-                    .foregroundColor(.primary)
             }
-            .buttonStyle(PlainButtonStyle())
+            .buttonStyle(.glass)
         }
         .padding(.vertical)
     }

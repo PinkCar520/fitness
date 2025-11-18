@@ -55,12 +55,6 @@ struct ContentView: View {
                         }
                         .tag(3)
 
-                    // Tab 5: Friends
-                    FriendsView()
-                        .tabItem {
-                            Image(systemName: "person.2.fill")
-                        }
-                        .tag(4)
                 }
 
                 .accentColor(appearanceViewModel.accentColor.color)

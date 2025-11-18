@@ -201,29 +201,35 @@ struct HistoryListView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                journeyContent
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button(action: { dismiss() }) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.title2)
-                                    .foregroundColor(.accentColor)
-                            }
+            journeyContent
+                .scrollIndicators(.hidden)
+                .scrollContentBackground(.hidden)
+                .toolbar {
+                    ToolbarItem() {
+                        Button(action: { dismiss() }) {
+                            Image(systemName: "checkmark")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(Color.black)
                         }
                     }
-                
-            }
+                }
+                .toolbar(removing: .title)
         }
-        .overlay(alignment: .bottom) { bottomControls }
+        .overlay(alignment: .bottomTrailing) {
+            bottomControls
+                .padding(.horizontal, 12)
+                .padding(.bottom, 4)
+                .ignoresSafeArea(.container, edges: .bottom)
+        }
         .onChange(of: selectedRange) { _ in
             currentPageIndex = 0
         }
     }
 
     private var journeyContent: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            ScrollView {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
                 header
                 summaryHero
 
@@ -237,10 +243,10 @@ struct HistoryListView: View {
 
                 timelineSection
             }
+            .padding(20)
+            .frame(maxWidth: .infinity)
+            .foregroundStyle(TrajectoryTheme.primaryText)
         }
-        .padding(20)
-        .frame(maxWidth: .infinity)
-        .foregroundStyle(TrajectoryTheme.primaryText)
     }
     
     private var header: some View {
@@ -509,39 +515,48 @@ struct HistoryListView: View {
     private var bottomControls: some View {
         let canGoPrev = safeCurrentIndex + 1 < pages.count
         let canGoNext = safeCurrentIndex > 0
-        return  GlassEffectContainer(spacing: 0) {
-            HStack(spacing: 12) {
-                Button {
-                    withAnimation {
-                        if canGoPrev { currentPageIndex += 1 }
+        return  GlassEffectContainer(spacing: 10) {
+            HStack(spacing: 0) {
+                VStack(spacing: 4) {
+                    Button {
+                        withAnimation {
+                            if canGoPrev { currentPageIndex += 1 }
+                        }
+                    } label: {
+                        LeftBadgesLabel()
                     }
-                } label: {
-                    LeftBadgesLabel()
-                        .frame(width: 24, height: 32)
+                    .frame(width: 48, height: 48)
+                    .contentShape(Circle())
+                    .glassEffect(.clear.interactive())
+                    .clipShape(Circle())
                 }
-                .buttonStyle(.glass)
-
+                .padding(.horizontal, 8)
+                
                 Picker("Range", selection: $selectedRange) {
                     ForEach(BodyProfileViewModel.TimeRange.allCases) { range in
                         Text(range.title).tag(range)
+                        
                     }
                 }
                 .pickerStyle(.segmented)
                 .controlSize(.extraLarge)
-                .glassEffect(.regular, in: .rect(cornerRadius: 24.0))
-
-                Button {
-                    withAnimation {
-                        if canGoNext { currentPageIndex -= 1 }
+                .glassEffect(.clear.interactive())
+                VStack(spacing: 4) {
+                    Button {
+                        withAnimation {
+                            if canGoNext { currentPageIndex -= 1 }
+                        }
+                    } label: {
+                        RightBadgesLabel()
                     }
-                } label: {
-                    RightBadgesLabel()
-                        .frame(width: 24, height: 32)
+                    .frame(width: 48, height: 48)
+                    .contentShape(Circle())
+                    .glassEffect(.clear.interactive())
+                    .clipShape(Circle())
                 }
-                .buttonStyle(.glass)
+                .padding(.horizontal, 8)
             }
         }
-        .padding()
     }
 
     private var emptyStateView: some View {

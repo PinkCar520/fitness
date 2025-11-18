@@ -38,6 +38,7 @@ struct PlanGoal: Codable, Hashable {
     var targetWeight: Double
     var startDate: Date
     var targetDate: Date?
+    var isProfessionalMode: Bool = false
 
     enum WeightGoalDirection: Equatable {
         case gain

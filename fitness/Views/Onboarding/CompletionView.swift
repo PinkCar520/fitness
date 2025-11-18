@@ -50,7 +50,7 @@ struct CompletionView: View {
         let calendar = Calendar.current
         let startDate = calendar.startOfDay(for: Date())
         let targetDate = calendar.date(byAdding: .day, value: planDuration, to: startDate)
-        let startWeight = latestWeight() ?? profile.targetWeight
+        let startWeight = profile.currentWeight ?? latestWeight() ?? profile.targetWeight
         let goal = profile.goal ?? .healthImprovement
 
         return PlanGoal(

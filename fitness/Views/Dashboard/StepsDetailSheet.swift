@@ -140,7 +140,7 @@ struct StepsDetailSheet: View {
                 }
                 .pickerStyle(.segmented)
                 .controlSize(.large)
-                .glassEffect(.regular,in: .rect(cornerRadius: 24.0))
+                .glassEffect()
                 .onChange(of: range) { _, newRange in
                     Task { await loadIfNeeded(newRange) }
                 }

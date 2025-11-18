@@ -28,7 +28,7 @@ struct GoalProgressView: View {
         return String(format: "%.1f", value)
     }
 
-    private var progressEvaluation: GoalProgressEvaluation? {
+    private var overallEvaluation: GoalProgressEvaluation? {
         guard
             let goal = planGoal,
             let baseline = startWeight
@@ -36,16 +36,27 @@ struct GoalProgressView: View {
         return GoalProgressEvaluator.evaluate(goal: goal, baselineWeight: baseline, currentWeight: currentWeightValue)
     }
 
+    private var weeklyEvaluation: WeeklyGoalProgressEvaluation? {
+        guard
+            let goal = planGoal,
+            let baseline = startWeight
+        else { return nil }
+        return GoalProgressEvaluator.evaluateWeekly(goal: goal, baselineWeight: baseline, metrics: weightMetrics)
+    }
+
     private var progress: Double {
-        progressEvaluation?.progress ?? 0.0
+        if let weekly = weeklyEvaluation {
+            return weekly.progress
+        }
+        return overallEvaluation?.progress ?? 0.0
     }
 
     private var progressColor: Color {
-        guard let evaluation = progressEvaluation else {
+        guard let status = weeklyEvaluation?.status ?? overallEvaluation?.status else {
             return Color.gray.opacity(0.35)
         }
 
-        switch evaluation.status {
+        switch status {
         case .onTrack:
             return .green
         case .ahead:
@@ -62,7 +73,7 @@ struct GoalProgressView: View {
     private var targetLabelText: String {
         guard let goal = planGoal else { return "-- KG" }
 
-        let direction = progressEvaluation?.direction ?? goal.weightGoalDirection(
+        let direction = (weeklyEvaluation?.direction ?? overallEvaluation?.direction) ?? goal.weightGoalDirection(
             baseline: startWeight,
             tolerance: GoalProgressEvaluator.defaultTolerance
         )
@@ -75,12 +86,27 @@ struct GoalProgressView: View {
         }
     }
 
+    private var weeklyStartLabel: String? {
+        guard let weekly = weeklyEvaluation else { return nil }
+        return String(format: "%.1f KG", weekly.actualStartWeight)
+    }
+
+    private var weeklyTargetLabel: String? {
+        guard let weekly = weeklyEvaluation else { return nil }
+        switch weekly.direction {
+        case .maintain:
+            return String(format: "%.1f KG ±%.1f KG", weekly.plannedEndWeight, weekly.tolerance)
+        case .gain, .lose:
+            return String(format: "%.1f KG", weekly.plannedEndWeight)
+        }
+    }
+
     var body: some View {
         Group {
             if let goal = planGoal {
                 let baseline = startWeight ?? goal.startWeight
-                let startLabel = String(format: "%.1f KG", baseline)
-                let targetLabel = targetLabelText
+                let startLabel = weeklyStartLabel ?? String(format: "%.1f KG", baseline)
+                let targetLabel = weeklyTargetLabel ?? targetLabelText
 
                 VStack(alignment: .leading) {
                     Text("目标进度")
@@ -117,6 +143,11 @@ struct GoalProgressView: View {
                             .offset(x: 70, y: 60)
                     }
                     .padding(.horizontal)
+
+                    if let weekly = weeklyEvaluation {
+                        weeklyMetaSection(weekly)
+                            .padding(.horizontal)
+                    }
                 }
                 .padding()
                 .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
@@ -124,6 +155,71 @@ struct GoalProgressView: View {
                 ContentUnavailableView("暂无计划", systemImage: "target")
                     .padding()
                     .background(Color(UIColor.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func weeklyMetaSection(_ weekly: WeeklyGoalProgressEvaluation) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("第\(weekly.weekNumber)/\(weekly.totalWeeks)周 · \(weekly.weekStartDate.shortDate) - \(weekly.weekEndDate.shortDate)")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+
+            HStack {
+                Label("本周目标 \(weeklyGoalChangeText(for: weekly))", systemImage: "target")
+                Spacer()
+                Text(weeklyRemainingText(for: weekly))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            if !weekly.hasRecordThisWeek {
+                Label("本周尚无体重记录", systemImage: "clock")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.top, 12)
+    }
+
+    private func weeklyGoalChangeText(for weekly: WeeklyGoalProgressEvaluation) -> String {
+        switch weekly.direction {
+        case .maintain:
+            return String(format: "±%.1f kg", weekly.tolerance)
+        case .gain, .lose:
+            if abs(weekly.plannedChange) < 0.01 {
+                return "0.0 kg"
+            }
+            return String(format: "%+.1f kg", weekly.plannedChange)
+        }
+    }
+
+    private func weeklyRemainingText(for weekly: WeeklyGoalProgressEvaluation) -> String {
+        if !weekly.hasRecordThisWeek {
+            switch weekly.direction {
+            case .maintain:
+                return "等待记录"
+            case .gain, .lose:
+                if weekly.targetDeltaMagnitude <= 0.01 {
+                    return "等待记录"
+                }
+                return String(format: "剩余 %.1f kg", weekly.targetDeltaMagnitude)
+            }
+        }
+
+        switch weekly.direction {
+        case .maintain:
+            if weekly.remainingDeltaMagnitude <= 0.01 {
+                return "已稳定"
+            } else {
+                return String(format: "偏差 %.1f kg", weekly.remainingDeltaMagnitude)
+            }
+        case .gain, .lose:
+            if weekly.remainingDeltaMagnitude <= 0.01 {
+                return "完成"
+            } else {
+                return String(format: "剩余 %.1f kg", weekly.remainingDeltaMagnitude)
             }
         }
     }

@@ -9,10 +9,7 @@ struct CalendarView: View {
 
     private let calendar = Calendar.current
     private var workingCalendar: Calendar {
-        var cal = calendar
-        cal.firstWeekday = 2
-        cal.minimumDaysInFirstWeek = 4
-        return cal
+        calendar
     }
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()

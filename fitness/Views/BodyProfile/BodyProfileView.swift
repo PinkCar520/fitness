@@ -20,8 +20,8 @@ struct BodyProfileView: View {
     
     @State private var showInputSheet = false
     @State private var showTrajectorySheet = false
-    @State private var selectedChartMetric: ChartableMetric = .weight
-    @State private var selectedRange: BodyProfileViewModel.TimeRange = .month
+    @State private var showBMIDetailSheet = false
+    @State private var showBodyFatDetailSheet = false
     @StateObject private var vm = BodyProfileViewModel()
     // Lines always shown by default (no toggles)
 
@@ -31,6 +31,9 @@ struct BodyProfileView: View {
     }
     private var latestBodyFat: Double {
         metrics.first(where: { $0.type == .bodyFatPercentage })?.value ?? 0
+    }
+    private var latestBodyFatRecordDate: Date? {
+        metrics.first(where: { $0.type == .bodyFatPercentage })?.date
     }
     private var bmi: Double { vm.bmi }
     private var latestWaistCircumference: Double {
@@ -58,104 +61,6 @@ struct BodyProfileView: View {
         latestValue(for: .waistToHipRatio) ?? 0
     }
 
-    private var chartData: [DateValuePoint] { vm.chartData }
-    
-    private var chartTitle: String {
-        "\(selectedChartMetric.rawValue)趋势"
-    }
-
-    private var chartXAxisRange: ClosedRange<Date>? {
-        guard supportsCustomXAxis(for: selectedRange) else { return nil }
-        let calendar = Calendar.current
-        let now = Date()
-        let startOfToday = calendar.startOfDay(for: now)
-        guard let start = calendar.date(byAdding: .day, value: -(selectedRange.days - 1), to: startOfToday) else {
-            return nil
-        }
-        return start...now
-    }
-
-    private var chartXAxisTicks: [Date]? {
-        guard let range = chartXAxisRange else { return nil }
-        let calendar = Calendar.current
-        switch selectedRange {
-        case .week:
-            return (0..<selectedRange.days).compactMap { offset in
-                calendar.date(byAdding: .day, value: offset, to: calendar.startOfDay(for: range.lowerBound))
-            }
-        case .month:
-            return centeredTicks(lowerBound: range.lowerBound, upperBound: range.upperBound, segments: 4)
-        case .quarter, .year:
-            let start = calendar.date(from: calendar.dateComponents([.year, .month], from: range.lowerBound)) ?? calendar.startOfDay(for: range.lowerBound)
-            return strideTicks(
-                startCandidate: start,
-                lowerBound: range.lowerBound,
-                upperBound: range.upperBound,
-                component: .month,
-                step: 1,
-                calendar: calendar
-            )
-        }
-    }
-
-    private func supportsCustomXAxis(for range: BodyProfileViewModel.TimeRange) -> Bool {
-        switch range {
-        case .week, .month, .quarter, .year:
-            return true
-        default:
-            return false
-        }
-    }
-    
-    private var chartColor: Color {
-        switch selectedChartMetric {
-        case .weight: return .blue
-        case .bodyFat: return .orange
-        case .waist: return .purple
-        case .heartRate: return .red
-        case .vo2Max: return .teal
-        }
-    }
-    
-    private var chartUnit: String {
-        switch selectedChartMetric {
-        case .weight: return "kg"
-        case .bodyFat: return "%"
-        case .waist: return "cm"
-        case .heartRate: return "bpm"
-        case .vo2Max: return "ml/kg/min"
-        }
-    }
-
-    private var chartXAxisFormat: Date.FormatStyle? {
-        let base = Date.FormatStyle.dateTime.locale(zhLocale)
-        switch selectedRange {
-        case .week, .month:
-            return base.month(.twoDigits).day(.twoDigits)
-        case .quarter, .year:
-            return nil
-        }
-    }
-
-    private var chartXAxisLabelProvider: ((Date) -> Text)? {
-        switch selectedRange {
-        case .quarter, .year:
-            let formatter = zhMonthFormatter
-            return { date in
-                Text(formatter.string(from: date))
-            }
-        default:
-            return nil
-        }
-    }
-
-    private var zhMonthFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.locale = zhLocale
-        formatter.dateFormat = "M月"
-        return formatter
-    }
-
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             ScrollView {
@@ -163,7 +68,6 @@ struct BodyProfileView: View {
                     emptyDataHintSection
                     currentIndicatorsSection
                     vo2QuickSection
-                    chartSection
                     additionalMetricsSection
                     bodyCompositionSection
                     visualRecordsSection
@@ -175,19 +79,28 @@ struct BodyProfileView: View {
         }
         .onAppear { refreshVM() }
         .onChange(of: metrics.map(\.date)) { _, _ in refreshVM() }
-        .onChange(of: selectedChartMetric) { refreshVM() }
-        .onChange(of: selectedRange) { refreshVM() }
-        .onReceive(NotificationCenter.default.publisher(for: .navigateToBodyProfileMetric)) { notif in
-            if let metric = notif.userInfo?["metric"] as? String {
-                if metric == "weight" { selectedChartMetric = .weight }
-                if metric == "bodyFat" { selectedChartMetric = .bodyFat }
-            }
-        }
         .sheet(isPresented: $showTrajectorySheet) {
             HistoryListView()
                 .environmentObject(weightManager)
-                .presentationDetents([.fraction(0.9)])
-                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showBMIDetailSheet) {
+            BMIDetailSheet(
+                bmi: bmi,
+                height: profileViewModel.userProfile.height,
+                latestWeight: vm.latestWeight,
+                category: vm.bmiCategory
+            )
+            .presentationDetents([.fraction(0.5), .fraction(0.9)])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showBodyFatDetailSheet) {
+            BodyFatDetailSheet(
+                bodyFat: vm.latestBodyFat,
+                gender: profileViewModel.userProfile.gender,
+                recordDate: latestBodyFatRecordDate
+            )
+            .presentationDetents([.fraction(0.5), .fraction(0.9)])
+            .presentationDragIndicator(.visible)
         }
     }
 
@@ -217,47 +130,6 @@ struct BodyProfileView: View {
             let items = [MetricDisplay(title: "VO2max", value: formatted(latest, precision: 1), unit: "ml/kg/min", icon: "lungs.fill", color: .teal)]
             metricSection(title: "心肺耐力", items: items)
         }
-    }
-
-    private var chartSection: some View {
-        VStack(spacing: 16) {
-            Picker("Select Metric", selection: $selectedChartMetric) {
-                ForEach(ChartableMetric.allCases) { metric in
-                    Text(metric.rawValue).tag(metric)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-
-            Picker("Range", selection: $selectedRange) {
-                ForEach(BodyProfileViewModel.TimeRange.allCases) { range in
-                    Text(range.title).tag(range)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-
-            let title = chartTitle
-            let data = chartData
-            let color = chartColor
-            let unit = chartUnit
-            let avg = vm.averageValue
-            let goal = (selectedChartMetric == .weight) ? vm.goalValue : nil
-            GenericLineChartView(
-                title: title,
-                data: data,
-                color: color,
-                unit: unit,
-                averageValue: avg,
-                goalValue: goal,
-                xAxisRange: chartXAxisRange,
-                xAxisTicks: chartXAxisTicks,
-                axisDateFormat: chartXAxisFormat,
-                axisLabelProvider: chartXAxisLabelProvider
-            )
-                .frame(minHeight: 220)
-        }
-        .padding(.horizontal)
     }
 
     private var additionalMetricsSection: some View {
@@ -385,50 +257,248 @@ struct BodyProfileView: View {
         }
     }
 
-    func strideTicks(
-        startCandidate: Date,
-        lowerBound: Date,
-        upperBound: Date,
-        component: Calendar.Component,
-        step: Int,
-        calendar: Calendar
-    ) -> [Date] {
-        var current = startCandidate
-        while current < lowerBound {
-            guard let next = calendar.date(byAdding: component, value: step, to: current) else { break }
-            current = next
-        }
-        var ticks: [Date] = []
-        while current <= upperBound {
-            ticks.append(current)
-            guard let next = calendar.date(byAdding: component, value: step, to: current) else { break }
-            current = next
-        }
-        return ticks
-    }
-
-    func centeredTicks(lowerBound: Date, upperBound: Date, segments: Int) -> [Date] {
-        guard segments > 0 else { return [] }
-        let duration = upperBound.timeIntervalSince(lowerBound)
-        guard duration > 0 else { return [lowerBound] }
-        let step = duration / Double(segments)
-        return (0..<segments).map { idx in
-            lowerBound.addingTimeInterval((Double(idx) + 0.5) * step)
-        }
-    }
 }
 
 private extension BodyProfileView {
     func refreshVM() {
-        vm.selectedMetric = selectedChartMetric
-        vm.timeRange = selectedRange
         vm.refresh(metrics: metrics, profile: profileViewModel.userProfile)
     }
 
     func handleMetricTap(_ item: MetricDisplay) {
         if item.title == "体重" {
             showTrajectorySheet = true
+        } else if item.title == "BMI" {
+            showBMIDetailSheet = true
+        } else if item.title == "体脂率" {
+            showBodyFatDetailSheet = true
         }
+    }
+}
+
+private struct BMIDetailSheet: View {
+    let bmi: Double
+    let height: Double
+    let latestWeight: Double?
+    let category: HealthStandards.BMICategory
+    
+    private let columns = [GridItem(.flexible()), GridItem(.flexible())]
+    
+    private var formattedBMI: String {
+        bmi > 0 ? String(format: "%.1f", bmi) : "--"
+    }
+    
+    private var heightText: String {
+        height > 0 ? "\(Int(round(height))) cm" : "--"
+    }
+    
+    private var weightText: String {
+        if let latestWeight, latestWeight > 0 {
+            return String(format: "%.1f kg", latestWeight)
+        }
+        return "--"
+    }
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Spacer()
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("BMI 详情")
+                        .font(.title3.bold())
+                    Text("根据身高与体重即时计算")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(formattedBMI)
+                        .font(.system(size: 46, weight: .heavy, design: .rounded))
+                    Text(category.displayTitle)
+                        .font(.headline)
+                        .foregroundColor(category.accentColor)
+                    Text(category.guidance)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(category.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                
+                LazyVGrid(columns: columns, spacing: 12) {
+                    infoTile(title: "最新体重", value: weightText, icon: "scalemass.fill")
+                    infoTile(title: "身高设置", value: heightText, icon: "ruler")
+                }
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("WHO 区间")
+                        .font(.headline)
+                    ForEach(HealthStandards.BMICategory.allCases) { band in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(band.displayTitle)
+                                    .font(.subheadline.bold())
+                                Text(band.rangeDescription)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            if band == category {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(band.accentColor)
+                            }
+                        }
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(band == category ? band.accentColor.opacity(0.12) : Color.gray.opacity(0.08))
+                        )
+                    }
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("计算方式")
+                        .font(.headline)
+                    Text("BMI = 体重(kg) ÷ 身高(m)²。建议结合体脂率等指标综合判断。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 24)
+        }
+        .scrollIndicators(.hidden)
+    }
+    
+    private func infoTile(title: String, value: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(title, systemImage: icon)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Text(value)
+                .font(.title3.bold())
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color(.systemGray6))
+        )
+    }
+}
+
+private struct BodyFatDetailSheet: View {
+    let bodyFat: Double?
+    let gender: Gender
+    let recordDate: Date?
+    
+    private var category: HealthStandards.BodyFatBand? {
+        guard let bodyFat, bodyFat > 0 else { return nil }
+        return HealthStandards.bodyFatBand(gender: gender, value: bodyFat)
+    }
+    
+    private var valueText: String {
+        guard let bodyFat, bodyFat > 0 else { return "--" }
+        return String(format: "%.1f%%", bodyFat)
+    }
+    
+    private var recordDateText: String {
+        guard let recordDate else { return "暂无记录" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh-Hans")
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: recordDate)
+    }
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Spacer()
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("体脂率详情")
+                        .font(.title3.bold())
+                    Text("结合性别差异的健康区间")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(valueText)
+                        .font(.system(size: 42, weight: .heavy, design: .rounded))
+                    Text(category?.displayTitle ?? "等待记录")
+                        .font(.headline)
+                        .foregroundColor(category?.accentColor ?? .secondary)
+                    Text(category?.guidance ?? "记录体脂率，解锁更精确的身体成分分析。")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill((category?.accentColor ?? .gray).opacity(0.12))
+                )
+                
+                HStack(spacing: 12) {
+                    infoTile(title: "最近记录", value: recordDateText, icon: "calendar")
+                    infoTile(title: "性别设定", value: gender.rawValue, icon: "figure.stand")
+                }
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("参考区间 (\(gender.rawValue))")
+                        .font(.headline)
+                    ForEach(HealthStandards.BodyFatBand.allCases) { band in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(band.displayTitle)
+                                    .font(.subheadline.bold())
+                                Text(band.rangeDescription(for: gender))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            if band == category {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(band.accentColor)
+                            }
+                        }
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(band == category ? band.accentColor.opacity(0.12) : Color.gray.opacity(0.08))
+                        )
+                    }
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("提示")
+                        .font(.headline)
+                    Text("体脂率受水分、饮食、测量方式影响，建议固定时间点测量，并结合围度、体重等指标综合判断。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 24)
+        }
+        .scrollIndicators(.hidden)
+    }
+    
+    private func infoTile(title: String, value: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(title, systemImage: icon)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Text(value)
+                .font(.title3.bold())
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color(.systemGray6))
+        )
     }
 }
 
@@ -469,6 +539,103 @@ struct MetricDisplay: Identifiable {
         self.unit = unit
         self.icon = icon
         self.color = color
+    }
+}
+
+extension HealthStandards.BMICategory: CaseIterable, Identifiable {
+    static var allCases: [HealthStandards.BMICategory] { [.underweight, .normal, .overweight, .obese] }
+    var id: HealthStandards.BMICategory { self }
+}
+
+private extension HealthStandards.BMICategory {
+    var displayTitle: String {
+        switch self {
+        case .underweight: return "偏瘦"
+        case .normal: return "标准"
+        case .overweight: return "超重"
+        case .obese: return "肥胖"
+        }
+    }
+    
+    var rangeDescription: String {
+        switch self {
+        case .underweight: return "< 18.5"
+        case .normal: return "18.5 – 24.9"
+        case .overweight: return "25 – 29.9"
+        case .obese: return "≥ 30"
+        }
+    }
+    
+    var guidance: String {
+        switch self {
+        case .underweight: return "适度增加热量与力量训练，帮助提升瘦体重。"
+        case .normal: return "保持当前饮食与训练节奏，继续跟踪体脂等指标。"
+        case .overweight: return "结合控热与耐力训练，逐步回到健康区间。"
+        case .obese: return "建议循序渐进调整饮食，并搭配低冲击训练。"
+        }
+    }
+    
+    var accentColor: Color {
+        switch self {
+        case .underweight: return .teal
+        case .normal: return .green
+        case .overweight: return .orange
+        case .obese: return .red
+        }
+    }
+}
+
+extension HealthStandards.BodyFatBand: CaseIterable, Identifiable {
+    static var allCases: [HealthStandards.BodyFatBand] { [.athletic, .fit, .average, .high] }
+    var id: HealthStandards.BodyFatBand { self }
+}
+
+private extension HealthStandards.BodyFatBand {
+    var displayTitle: String {
+        switch self {
+        case .athletic: return "运动型"
+        case .fit: return "良好"
+        case .average: return "平均"
+        case .high: return "偏高"
+        }
+    }
+    
+    func rangeDescription(for gender: Gender) -> String {
+        switch (gender, self) {
+        case (.male, .athletic): return "< 10%"
+        case (.male, .fit): return "10% – 16%"
+        case (.male, .average): return "17% – 24%"
+        case (.male, .high): return "≥ 25%"
+        case (.female, .athletic): return "< 18%"
+        case (.female, .fit): return "18% – 24%"
+        case (.female, .average): return "25% – 31%"
+        case (.female, .high): return "≥ 32%"
+        case (.preferNotToSay, _):
+            switch self {
+            case .athletic: return "< 15%"
+            case .fit: return "15% – 22%"
+            case .average: return "23% – 30%"
+            case .high: return "≥ 31%"
+            }
+        }
+    }
+    
+    var guidance: String {
+        switch self {
+        case .athletic: return "训练状态良好，注意补充能量并保持恢复。"
+        case .fit: return "身体成分优秀，可持续当前训练节奏。"
+        case .average: return "处于正常范围，可搭配力量+有氧稳步优化。"
+        case .high: return "建议关注饮食结构，并循序渐进增加活动量。"
+        }
+    }
+    
+    var accentColor: Color {
+        switch self {
+        case .athletic: return .teal
+        case .fit: return .green
+        case .average: return .orange
+        case .high: return .red
+        }
     }
 }
 
