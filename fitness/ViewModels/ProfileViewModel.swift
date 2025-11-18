@@ -9,7 +9,7 @@ final class ProfileViewModel: ObservableObject {
     @Published var userProfile: UserProfile
 
     private let userDefaultsKey = "userProfile"
-    private let appGroup = "group.com.pineapple.fitness"
+    private let appGroup = AppGroup.suiteName
 
     // Computed property to get the avatar UIImage
     var displayAvatar: UIImage {

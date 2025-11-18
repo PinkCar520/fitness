@@ -36,21 +36,18 @@ struct InputSheetView: View {
                         }
                     }
                     .pickerStyle(SegmentedPickerStyle())
+                    .controlSize(.regular)
+                    .glassEffect(.regular,in: .rect(cornerRadius: 24.0))
                     
                     switch selectedMetric {
                     case .weight:
                         VStack(alignment: .leading, spacing: 8) {
                             Text("体重").font(.headline)
                             WeightSlider(weight: $currentWeight, initialWeight: baseWeight)
-                            if !isWeightValid(currentWeight) {
-                                Text("体重必须在30到200公斤之间。")
-                                    .foregroundColor(.red).font(.footnote)
-                            } else {
-                                Text("测量建议：晨起空腹，以保证数据一致性")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .frame(maxWidth: .infinity, alignment: .trailing)
-                            }
+                            Text("测量建议：晨起空腹，以保证数据一致性")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .trailing)
                         }
                     case .bodyFatPercentage:
                         VStack(alignment: .leading, spacing: 8) {
@@ -122,7 +119,7 @@ struct InputSheetView: View {
     private func isSaveButtonDisabled() -> Bool {
         switch selectedMetric {
         case .weight:
-            return !isWeightValid(currentWeight)
+            return currentWeight == nil
         case .bodyFatPercentage:
             return !isBodyFatValid(bodyFatPercentage)
         case .waistCircumference:
@@ -132,11 +129,6 @@ struct InputSheetView: View {
         }
     }
 
-    private func isWeightValid(_ w: Double?) -> Bool {
-        guard let weightValue = w else { return false } 
-        return (30...200).contains(weightValue)
-    }
-    
     private func isBodyFatValid(_ p: Double?) -> Bool {
         guard let percentageValue = p else { return false } 
         return (3...50).contains(percentageValue)
@@ -152,7 +144,7 @@ struct InputSheetView: View {
         
         switch selectedMetric {
         case .weight:
-            if let value = currentWeight, isWeightValid(value) {
+            if let value = currentWeight {
                 metricToSave = HealthMetric(date: date, value: value, type: .weight)
             }
         case .bodyFatPercentage:

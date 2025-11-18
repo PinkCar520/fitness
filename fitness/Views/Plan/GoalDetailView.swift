@@ -52,6 +52,24 @@ struct GoalDetailView: View {
                     .fontWeight(.bold)
                     .padding(.horizontal)
 
+                if goal.isProfessionalMode {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "cross.case.fill")
+                            .foregroundColor(.red)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("专业模式已启用")
+                                .font(.subheadline.weight(.bold))
+                            Text("当前目标在医生/教练指导下放宽限制，若状态已改变，可返回计划设置关闭专业模式。")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding()
+                    .background(Color.red.opacity(0.12))
+                    .cornerRadius(16)
+                    .padding(.horizontal)
+                }
+
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Image(systemName: "target")

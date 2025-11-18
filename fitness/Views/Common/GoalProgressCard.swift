@@ -28,6 +28,71 @@ struct GoalProgressCard: View {
         return goal.resolvedStartWeight(from: weightMetrics)
     }
 
+    private var overallEvaluation: GoalProgressEvaluation? {
+        guard
+            let goal = planGoal,
+            let baseline = resolvedStartWeight
+        else { return nil }
+        return GoalProgressEvaluator.evaluate(goal: goal, baselineWeight: baseline, currentWeight: weightMetrics.last?.value)
+    }
+
+    private var weeklyEvaluation: WeeklyGoalProgressEvaluation? {
+        guard
+            let goal = planGoal,
+            let baseline = resolvedStartWeight
+        else { return nil }
+        return GoalProgressEvaluator.evaluateWeekly(goal: goal, baselineWeight: baseline, metrics: weightMetrics)
+    }
+
+    private var progressValue: Double {
+        if let weekly = weeklyEvaluation {
+            return weekly.progress
+        }
+        return overallEvaluation?.progress ?? 0.0
+    }
+
+    private var progressColor: Color {
+        guard let status = weeklyEvaluation?.status ?? overallEvaluation?.status else {
+            return Color.gray.opacity(0.35)
+        }
+
+        switch status {
+        case .onTrack:
+            return .green
+        case .ahead:
+            return .orange
+        case .behind:
+            return .red
+        case .inProgress:
+            return .accentColor
+        case .notStarted:
+            return Color.gray.opacity(0.5)
+        }
+    }
+
+    private var completionMessage: String {
+        guard let evaluation = overallEvaluation else { return "恭喜你目标达成" }
+        switch evaluation.direction {
+        case .gain:
+            return "已达成增重目标"
+        case .lose:
+            return "已达成减重目标"
+        case .maintain:
+            return "体重保持稳定"
+        }
+    }
+
+    private var goalDirection: PlanGoal.WeightGoalDirection? {
+        if let evaluation = overallEvaluation {
+            return evaluation.direction
+        }
+        guard let goal = planGoal else { return nil }
+        return goal.weightGoalDirection(
+            baseline: resolvedStartWeight,
+            tolerance: GoalProgressEvaluator.defaultTolerance
+        )
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             if planGoal == nil {
@@ -102,7 +167,7 @@ struct GoalProgressCard: View {
     }
 
     private var progressSection: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 12) {
             ZStack {
                 SemicircleShape()
                     .stroke(style: StrokeStyle(lineWidth: 10, lineCap: .round, dash: [0, 12]))
@@ -112,7 +177,7 @@ struct GoalProgressCard: View {
                 SemicircleShape(progress: progressValue)
                     .trim(from: 0, to: progressValue)
                     .stroke(style: StrokeStyle(lineWidth: 10, lineCap: .round, dash: [0, 12]))
-                    .foregroundStyle(progressValue >= 1.0 ? Color.orange : Color.green)
+                    .foregroundStyle(progressColor)
                     .frame(height: 100)
 
                 progressInnerContent
@@ -125,7 +190,7 @@ struct GoalProgressCard: View {
             }
 
             HStack {
-                Text(startWeightLabel)
+                Text(weeklyStartWeightLabel)
                     .font(.caption2)
                     .foregroundStyle(.gray)
                     .offset(x: 20)
@@ -134,30 +199,63 @@ struct GoalProgressCard: View {
                     .font(.caption2)
                     .foregroundColor(.gray)
                 Spacer()
-                Text(targetWeightLabel)
+                Text(weeklyTargetWeightLabel)
                     .font(.caption2)
                     .foregroundStyle(.gray)
                     .offset(x: -20)
             }
             .padding(.horizontal, 20)
+
+            if let weekly = weeklyEvaluation {
+                weeklySummary(for: weekly)
+            }
         }
-        .frame(height: 80)
+    }
+
+    @ViewBuilder
+    private func weeklySummary(for weekly: WeeklyGoalProgressEvaluation) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Text("第\(weekly.weekNumber)/\(weekly.totalWeeks)周目标")
+                    .font(.caption.weight(.semibold))
+                Spacer()
+                Text("\(weekly.weekStartDate.shortDate) - \(weekly.weekEndDate.shortDate)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack {
+                Text("本周目标 \(weeklyGoalChangeText(for: weekly))")
+                Spacer()
+                Text(weeklyRemainingText(for: weekly))
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+
+            if !weekly.hasRecordThisWeek {
+                Text("本周尚无体重记录")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 12)
     }
 
     private var progressInnerContent: some View {
         Group {
-            if progressValue >= 1.0 {
+            if let evaluation = overallEvaluation, evaluation.isCompleted {
                 VStack(spacing: 4) {
                     Image(systemName: "trophy.fill")
-                        .foregroundColor(.orange)
+                        .foregroundColor(progressColor)
                         .font(.title2)
-                    Text("目标已达成")
+                        .contentTransition(.numericText(countsDown: false))
+
+                    Text(completionMessage)
                         .font(.system(size: 20))
                         .fontWeight(.bold)
-                        .foregroundColor(.orange)
+                        .foregroundColor(progressColor)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.clear)
+                .offset(y: 20)
             } else if progressValue > 0 {
                 HStack(spacing: 0) {
                     Text("\(Int(progressValue * 100))")
@@ -172,16 +270,18 @@ struct GoalProgressCard: View {
                 }
                 .offset(y: 20)
             } else {
-                VStack(spacing: 4) {
-                    Image(systemName: "flame.fill")
-                        .foregroundColor(.red)
-                        .font(.title2)
-                    Text("继续加油")
-                        .font(.system(size: 18))
+                HStack(spacing: 0) {
+                    Text("0")
+                        .font(.system(size: 48))
                         .fontWeight(.bold)
-                        .foregroundColor(.red)
+                        .contentTransition(.numericText(countsDown: false))
+                        .foregroundColor(.gray)
+                    Text("%")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .offset(y: 10)
                 }
-                .frame(width: 100, height: 100)
+                .offset(y: 20)
             }
         }
     }
@@ -249,39 +349,49 @@ struct GoalProgressCard: View {
         return (whole, fractional)
     }
 
-    private var startWeightLabel: String {
+    private var weeklyStartWeightLabel: String {
+        if let weekly = weeklyEvaluation {
+            return String(format: "%.1f kg", weekly.actualStartWeight)
+        }
         if let start = resolvedStartWeight {
             return String(format: "%.1f kg", start)
         }
         return "--"
     }
 
-    private var targetWeightLabel: String {
-        if let target = planGoal?.targetWeight {
-            return String(format: "%.1f kg", target)
+    private var weeklyTargetWeightLabel: String {
+        if let weekly = weeklyEvaluation {
+            switch weekly.direction {
+            case .maintain:
+                return String(format: "%.1f kg ±%.1f kg", weekly.plannedEndWeight, weekly.tolerance)
+            case .gain, .lose:
+                return String(format: "%.1f kg", weekly.plannedEndWeight)
+            }
         }
-        return "--"
+
+        guard let goal = planGoal else { return "--" }
+
+        let direction = goalDirection ?? goal.weightGoalDirection(
+            baseline: resolvedStartWeight,
+            tolerance: GoalProgressEvaluator.defaultTolerance
+        )
+
+        switch direction {
+        case .maintain:
+            return String(format: "%.1f kg ±%.1f kg", goal.targetWeight, GoalProgressEvaluator.defaultTolerance)
+        case .gain, .lose:
+            return String(format: "%.1f kg", goal.targetWeight)
+        }
     }
 
     private var latestDateText: String {
+        if let weekly = weeklyEvaluation, weekly.hasRecordThisWeek {
+            return weekly.latestRecordDate.MMddHHmm
+        }
         if let record = weightMetrics.last {
             return "\(record.date.MMddHHmm)"
         }
         return "暂无记录"
-    }
-
-    private var progressValue: Double {
-        guard
-            let goal = planGoal,
-            let baseline = resolvedStartWeight,
-            let current = weightMetrics.last?.value
-        else {
-            return 0.0
-        }
-        let totalChange = goal.targetWeight - baseline
-        guard totalChange != 0 else { return current == goal.targetWeight ? 1.0 : 0.0 }
-        let progress = (current - baseline) / totalChange
-        return max(0, min(1, progress))
     }
 
     private var comparisonChange: (change: String, color: Color, description: String) {
@@ -290,16 +400,99 @@ struct GoalProgressCard: View {
         let latest = weightMetrics.last!
         let previous = weightMetrics[weightMetrics.count - 2]
         let change = latest.value - previous.value
+        let formattedChange: String
 
         let dayDifference = Calendar.current.dateComponents([.day], from: previous.date, to: latest.date).day ?? 0
         let description = dayDifference <= 1 ? "对比上次" : "对比\(dayDifference)天前"
 
         if abs(change) < 0.01 {
-            return ("0.0 kg", .primary, description)
+            formattedChange = "0.0 kg"
         } else if change > 0 {
-            return (String(format: "+%.1f kg", change), .red, description)
+            formattedChange = String(format: "+%.1f kg", change)
         } else {
-            return (String(format: "%.1f kg", change), .green, description)
+            formattedChange = String(format: "%.1f kg", change)
+        }
+
+        guard let goal = planGoal else {
+            return (formattedChange, .primary, description)
+        }
+
+        let direction = goalDirection ?? goal.weightGoalDirection(
+            baseline: resolvedStartWeight,
+            tolerance: GoalProgressEvaluator.defaultTolerance
+        )
+
+        let color: Color
+        switch direction {
+        case .gain:
+            if abs(change) < 0.01 {
+                color = .primary
+            } else {
+                color = change > 0 ? .green : .red
+            }
+        case .lose:
+            if abs(change) < 0.01 {
+                color = .primary
+            } else {
+                color = change < 0 ? .green : .red
+            }
+        case .maintain:
+            if abs(change) < 0.01 {
+                color = .primary
+            } else {
+                let latestDistance = abs(latest.value - goal.targetWeight)
+                let previousDistance = abs(previous.value - goal.targetWeight)
+                if latestDistance < previousDistance {
+                    color = .green
+                } else if latestDistance > previousDistance {
+                    color = .orange
+                } else {
+                    color = .primary
+                }
+            }
+        }
+
+        return (formattedChange, color, description)
+    }
+
+    private func weeklyGoalChangeText(for weekly: WeeklyGoalProgressEvaluation) -> String {
+        switch weekly.direction {
+        case .maintain:
+            return String(format: "±%.1f kg", weekly.tolerance)
+        case .gain, .lose:
+            if abs(weekly.plannedChange) < 0.01 {
+                return "0.0 kg"
+            }
+            return String(format: "%+.1f kg", weekly.plannedChange)
+        }
+    }
+
+    private func weeklyRemainingText(for weekly: WeeklyGoalProgressEvaluation) -> String {
+        if !weekly.hasRecordThisWeek {
+            switch weekly.direction {
+            case .maintain:
+                return "等待记录"
+            case .gain, .lose:
+                if weekly.targetDeltaMagnitude <= 0.01 {
+                    return "等待记录"
+                }
+                return String(format: "剩余 %.1f kg", weekly.targetDeltaMagnitude)
+            }
+        }
+
+        switch weekly.direction {
+        case .maintain:
+            if weekly.remainingDeltaMagnitude <= 0.01 {
+                return "已稳定"
+            } else {
+                return String(format: "偏差 %.1f kg", weekly.remainingDeltaMagnitude)
+            }
+        case .gain, .lose:
+            if weekly.remainingDeltaMagnitude <= 0.01 {
+                return "完成"
+            } else {
+                return String(format: "剩余 %.1f kg", weekly.remainingDeltaMagnitude)
+            }
         }
     }
 }
@@ -319,7 +512,7 @@ struct GoalProgressCard_Previews: PreviewProvider {
                 type: .weight
             )
         )
-        context.insert(HealthMetric(date: Date(), value: 70.5, type: .weight))
+        context.insert(HealthMetric(date: Date(), value: 70, type: .weight))
 
         let planGoal = PlanGoal(
             fitnessGoal: .fatLoss,

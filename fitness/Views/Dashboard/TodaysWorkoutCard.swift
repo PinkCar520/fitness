@@ -8,40 +8,21 @@ struct TodaysWorkoutCard: View {
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            if dailyTask.isCompleted {
-                completedContent()
+        if dailyTask.isCompleted {
+            completedContent()
+        } else {
+            if isNoActivePlan {
+                noPlanContent()
+            } else if dailyTask.workouts.isEmpty {
+                restDayContent()
             } else {
-                header()
-
-                if isNoActivePlan {
-                    noPlanContent()
-                } else if dailyTask.workouts.isEmpty {
-                    restDayContent()
-                } else {
-                    nextWorkoutContent(for: dailyTask)
-                }
+                nextWorkoutContent(for: dailyTask)
             }
         }
-        .padding()
-        .background(
-            Color(UIColor.secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: 20)
-        )
     }
 }
 
-private extension TodaysWorkoutCard {
-    @ViewBuilder
-    func header() -> some View {
-        HStack {
-            Text("今日计划")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-    }
-    
+private extension TodaysWorkoutCard {    
     @ViewBuilder
     func noPlanContent() -> some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -93,83 +74,56 @@ private extension TodaysWorkoutCard {
     @ViewBuilder
     func nextWorkoutContent(for task: DailyTask) -> some View {
         if let workout = task.workouts.first {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
+            Button {
+                appState.selectedTab = 1
+            } label: {
+                HStack(alignment: .center, spacing: 12) {
+                    // Icon (match QuickActionButton style)
                     Image(systemName: "flame.fill")
-                        .foregroundStyle(.white.opacity(0.9))
-                        .padding(6)
-                        .background(Color.accentColor.opacity(0.6))
-                        .clipShape(Circle())
-                    
+                        .font(.title3.weight(.semibold))
+                        .frame(width: 36, height: 36)
+                        .background(Color.accentColor.opacity(0.15), in: Circle())
+                        .foregroundColor(.accentColor)
+
                     VStack(alignment: .leading, spacing: 4) {
                         Text("下一项训练")
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.7))
+                            .font(.headline.weight(.semibold))
+                            .foregroundColor(.primary)
                         Text(workout.name)
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.white)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        // Inline info chips
+                        HStack(spacing: 8) {
+                            if let sets = workout.sets, !sets.isEmpty {
+                                InfoChip(icon: "repeat", text: "\(sets.count) 组", tint: .secondary, backgroundColor: Color.primary.opacity(0.06))
+                            }
+                            if let duration = workout.durationInMinutes {
+                                InfoChip(icon: "stopwatch", text: "\(duration) 分钟", tint: .secondary, backgroundColor: Color.primary.opacity(0.06))
+                            }
+                            if workout.caloriesBurned > 0 {
+                                InfoChip(icon: "flame.fill", text: "\(workout.caloriesBurned) 千卡", tint: .secondary, backgroundColor: Color.primary.opacity(0.06))
+                            }
+                        }
                     }
-                    
+
                     Spacer()
-                    
-                    Text("\(task.workouts.count) 项")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white.opacity(0.85))
-                        .padding(.vertical, 4)
-                        .padding(.horizontal, 10)
-                        .background(Color.white.opacity(0.15), in: Capsule())
-                }
-                
-                HStack(spacing: 8) {
-                    if workout.type == .strength,
-                       let sets = workout.sets,
-                       !sets.isEmpty {
-                        infoCapsule(text: "\(sets.count) 组", icon: "repeat")
-                    }
-                    
-                    if workout.type == .cardio,
-                       let duration = workout.durationInMinutes {
-                        infoCapsule(text: "\(duration) 分钟", icon: "stopwatch")
-                    }
-                    
-                    if workout.caloriesBurned > 0 {
-                        infoCapsule(text: "\(workout.caloriesBurned) 千卡", icon: "flame.fill")
-                    }
-                }
-                
-                Button {
-                    appState.selectedTab = 1
-                } label: {
-                    HStack(spacing: 6) {
-                        Text("查看计划")
-                            .font(.footnote)
-                            .fontWeight(.semibold)
+
+                    // Count + chevron
+                    VStack(alignment: .trailing, spacing: 6) {
+                        InfoChip(icon: nil, text: "\(task.workouts.count) 项", tint: .secondary, backgroundColor: Color.primary.opacity(0.06))
                         Image(systemName: "chevron.right")
-                            .font(.footnote)
+                            .font(.footnote.weight(.semibold))
+                            .foregroundColor(.secondary)
                     }
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 14)
-                    .background(Color.white.opacity(0.18), in: Capsule())
-                    .foregroundStyle(.white)
                 }
-                .buttonStyle(.plain)
-                .accessibilityHint("切换到计划页查看详情")
-            }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                LinearGradient(
-                    colors: [
-                        Color.accentColor.opacity(0.85),
-                        Color.accentColor.opacity(0.45)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(Color(UIColor.secondarySystemGroupedBackground))
                 )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            }
+            .buttonStyle(.plain)
         } else {
             restDayContent()
         }

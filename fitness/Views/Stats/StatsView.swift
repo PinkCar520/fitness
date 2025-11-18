@@ -32,10 +32,17 @@ struct StatsView: View {
         }
     }
     @State private var selectedTimeFrame: TimeFrame = .thirtyDays
+    
+    @StateObject private var viewModel = StatsViewModel()
+    
+    
 
     // Environment & Data Sources
     @EnvironmentObject var healthKitManager: HealthKitManager
+    @EnvironmentObject var appState: AppState
     @Query(sort: \Workout.date, order: .reverse) private var workouts: [Workout]
+    @Query(sort: \HealthMetric.date, order: .forward) private var allMetrics: [HealthMetric]
+    @Query(filter: #Predicate<Plan> { $0.status == "active" }) private var activePlans: [Plan]
 
     // State for fetched data
     @State private var totalCalories: Double = 0
@@ -106,6 +113,7 @@ struct StatsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    emptyStateBanner
                     // Time Frame Picker
                     Picker("Time Frame", selection: $selectedTimeFrame) {
                         ForEach(TimeFrame.allCases) { timeFrame in
@@ -113,14 +121,15 @@ struct StatsView: View {
                         }
                     }
                     .pickerStyle(.segmented)
-
+                    .controlSize(.large)
+        
                     // Core Metrics Grid
                     VStack(alignment: .leading) {
                         Text("核心指标")
                             .font(.title3).bold()
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                            MetricCard(title: "运动天数", value: "\(workoutDays)", unit: "天", icon: "figure.walk", color: .orange)
-                            MetricCard(title: "总消耗", value: String(format: "%.0f", totalCalories), unit: "千卡", icon: "flame.fill", color: .red)
+                            MetricCard(title: "运动天数", value: "\(viewModel.workoutDays)", unit: "天", icon: "figure.walk", color: .orange)
+                            MetricCard(title: "总消耗", value: String(format: "%.0f", viewModel.totalCalories), unit: "千卡", icon: "flame.fill", color: .red)
                         }
                     }
 
@@ -130,28 +139,170 @@ struct StatsView: View {
                     // Workout Type Distribution
                     WorkoutTypePieChartView(data: workoutTypeDistributionData)
                     
+                    // Daily Calories
+                    GenericLineChartView(
+                        title: "每日消耗（卡路里）",
+                        data: dailyCaloriesSeries,
+                        color: .pink,
+                        unit: "kcal"
+                    )
+
                     // Personal Records
                     PersonalRecordsView(records: personalRecords)
-
-
                 }
                 .padding()
             }
             .navigationTitle("统计")
-            .onAppear(perform: fetchData)
-            .onChange(of: selectedTimeFrame) { 
-                fetchData()
-            }
+            .onAppear(perform: refreshAll)
+            .onChange(of: selectedTimeFrame) { _, _ in refreshAll() }
+            
+            
         }
     }
 
-    private func fetchData() {
+    // execution summary section removed per request
+
+    // MARK: - Single-container Sections (to be removed in rollback)
+    private var overviewSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("核心指标").font(.title3).bold()
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                MetricCard(title: "运动天数", value: "\(viewModel.workoutDays)", unit: "天", icon: "figure.walk", color: .orange)
+                MetricCard(title: "总消耗", value: String(format: "%.0f", viewModel.totalCalories), unit: "千卡", icon: "flame.fill", color: .red)
+            }
+            GenericLineChartView(
+                title: "每日消耗（迷你）",
+                data: dailyCaloriesSeries,
+                color: .pink,
+                unit: "kcal"
+            )
+            .frame(height: 180)
+        }
+    }
+
+    // floatingTimeFramePicker removed in rollback
+
+    private var trendSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("趋势").font(.title3).bold()
+            TabView {
+                GenericLineChartView(
+                    title: "每日消耗（卡路里）",
+                    data: dailyCaloriesSeries,
+                    color: .pink,
+                    unit: "kcal"
+                )
+                .padding(.vertical)
+                .tag(0)
+
+                WorkoutFrequencyChartView(data: workoutFrequencyData)
+                    .padding(.vertical)
+                    .tag(1)
+            }
+            .frame(height: 280)
+            .tabViewStyle(.page(indexDisplayMode: .always))
+        }
+    }
+
+    private var distributionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("分布").font(.title3).bold()
+            WorkoutTypePieChartView(data: workoutTypeDistributionData)
+        }
+    }
+
+    private func refreshAll() {
         healthKitManager.fetchTotalActiveEnergy(for: selectedTimeFrame.days) { calories in
-            self.totalCalories = calories
+            self.viewModel.totalCalories = calories
         }
         healthKitManager.fetchWorkoutDays(for: selectedTimeFrame.days) { days in
-            self.workoutDays = days
+            self.viewModel.workoutDays = days
         }
+        // execution summary removed; no computation here
+    }
+
+    // buildExecutionSummary removed per request
+
+    // MARK: - Permission & Empties
+    // permissionBanner removed per design
+
+    private var emptyStateBanner: some View {
+        Group {
+            if relevantWorkouts.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("暂无训练记录")
+                        .font(.headline)
+                    Text("开始一次训练或从计划页选择今日任务，完成后这里会展示分析数据。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button {
+                        appState.selectedTab = 1
+                    } label: { Label("前往计划页", systemImage: "figure.run") }
+                    .buttonStyle(.bordered)
+                }
+                .padding()
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(12)
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    private func openHealthApp() {
+        if let url = URL(string: "x-apple-health://"), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        } else if let url = URL(string: UIApplication.openSettingsURLString), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        }
+    }
+
+    @ViewBuilder private func infoBanner(text: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "info.circle")
+            Text(text).font(.caption)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(10)
+        .padding(.horizontal)
+    }
+
+    // Heatmap section removed per request
+
+    private func dateRange(from start: Date, to end: Date) -> [Date] {
+        var days: [Date] = []
+        var d = start
+        let cal = Calendar.current
+        while d <= end {
+            days.append(d)
+            d = cal.date(byAdding: .day, value: 1, to: d) ?? d
+        }
+        return days
+    }
+
+    // MARK: - Type Efficiency
+    // typeEfficiencySection removed per request
+
+    // MARK: - Calories series by day (from workouts)
+    private var dailyCaloriesSeries: [DateValuePoint] {
+        let cal = Calendar.current
+        let now = cal.startOfDay(for: Date())
+        let start = cal.date(byAdding: .day, value: -selectedTimeFrame.days + 1, to: now) ?? now
+        let relevant = workouts.filter { $0.date >= start && $0.date <= now }
+        let grouped = Dictionary(grouping: relevant, by: { cal.startOfDay(for: $0.date) })
+        let days = dateRange(from: start, to: now)
+        return days.map { day in
+            let sum = (grouped[day] ?? []).reduce(0) { $0 + $1.caloriesBurned }
+            return DateValuePoint(date: day, value: Double(sum))
+        }
+    }
+
+    private func shiftTimeFrame(by offset: Int) {
+        guard let currentIndex = TimeFrame.allCases.firstIndex(of: selectedTimeFrame) else { return }
+        let newIndex = currentIndex + offset
+        guard TimeFrame.allCases.indices.contains(newIndex) else { return }
+        selectedTimeFrame = TimeFrame.allCases[newIndex]
     }
 }
 

@@ -11,8 +11,8 @@ struct SummaryDashboardView: View {
     @Binding var showInputSheet: Bool
     @State private var showSettingsSheet = false
     @State private var showEditSheet = false // For the new edit sheet
-    @State private var overviewImage: UIImage?
-    @State private var showShareSheet = false
+    @State private var showStepsSheet = false
+    @State private var showDistanceSheet = false
 
     // View Models
     @StateObject private var dashboardViewModel: DashboardViewModel
@@ -50,40 +50,88 @@ struct SummaryDashboardView: View {
     @ViewBuilder
     private func dashboardContent(card: DashboardCard) -> some View {
         switch card.id {
-        case .todaysWorkout:
-            // Logic for Today's Workout Card
-            if let activePlan = activePlans.first {
-                let today = Calendar.current.startOfDay(for: Date())
-                // Try to find today's task
-                if let todayTask = activePlan.dailyTasks.first(where: { Calendar.current.isDate($0.date, inSameDayAs: today) }) {
-                    TodaysWorkoutCard(dailyTask: todayTask, isNoActivePlan: false)
-                } else {
-                    // If no specific task for today, create a dummy DailyTask for a rest day
-                    let restDayTask = DailyTask(date: today, workouts: [])
-                    TodaysWorkoutCard(dailyTask: restDayTask, isNoActivePlan: false)
-                }
+        case .todaysWorkout: cardTodaysWorkout()
+        case .fitnessRings: cardFitnessRings()
+        case .goalProgress: cardGoalProgress()
+        case .stepsAndDistance: cardStepsAndDistance()
+        case .monthlyChallenge: cardMonthlyChallenge()
+        case .recentActivity: cardRecentActivity()
+        case .hydration:
+            if shouldRenderHydrationMenstrualRow(for: .hydration) {
+                hydrationMenstrualRow()
             } else {
-                // If no active plan at all, create a dummy DailyTask to indicate no plan
-                let noPlanTask = DailyTask(date: Date(), workouts: [])
-                TodaysWorkoutCard(dailyTask: noPlanTask, isNoActivePlan: true)
+                EmptyView()
             }
-        case .fitnessRings:
-            FitnessRingCard(activitySummary: dashboardViewModel.activitySummary)
-        case .goalProgress:
-            GoalProgressCard(showInputSheet: $showInputSheet)
-        case .stepsAndDistance:
-            HStack(spacing: 16) {
-                StepsCard(stepCount: dashboardViewModel.stepCount, weeklyStepData: dashboardViewModel.weeklyStepData)
-                DistanceCard(distance: dashboardViewModel.distance, weeklyDistanceData: dashboardViewModel.weeklyDistanceData)
+        case .menstrualCycle:
+            if shouldRenderHydrationMenstrualRow(for: .menstrualCycle) {
+                hydrationMenstrualRow()
+            } else {
+                EmptyView()
             }
-        case .monthlyChallenge:
-            MonthlyChallengeCard(monthlyChallengeCompletion: dashboardViewModel.monthlyChallengeCompletion)
-        case .recentActivity:
-            RecentActivityCard(mostRecentWorkout: dashboardViewModel.mostRecentWorkout)
-        case .historyList:
-            HistoryListView() // HistoryListView uses @Query directly, no change needed here for now
         }
     }
+
+    // MARK: - Extracted subviews to help compiler
+    @ViewBuilder
+    private func todaysWorkoutView() -> some View {
+        if let activePlan = activePlans.first {
+            let today = Calendar.current.startOfDay(for: Date())
+            if let todayTask = activePlan.dailyTasks.first(where: { Calendar.current.isDate($0.date, inSameDayAs: today) }) {
+                TodaysWorkoutCard(dailyTask: todayTask, isNoActivePlan: false)
+            } else {
+                let restDayTask = DailyTask(date: today, workouts: [])
+                TodaysWorkoutCard(dailyTask: restDayTask, isNoActivePlan: false)
+            }
+        } else {
+            let noPlanTask = DailyTask(date: Date(), workouts: [])
+            TodaysWorkoutCard(dailyTask: noPlanTask, isNoActivePlan: true)
+        }
+    }
+
+    @ViewBuilder
+    private func stepsAndDistanceRow() -> some View {
+        HStack(spacing: 16) {
+            Button(action: { showStepsSheet = true }) {
+                StepsCard(stepCount: dashboardViewModel.stepCount, weeklyStepData: dashboardViewModel.weeklyStepData)
+            }
+            .buttonStyle(.plain)
+
+            Button(action: { showDistanceSheet = true }) {
+                DistanceCard(distance: dashboardViewModel.distance, weeklyDistanceData: dashboardViewModel.weeklyDistanceData)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder
+    private func hydrationMenstrualRow() -> some View {
+        HStack(spacing: 16) {
+            if isCardVisible(.hydration) {
+                cardHydration()
+                    .frame(maxWidth: .infinity)
+            }
+            if isCardVisible(.menstrualCycle) {
+                cardMenstrualCycle()
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    // MARK: - Thin card wrappers to help type-checker
+    private func cardTodaysWorkout() -> some View { todaysWorkoutView() }
+    private func cardFitnessRings() -> some View { FitnessRingCard(activitySummary: dashboardViewModel.activitySummary) }
+    private func cardGoalProgress() -> some View { GoalProgressCard(showInputSheet: $showInputSheet) }
+    private func cardStepsAndDistance() -> some View { stepsAndDistanceRow() }
+    private func cardHydration() -> some View {
+        HydrationCard(
+            targetLiters: profileViewModel.userProfile.waterIntake?.recommendedLiters ?? 2.0
+        )
+    }
+    private func cardMenstrualCycle() -> some View {
+        MenstrualCycleCard(gender: profileViewModel.userProfile.gender)
+    }
+    private func cardMonthlyChallenge() -> some View { MonthlyChallengeCard(monthlyChallengeCompletion: dashboardViewModel.monthlyChallengeCompletion) }
+    private func cardRecentActivity() -> some View { RecentActivityCard(mostRecentWorkout: dashboardViewModel.mostRecentWorkout) }
 
     var body: some View {
         NavigationStack {
@@ -92,64 +140,12 @@ struct SummaryDashboardView: View {
                     .ignoresSafeArea()
                 
                 ScrollView {
+                    let cards = dashboardViewModel.cards
+                    let quickActions = dashboardViewModel.quickActions
                     VStack(spacing: 16) {
-
-                        if !dashboardViewModel.quickActions.isEmpty {
-                            quickActionsSection
-                        }
-
-                        if !dashboardViewModel.insights.isEmpty {
-                            insightsSection
-                        }
-
-                        // Dynamically generate cards
-                        ForEach(dashboardViewModel.cards) { card in
-                            if card.isVisible {
-                                dashboardContent(card: card)
-                            }
-                        }
-
-                        // Bottom Action Buttons
-                        HStack(spacing: 16) {
-                            Button(action: { showEditSheet = true }) {
-                                Text("编辑卡片")
-                                    .font(.headline)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color(UIColor.secondarySystemGroupedBackground))
-                                    .cornerRadius(32)
-                                    .foregroundColor(.primary)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-
-                            Button(action: {
-                                // Create a view to snapshot with environment objects
-                                let viewToSnapshot = VStack(spacing: 16) {
-                                    ForEach(dashboardViewModel.cards) { card in
-                                        if card.isVisible {
-                                            dashboardContent(card: card)
-                                        }
-                                    }
-                                }
-                                .padding()
-                                .environmentObject(weightManager)
-                                .environmentObject(profileViewModel)
-                                .environmentObject(healthKitManager)
-
-                                self.overviewImage = viewToSnapshot.snapshot()
-                                self.showShareSheet = true
-                            }) {
-                                Text("分享今日成就")
-                                    .font(.headline)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color(UIColor.secondarySystemGroupedBackground))
-                                    .cornerRadius(32)
-                                    .foregroundColor(.primary)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                        .padding(.vertical)
+                        if !quickActions.isEmpty { quickActionsSection }
+                        renderCards(cards)
+                        bottomActions()
                     }
                     .padding()
                 }
@@ -159,12 +155,8 @@ struct SummaryDashboardView: View {
                 await dashboardViewModel.loadNonReactiveData()
             }
             .onAppear(perform: refreshAuxiliaryData)
-            .onChange(of: activePlans.map(\.id)) { _ in
-                refreshAuxiliaryData()
-            }
-            .onChange(of: allMetrics.map(\.date)) { _ in
-                refreshAuxiliaryData()
-            }
+            .onChange(of: activePlans.map(\.id)) { _, _ in refreshAuxiliaryData() }
+            .onChange(of: allMetrics.map(\.date)) { _, _ in refreshAuxiliaryData() }
             .onReceive(NotificationCenter.default.publisher(for: .planDataDidChange)) { _ in
                 refreshAuxiliaryData()
             }
@@ -184,19 +176,29 @@ struct SummaryDashboardView: View {
                     }
                 }
             }
+            .sheet(isPresented: $showStepsSheet) {
+                StepsDetailSheet(stepCount: Int(dashboardViewModel.stepCount), weeklyData: dashboardViewModel.weeklyStepData)
+                    .environmentObject(dashboardViewModel)
+                    // 固定为中等高度，禁止向上拉至 large
+                    .presentationDetents([.medium])
+            }
             .sheet(isPresented: $showSettingsSheet) {
                 SettingsView()
             }
-            .sheet(isPresented: $showShareSheet) {
-                if let image = overviewImage {
-                    ShareSheet(items: [image])
-                }
+            // removed share sheet per new design
+            .sheet(isPresented: $showDistanceSheet) {
+                DistanceDetailSheet(distanceKM: dashboardViewModel.distance, weeklyData: dashboardViewModel.weeklyDistanceData)
+                    .environmentObject(dashboardViewModel)
+                    // 固定为中等高度，禁止向上拉至 large
+                    .presentationDetents([.medium])
             }
-                            .sheet(isPresented: $showEditSheet) {
-                                EditDashboardView()
-                                    .environmentObject(dashboardViewModel) // Inject DashboardViewModel
-                                    .presentationDetents([.fraction(0.85), .large])
-                            }        }
+            .sheet(isPresented: $showEditSheet) {
+                EditDashboardView()
+                    .environmentObject(dashboardViewModel) // Inject DashboardViewModel
+                    .presentationDetents([.fraction(0.85)])
+                    .presentationDragIndicator(.visible)
+            }
+        }
     }
 
     private var quickActionsSection: some View {
@@ -207,7 +209,8 @@ struct SummaryDashboardView: View {
                         title: action.title,
                         subtitle: action.subtitle,
                         icon: action.icon,
-                        tint: action.tint
+                        tint: action.tint,
+                        chips: action.chips
                     ) {
                         perform(action.intent)
                     }
@@ -218,30 +221,30 @@ struct SummaryDashboardView: View {
         }
     }
 
-    private var insightsSection: some View {
-        VStack(spacing: 12) {
-            ForEach(dashboardViewModel.insights) { item in
-                InsightCard(
-                    title: item.title,
-                    description: item.message,
-                    tone: item.tone,
-                    action: actionForInsight(item.intent)
-                )
+    // Insights section removed; now shown via Widgets
+
+    // MARK: - Render helpers extracted to reduce type-checking complexity
+    @ViewBuilder
+    private func renderCards(_ cards: [DashboardCard]) -> some View {
+        Group {
+            ForEach(cards.filter { $0.isVisible }) { card in
+                dashboardContent(card: card)
             }
         }
     }
 
-    private func actionForInsight(_ intent: DashboardInsightItem.Intent) -> InsightCard.Action? {
-        switch intent {
-        case .startWorkout:
-            return InsightCard.Action(title: "开始训练", icon: "play.fill") { perform(.startWorkout) }
-        case .logWeight:
-            return InsightCard.Action(title: "记录体重", icon: "scalemass.fill") { perform(.logWeight) }
-        case .openPlan:
-            return InsightCard.Action(title: "查看计划", icon: "target") { perform(.openPlan) }
-        case .none:
-            return nil
+    @ViewBuilder
+    private func bottomActions() -> some View {
+        HStack(spacing: 16) {
+            Button(action: { showEditSheet = true }) {
+                Text("编辑卡片")
+                    .font(.headline)
+                    .padding()
+                    .cornerRadius(32)
+            }
+            .buttonStyle(.glass)
         }
+        .padding(.vertical)
     }
 
     private func perform(_ intent: DashboardQuickAction.Intent) {
@@ -264,6 +267,23 @@ struct SummaryDashboardView: View {
             todaysTask: todaysTask,
             weightMetrics: weightMetrics
         )
+    }
+}
+
+private extension SummaryDashboardView {
+    func shouldRenderHydrationMenstrualRow(for cardType: DashboardCard.CardType) -> Bool {
+        guard cardType == .hydration || cardType == .menstrualCycle else { return false }
+        return firstVisibleHydrationMenstrualCard == cardType
+    }
+
+    var firstVisibleHydrationMenstrualCard: DashboardCard.CardType? {
+        dashboardViewModel.cards
+            .filter { $0.isVisible && ($0.id == .hydration || $0.id == .menstrualCycle) }
+            .first?.id
+    }
+
+    func isCardVisible(_ type: DashboardCard.CardType) -> Bool {
+        dashboardViewModel.cards.first(where: { $0.id == type })?.isVisible ?? false
     }
 }
 

@@ -15,6 +15,7 @@ struct OnboardingFlowView: View {
     // States for network simulation
     @State private var isGeneratingPlan = false
     @State private var showNetworkErrorAlert = false
+    @State private var showMissingWeightAlert = false
 
     // UserDefaults keys for saving progress
     private let onboardingDataKey = "onboardingInProgressData"
@@ -40,9 +41,9 @@ struct OnboardingFlowView: View {
         switch selection {
         case 0:
             return "开始"
-        case 4:
+        case 5:
             return "完成并生成计划"
-        case 5: // Completion view
+        case 6: // Completion view
             return "完成"
         default:
             return "下一步"
@@ -57,19 +58,29 @@ struct OnboardingFlowView: View {
                     withAnimation { selection += 1 }
                 }
             }
-        } else if selection == 4 {
-            handleCompletion()
         } else if selection == 5 {
+            handleCompletion()
+        } else if selection == 6 {
             withAnimation {
                 showOnboarding = false
             }
         } else {
+            if selection == 4 && onboardingData.currentWeight == nil {
+                showMissingWeightAlert = true
+                return
+            }
             withAnimation { selection += 1 }
         }
     }
 
     private func handleCompletion() {
         isGeneratingPlan = true
+
+        if let capturedWeight = onboardingData.currentWeight {
+            let metric = HealthMetric(date: Date(), value: capturedWeight, type: .weight)
+            modelContext.insert(metric)
+        }
+
         let planDuration = defaultPlanDuration
         let planGoal = buildPlanGoal(for: onboardingData, planDuration: planDuration)
         let generatedPlan = recommendationManager.generateInitialWorkoutPlan(
@@ -86,7 +97,7 @@ struct OnboardingFlowView: View {
             await healthKitManager.setupHealthKitData(weightManager: weightManager)
         }
         clearSavedProgress()
-        withAnimation { selection = 5 }
+        withAnimation { selection = 6 }
         isGeneratingPlan = false
     }
 
@@ -110,8 +121,9 @@ struct OnboardingFlowView: View {
                     GoalSelectionView(goal: $onboardingData.goal).tag(1)
                     ExperienceLevelView(experienceLevel: $onboardingData.experienceLevel).tag(2)
                     WorkoutLocationView(workoutLocation: $onboardingData.workoutLocation).tag(3)
-                    SafetyCheckView(healthConditions: $onboardingData.healthConditions).tag(4)
-                    CompletionView().tag(5)
+                    CurrentWeightInputView(weight: $onboardingData.currentWeight).tag(4)
+                    SafetyCheckView(healthConditions: $onboardingData.healthConditions).tag(5)
+                    CompletionView().tag(6)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .overlay(alignment: .bottom) {
@@ -144,11 +156,6 @@ struct OnboardingFlowView: View {
                             .padding(.bottom, 10)
                         }
 
-                        if selection > 0 && selection < 5 { // ProgressView moved to bottom
-                            ProgressView(value: Double(selection), total: 4)
-                                .padding(.horizontal)
-                                .padding(.bottom, 10)
-                        }
                         if isGeneratingPlan {
                             ProgressView()
                                 .padding(.bottom, 20)
@@ -174,6 +181,16 @@ struct OnboardingFlowView: View {
             } message: {
                 Text("请检查您的网络连接并重试。")
             }
+            .alert("请先记录当前体重", isPresented: $showMissingWeightAlert) {
+                Button("好的", role: .cancel) { }
+                Button("我已记录") {
+                    if onboardingData.currentWeight != nil {
+                        withAnimation { selection += 1 }
+                    }
+                }
+            } message: {
+                Text("需要至少录入一次体重，以便生成更精准的计划。您可以手动输入最近一次称重结果。")
+            }
         }
     }
 
@@ -183,7 +200,7 @@ struct OnboardingFlowView: View {
         let calendar = Calendar.current
         let startDate = calendar.startOfDay(for: Date())
         let targetDate = calendar.date(byAdding: .day, value: planDuration, to: startDate)
-        let startWeight = latestWeight() ?? profile.targetWeight
+        let startWeight = profile.currentWeight ?? latestWeight() ?? profile.targetWeight
         let goal = profile.goal ?? .healthImprovement
 
         return PlanGoal(

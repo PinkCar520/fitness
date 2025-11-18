@@ -13,5 +13,7 @@ struct WeightWidgetsBundle: WidgetBundle {
     var body: some Widget {
         WeightWidgets()
         WeightWidgetsControl()
+        InsightsWidget()
+        WeeklySummaryWidget()
     }
 }

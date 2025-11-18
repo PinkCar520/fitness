@@ -5,17 +5,15 @@ struct CalendarView: View {
     let completedDates: Set<Date>
     
     @State private var currentWeekStartDate: Date = Date()
+    @Environment(\.colorScheme) private var colorScheme
 
     private let calendar = Calendar.current
     private var workingCalendar: Calendar {
-        var cal = calendar
-        cal.firstWeekday = 2
-        cal.minimumDaysInFirstWeek = 4
-        return cal
+        calendar
     }
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "MM月dd日 EEEE"
+        formatter.dateFormat = "M月d日"
         formatter.locale = Locale(identifier: "zh_CN")
         return formatter
     }()
@@ -25,19 +23,9 @@ struct CalendarView: View {
     private let systemBlue = Color(red: 59/255, green: 130/255, blue: 246/255) // #3B82F6
 
     var body: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 12) {
             headerSection
-
-            HStack(spacing: 0) {
-                ForEach(Array(weekdayLabels.enumerated()), id: \.offset) { _, label in
-                    Text(label)
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(Color.primary.opacity(0.45))
-                        .frame(maxWidth: .infinity)
-                        .textCase(.uppercase)
-                }
-            }
-
+            weekdayLabelSection
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 12) {
                 ForEach(weekDates, id: \.self) { date in
                     let isCompleted = completedDates.contains { calendar.isDate($0, inSameDayAs: date) }
@@ -52,20 +40,9 @@ struct CalendarView: View {
                     )
                 }
             }
-            .padding(.horizontal, 4)
         }
-        .padding(.vertical, 20)
-        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.gray.opacity(0.1), lineWidth: 1)
-        )
         .gesture(
             DragGesture()
                 .onEnded { gesture in
@@ -95,19 +72,8 @@ struct CalendarView: View {
                 .truncationMode(.tail)
                 .layoutPriority(1)
 
-            Spacer(minLength: 8)
-
-            HStack(spacing: 10) {
-                navButton(systemName: "chevron.left") {
-                    changeWeek(by: -1)
-                }
-
-                todayButton
-
-                navButton(systemName: "chevron.right") {
-                    changeWeek(by: 1)
-                }
-            }
+            Spacer()
+            todayButton
             .layoutPriority(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -121,36 +87,35 @@ struct CalendarView: View {
 
     private var todayButton: some View {
         Button(action: todayButtonTapped) {
-            Text("今天")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(
-                    LinearGradient(
-                        colors: [systemBlue, Color(red: 65/255, green: 92/255, blue: 255/255)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .clipShape(Capsule())
+            Text("今")
+                .font(.system(size: 16))
+                .padding()
+                .glassEffect()
         }
         .buttonStyle(.plain)
-        .shadow(color: systemBlue.opacity(0.25), radius: 6, x: 0, y: 4)
     }
 
     private func navButton(systemName: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(systemBlue)
+                .foregroundStyle(.primary)
                 .frame(width: 32, height: 32)
-                .background(
-                    Circle()
-                        .fill(systemBlue.opacity(0.12))
-                )
+                .background(Circle().fill(Color.primary.opacity(0.06)))
         }
         .buttonStyle(.plain)
+    }
+    
+    private var weekdayLabelSection: some View {
+        return HStack(spacing: 12) {
+            ForEach(Array(weekdayLabels.enumerated()), id: \.offset) { _, label in
+                Text(label)
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(Color.primary.opacity(0.45))
+                    .frame(maxWidth: .infinity)
+                    .textCase(.uppercase)
+            }
+        }
     }
 
     private var weekdayLabels: [String] {
@@ -191,6 +156,40 @@ struct CalendarView: View {
             }
         }
         return days
+    }
+}
+
+private extension CalendarView {
+    var containerBackground: Color {
+        colorScheme == .dark ? Color(uiColor: .secondarySystemBackground) : .white
+    }
+
+    var containerStroke: Color {
+        colorScheme == .dark ? Color.white.opacity(0.08) : Color.gray.opacity(0.1)
+    }
+
+    var containerStrokeWidth: CGFloat {
+        colorScheme == .dark ? 0.5 : 1
+    }
+
+    var containerShadow: Color {
+        colorScheme == .dark ? Color.black.opacity(0.35) : Color.black.opacity(0.05)
+    }
+
+    var containerShadowRadius: CGFloat {
+        colorScheme == .dark ? 14 : 5
+    }
+
+    var containerShadowY: CGFloat {
+        colorScheme == .dark ? 6 : 2
+    }
+
+    var navigationBackground: Color {
+        colorScheme == .dark ? Color.white.opacity(0.12) : systemBlue.opacity(0.12)
+    }
+
+    var navigationForeground: Color {
+        colorScheme == .dark ? Color.white.opacity(0.9) : systemBlue
     }
 }
 
@@ -378,6 +377,7 @@ struct DayView: View {
     let isCompleted: Bool
 
     @State private var showTooltip = false // New state for tooltip visibility
+    @Environment(\.colorScheme) private var colorScheme
 
     private let calendar = Calendar.current
 
@@ -417,7 +417,7 @@ struct DayView: View {
             Text(String(calendar.component(.day, from: date)))
                 .font(.system(size: 18, weight: .semibold))
                 .kerning(-0.3)
-                .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(0.95))
+                .foregroundStyle(isSelected ? Color.white : dayNumberColor)
         }
         .overlay(completionBadge, alignment: .topTrailing)
     }
@@ -442,6 +442,31 @@ struct DayView: View {
         calendar.isDateInToday(date)
     }
 
+    private var dayNumberColor: Color {
+        if isToday && !isSelected {
+            return colorScheme == .dark ? Color.cyan.opacity(0.85) : systemBlue
+        }
+        if colorScheme == .dark {
+            return isWeekend ? Color.white.opacity(0.75) : Color.white.opacity(0.9)
+        }
+        return isWeekend ? Color.primary.opacity(0.7) : Color.primary.opacity(0.95)
+    }
+
+    private var unselectedCircleFill: Color {
+        colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.1)
+    }
+
+    private var unselectedCircleStroke: Color {
+        colorScheme == .dark ? Color.white.opacity(0.2) : Color.white.opacity(0.15)
+    }
+
+    private var ringBaselineOpacity: Double {
+        if isSelected {
+            return colorScheme == .dark ? 0.26 : 0.18
+        }
+        return colorScheme == .dark ? 0.22 : 0.12
+    }
+
     private var innerCircle: some View {
         Group {
             if isSelected {
@@ -458,10 +483,10 @@ struct DayView: View {
                     )
             } else {
                 Circle()
-                    .fill(Color.white.opacity(0.1))
+                    .fill(unselectedCircleFill)
                     .overlay(
                         Circle()
-                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                            .stroke(unselectedCircleStroke, lineWidth: 1)
                     )
             }
         }
@@ -481,7 +506,7 @@ struct DayView: View {
                 Circle()
                     .trim(from: start, to: end)
                     .stroke(
-                        descriptor.color.opacity(isSelected ? 0.18 : 0.12),
+                        descriptor.color.opacity(ringBaselineOpacity),
                         style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
                     )
                     .rotationEffect(.degrees(-90))
@@ -502,7 +527,9 @@ struct DayView: View {
 
     private func progressColor(for baseColor: Color, intensity: Double) -> Color {
         let normalized = min(max(intensity, 0), 1)
-        let baseOpacity = isSelected ? 0.82 : 0.65
+        let baseOpacity = isSelected
+            ? (colorScheme == .dark ? 0.88 : 0.82)
+            : (colorScheme == .dark ? 0.72 : 0.65)
         let bonus = 0.18 * normalized
         return baseColor.opacity(baseOpacity + bonus)
     }

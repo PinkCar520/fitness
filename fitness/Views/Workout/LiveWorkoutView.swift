@@ -9,9 +9,6 @@ struct LiveWorkoutView: View {
     
     @State private var showEndWorkoutAlert: Bool = false
     
-    @State private var showingDistancePicker = false
-    @State private var showingDurationPicker = false
-    
     let resumableState: WorkoutSessionState?
     
     init(dailyTask: DailyTask, modelContext: ModelContext, resumableState: WorkoutSessionState? = nil) {
@@ -20,163 +17,294 @@ struct LiveWorkoutView: View {
     }
     
     var body: some View {
-        NavigationView {
-            VStack {
+        ZStack {
+            backgroundGradient
+                .ignoresSafeArea()
+
+            VStack(spacing: 24) {
+                topBar
+
                 if let workout = sessionManager.currentWorkout {
-                    // Header: Exercise Name and Progress
-                    VStack {
-                        Text(workout.name)
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                        Text("动作 \(sessionManager.currentExerciseIndex + 1) / \(sessionManager.dailyTask.workouts.count)")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                    }.padding()
+                    heroSection(for: workout)
 
-                    Text(formatTime(sessionManager.elapsedTime))
-                        .font(.system(size: 60, weight: .bold, design: .monospaced))
-                        .padding()
-                    
+                    timerSection
+
                     if sessionManager.restTimeRemaining > 0 {
-                        Text("休息: \(formatTime(sessionManager.restTimeRemaining))")
-                            .font(.system(size: 30, weight: .semibold, design: .monospaced))
-                            .foregroundColor(.orange)
-                            .padding(.bottom, 10)
+                        restOverlay
                     }
-                    
-                    // Display sets for strength workouts
-                    if workout.type == .strength {
-                        ScrollView {
-                            ForEach($sessionManager.actualSets.indices, id: \.self) { index in
-                                WorkoutSetRowView(set: $sessionManager.actualSets[index], setIndex: index) {
-                                    Haptics.simpleSuccess()
-                                    sessionManager.completeSet(at: index)
-                                }
-                            }
-                        }
-                    } else if workout.type == .cardio {
-                        VStack(spacing: 20) {
-                            VStack {
-                                Text("距离 (km)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                HStack {
-                                    Button(action: {
-                                        if sessionManager.currentDistance > 0 { sessionManager.currentDistance -= 0.1 }
-                                    }) {
-                                        Image(systemName: "minus.circle.fill")
-                                            .font(.title2)
-                                            .foregroundColor(.red)
-                                    }
-                                    Text("\(sessionManager.currentDistance, specifier: "%.1f")")
-                                        .font(.title2)
-                                        .frame(minWidth: 60)
-                                        .onTapGesture { showingDistancePicker = true }
-                                    Button(action: {
-                                        sessionManager.currentDistance += 0.1
-                                    }) {
-                                        Image(systemName: "plus.circle.fill")
-                                            .font(.title2)
-                                            .foregroundColor(.green)
-                                    }
-                                }
-                            }
-                            VStack {
-                                Text("时长 (min)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                HStack {
-                                    Button(action: {
-                                        if sessionManager.currentDuration > 0 { sessionManager.currentDuration -= 1 }
-                                    }) {
-                                        Image(systemName: "minus.circle.fill")
-                                            .font(.title2)
-                                            .foregroundColor(.red)
-                                    }
-                                    Text("\(sessionManager.currentDuration, specifier: "%.0f")")
-                                        .font(.title2)
-                                        .frame(minWidth: 60)
-                                        .onTapGesture { showingDurationPicker = true }
-                                    Button(action: {
-                                        sessionManager.currentDuration += 1
-                                    }) {
-                                        Image(systemName: "plus.circle.fill")
-                                            .font(.title2)
-                                            .foregroundColor(.green)
-                                    }
-                                }
-                            }
-                        }
-                        .padding()
-                        Spacer()
-                    } else {
-                        // UI for Other workout types
-                        VStack(alignment: .leading) {
-                            Text("记录感受:")
-                                .font(.headline)
-                                .padding(.horizontal)
-                            TextEditor(text: $sessionManager.currentNotes)
-                                .frame(height: 150)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.gray, lineWidth: 1)
-                                )
-                                .padding(.horizontal)
-                        }
-                        Spacer()
-                    }
-                    
-                    // Footer: Next Exercise Button
-                    Button(action: {
-                        Haptics.simpleTap()
-                        if sessionManager.currentExerciseIndex < sessionManager.dailyTask.workouts.count - 1 {
-                            sessionManager.nextExercise()
-                        } else {
-                            // This is the last exercise, end the workout
-                            let completed = sessionManager.endWorkout()
-                            appState.workoutSummary = (show: true, workouts: completed)
-                            dismiss()
-                        }
-                    }) {
-                        Text(sessionManager.currentExerciseIndex < sessionManager.dailyTask.workouts.count - 1 ? "下一个动作" : "完成训练")
-                            .font(.headline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(Color.blue)
-                            .cornerRadius(12)
-                    }
-                    .padding()
 
-                }
-            }
-            .onAppear {
-                sessionManager.startWorkout()
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { 
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("结束") {
-                        showEndWorkoutAlert = true
-                    }
-                    .foregroundColor(.red)
-                }
-            }
-            .alert("结束训练?", isPresented: $showEndWorkoutAlert) {
-                Button("确认结束", role: .destructive) {
-                    let completed = sessionManager.endWorkout()
-                    appState.workoutSummary = (show: true, workouts: completed)
-                    dismiss()
-                }
-                Button("取消", role: .cancel) { }
-            } message: {
-                Text("您确定要结束当前的训练吗？所有进度将被保存。")
-            }
+                    content(for: workout)
 
+                    primaryButton
+                } else {
+                    ProgressView()
+                        .tint(.white)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 60)
+            .padding(.bottom, 30)
+        }
+        .onAppear {
+            sessionManager.startWorkout()
+        }
+        .alert("结束训练?", isPresented: $showEndWorkoutAlert) {
+            Button("确认结束", role: .destructive) {
+                finishWorkout()
+            }
+            Button("取消", role: .cancel) { }
+        } message: {
+            Text("确定要退出沉浸式训练？当前进度会被保存。")
         }
     }
-    
+
+    private var totalExercises: Int {
+        max(1, sessionManager.dailyTask.workouts.count)
+    }
+
+    private var workoutProgress: Double {
+        Double(sessionManager.currentExerciseIndex) / Double(totalExercises)
+    }
+
+    private var actionTitle: String {
+        sessionManager.currentExerciseIndex < totalExercises - 1 ? "下一个动作" : "完成训练"
+    }
+
+    private var backgroundGradient: some View {
+        LinearGradient(
+            colors: [
+                Color(red: 0.08, green: 0.11, blue: 0.2),
+                Color(red: 0.03, green: 0.04, blue: 0.08)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private var topBar: some View {
+        HStack {
+            Button {
+                showEndWorkoutAlert = true
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title2.bold())
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("第 \(sessionManager.currentExerciseIndex + 1)/\(totalExercises) 个动作")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.8))
+                ProgressView(value: workoutProgress)
+                    .tint(.white)
+                    .frame(width: 140)
+            }
+        }
+    }
+
+    private func heroSection(for workout: Workout) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(workout.name)
+                        .font(.title)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                    Text(workout.type.displayName)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+                Spacer()
+                Text(workout.durationInMinutes != nil ? "\(workout.durationInMinutes ?? 0)min" : workout.type == .strength ? "力量" : "训练")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.white.opacity(0.15), in: Capsule())
+            }
+            Text(workout.notes ?? "专注节奏与呼吸，保持稳定输出。")
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.8))
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(.white.opacity(0.1))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(.white.opacity(0.05))
+        )
+    }
+
+    private var timerSection: some View {
+        VStack(spacing: 8) {
+            Text(formatTime(sessionManager.elapsedTime))
+                .font(.system(size: 64, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+            Text("已用时")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.6))
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var restOverlay: some View {
+        HStack {
+            Image(systemName: "timer")
+                .font(.headline)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("休息中")
+                    .font(.footnote.weight(.semibold))
+                Text(formatTime(sessionManager.restTimeRemaining))
+                    .font(.callout.monospacedDigit())
+            }
+            Spacer()
+        }
+        .foregroundStyle(.white)
+        .padding()
+        .background(.orange.opacity(0.2), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    private func content(for workout: Workout) -> some View {
+        Group {
+            switch workout.type {
+            case .strength:
+                strengthSection
+            case .cardio:
+                cardioSection
+            default:
+                freestyleSection
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .animation(.easeInOut(duration: 0.25), value: sessionManager.currentExerciseIndex)
+    }
+
+    private var strengthSection: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 12) {
+                ForEach($sessionManager.actualSets.indices, id: \.self) { index in
+                    let setBinding = $sessionManager.actualSets[index]
+                    Button {
+                        Haptics.simpleSuccess()
+                        sessionManager.completeSet(at: index)
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("第 \(index + 1) 组")
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.7))
+                                Text("\(setBinding.wrappedValue.reps) 次 · \(setBinding.wrappedValue.weight ?? 0, specifier: "%.0f") kg")
+                                    .font(.headline)
+                                    .foregroundStyle(.white)
+                            }
+                            Spacer()
+                            let completed = setBinding.wrappedValue.isCompleted ?? false
+                            Image(systemName: completed ? "checkmark.circle.fill" : "circle")
+                                .font(.title2)
+                                .foregroundStyle(completed ? .green : .white.opacity(0.4))
+                        }
+                        .padding()
+                        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    private var cardioSection: some View {
+        VStack(spacing: 16) {
+            HStack(spacing: 16) {
+                metricCard(title: "距离 (km)", value: sessionManager.currentDistance, step: 0.1) { delta in
+                    sessionManager.currentDistance = max(0, sessionManager.currentDistance + delta)
+                }
+                metricCard(title: "时长 (min)", value: sessionManager.currentDuration, step: 1) { delta in
+                    sessionManager.currentDuration = max(0, sessionManager.currentDuration + delta)
+                }
+            }
+            .frame(maxWidth: .infinity)
+
+            Text("左右滑动即可调节，无需键盘")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.5))
+        }
+    }
+
+    private func metricCard(title: String, value: Double, step: Double, onChange: @escaping (Double) -> Void) -> some View {
+        VStack(spacing: 12) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.7))
+            Text("\(value, specifier: step == 1 ? "%.0f" : "%.1f")")
+                .font(.title.bold())
+                .foregroundStyle(.white)
+            HStack(spacing: 20) {
+                Button {
+                    onChange(-step)
+                } label: {
+                    Image(systemName: "minus")
+                        .font(.headline)
+                        .frame(width: 36, height: 36)
+                        .background(.white.opacity(0.12), in: Circle())
+                }
+                Button {
+                    onChange(step)
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.headline)
+                        .frame(width: 36, height: 36)
+                        .background(.white, in: Circle())
+                        .foregroundStyle(.black)
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    private var freestyleSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("记录感受")
+                .font(.headline)
+                .foregroundStyle(.white)
+            TextEditor(text: $sessionManager.currentNotes)
+                .frame(height: 140)
+                .scrollContentBackground(.hidden)
+                .padding(12)
+                .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+    }
+
+    private var primaryButton: some View {
+        Button {
+            Haptics.simpleTap()
+            if sessionManager.currentExerciseIndex < totalExercises - 1 {
+                sessionManager.nextExercise()
+            } else {
+                finishWorkout()
+            }
+        } label: {
+            Text(actionTitle)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(.black)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(.white, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        }
+        .padding(.top, 10)
+    }
+
+    private func finishWorkout() {
+        let completed = sessionManager.endWorkout()
+        appState.workoutSummary = (show: true, workouts: completed)
+        dismiss()
+    }
+
     private func formatTime(_ time: TimeInterval) -> String {
         let hours = Int(time) / 3600
         let minutes = Int(time) / 60 % 60

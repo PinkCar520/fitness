@@ -6,16 +6,24 @@ enum ChartableMetric: String, CaseIterable, Identifiable {
     case bodyFat = "体脂率"
     case waist = "腰围"
     case heartRate = "心率"
+    case vo2Max = "VO2max"
 
     var id: String { self.rawValue }
 }
 
 struct BodyProfileView: View {
     @EnvironmentObject var profileViewModel: ProfileViewModel
+    @EnvironmentObject var healthKitManager: HealthKitManager
+    @EnvironmentObject var weightManager: WeightManager
     @Query(sort: \HealthMetric.date, order: .reverse) private var metrics: [HealthMetric]
+    private let zhLocale = Locale(identifier: "zh-Hans")
     
     @State private var showInputSheet = false
-    @State private var selectedChartMetric: ChartableMetric = .weight
+    @State private var showTrajectorySheet = false
+    @State private var showBMIDetailSheet = false
+    @State private var showBodyFatDetailSheet = false
+    @StateObject private var vm = BodyProfileViewModel()
+    // Lines always shown by default (no toggles)
 
     // Computed properties to get latest values
     private var latestWeight: Double {
@@ -24,11 +32,10 @@ struct BodyProfileView: View {
     private var latestBodyFat: Double {
         metrics.first(where: { $0.type == .bodyFatPercentage })?.value ?? 0
     }
-    private var bmi: Double {
-        let height = profileViewModel.userProfile.height / 100 // in meters
-        guard height > 0, latestWeight > 0 else { return 0 }
-        return latestWeight / (height * height)
+    private var latestBodyFatRecordDate: Date? {
+        metrics.first(where: { $0.type == .bodyFatPercentage })?.date
     }
+    private var bmi: Double { vm.bmi }
     private var latestWaistCircumference: Double {
         latestValue(for: .waistCircumference) ?? 0
     }
@@ -54,151 +61,157 @@ struct BodyProfileView: View {
         latestValue(for: .waistToHipRatio) ?? 0
     }
 
-    // Computed property to prepare data for the chart based on selection
-    private var chartData: [DateValuePoint] {
-        let selectedType: MetricType
-        switch selectedChartMetric {
-        case .weight:
-            selectedType = .weight
-        case .bodyFat:
-            selectedType = .bodyFatPercentage
-        case .waist:
-            selectedType = .waistCircumference
-        case .heartRate:
-            selectedType = .heartRate
-        }
-        
-        return metrics
-            .filter { $0.type == selectedType }
-            .map { DateValuePoint(date: $0.date, value: $0.value) }
-            .sorted(by: { $0.date < $1.date })
-    }
-    
-    private var chartTitle: String {
-        "\(selectedChartMetric.rawValue)趋势"
-    }
-    
-    private var chartColor: Color {
-        switch selectedChartMetric {
-        case .weight: return .blue
-        case .bodyFat: return .orange
-        case .waist: return .purple
-        case .heartRate: return .red
-        }
-    }
-    
-    private var chartUnit: String {
-        switch selectedChartMetric {
-        case .weight: return "kg"
-        case .bodyFat: return "%"
-        case .waist: return "cm"
-        case .heartRate: return "bpm"
-        }
-    }
-
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    // Dashboard Section
-                    metricSection(
-                        title: "当前指标",
-                        items: [
-                            MetricDisplay(title: "体重", value: formatted(latestWeight, precision: 1), unit: "公斤", icon: "scalemass.fill", color: .blue),
-                            MetricDisplay(title: "BMI", value: formatted(bmi, precision: 1), unit: "", icon: "figure.walk", color: .green),
-                            MetricDisplay(title: "体脂率", value: formatted(latestBodyFat, precision: 1), unit: "%", icon: "flame.fill", color: .orange),
-                            MetricDisplay(title: "静息心率", value: formatted(latestHeartRate, precision: 0), unit: "bpm", icon: "heart.fill", color: .red)
-                        ]
-                    )
-
-                    // Chart Section
-                    VStack(spacing: 16) {
-                        Picker("Select Metric", selection: $selectedChartMetric) {
-                            ForEach(ChartableMetric.allCases) { metric in
-                                Text(metric.rawValue).tag(metric)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.horizontal)
-                        
-                        GenericLineChartView(
-                            title: chartTitle,
-                            data: chartData,
-                            color: chartColor,
-                            unit: chartUnit
-                        )
-                        .frame(minHeight: 220)
-                    }
-                    .padding(.horizontal)
-
-                    // Additional Metrics Section
-                    metricSection(
-                        title: "身体围度",
-                        items: [
-                            MetricDisplay(title: "腰围", value: formatted(latestWaistCircumference, precision: 1), unit: "cm", icon: "tape.measure", color: .purple),
-                            MetricDisplay(title: "胸围", value: formatted(latestChestCircumference, precision: 1), unit: "cm", icon: "figure.stand", color: .pink),
-                            MetricDisplay(title: "腰臀比", value: formatted(latestWaistToHipRatio, precision: 2), unit: "", icon: "circle.grid.cross", color: .teal)
-                        ]
-                    )
-
-                    metricSection(
-                        title: "身体成分",
-                        items: [
-                            MetricDisplay(title: "体脂肪量", value: formatted(latestBodyFatMass, precision: 1), unit: "kg", icon: "scalemass.fill", color: .orange),
-                            MetricDisplay(title: "骨骼肌量", value: formatted(latestSkeletalMuscleMass, precision: 1), unit: "kg", icon: "figure.strengthtraining.traditional", color: .purple),
-                            MetricDisplay(title: "身体水分率", value: formatted(latestBodyWaterPercentage, precision: 1), unit: "%", icon: "drop.fill", color: .blue),
-                            MetricDisplay(title: "基础代谢率", value: formatted(latestBasalMetabolicRate, precision: 0), unit: "kcal", icon: "flame.circle.fill", color: .red)
-                        ]
-                    )
-
-                    BodyCompositionSummary(bmi: bmi, bodyFat: latestBodyFat)
-                        .padding(.horizontal)
-
-                    // Visual Records Placeholder Section
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("视觉记录")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .padding(.horizontal)
-
-                        VStack(alignment: .center) {
-                            Image(systemName: "photo.on.rectangle.angled")
-                                .font(.largeTitle)
-                                .foregroundColor(.secondary)
-                                .padding(.bottom, 5)
-                            Text("记录你的蜕变，见证每一次进步")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            Text("点击添加照片 (即将推出)")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(12)
-                        .padding(.horizontal)
-                    }
-
-                    Spacer(minLength: 80) // Spacer to ensure content is above the FAB
+                    emptyDataHintSection
+                    currentIndicatorsSection
+                    vo2QuickSection
+                    additionalMetricsSection
+                    bodyCompositionSection
+                    visualRecordsSection
+                    Spacer(minLength: 80)
                 }
                 .padding(.vertical)
             }
 
-            // Floating Action Button
-            Button(action: { showInputSheet = true }) {
-                Image(systemName: "plus")
-                    .font(.title.weight(.semibold))
-                    .padding()
-                    .background(Color.accentColor)
-                    .foregroundColor(.white)
-                    .clipShape(Circle())
-                    .shadow(radius: 10)
+        }
+        .onAppear { refreshVM() }
+        .onChange(of: metrics.map(\.date)) { _, _ in refreshVM() }
+        .sheet(isPresented: $showTrajectorySheet) {
+            HistoryListView()
+                .environmentObject(weightManager)
+        }
+        .sheet(isPresented: $showBMIDetailSheet) {
+            BMIDetailSheet(
+                bmi: bmi,
+                height: profileViewModel.userProfile.height,
+                latestWeight: vm.latestWeight,
+                category: vm.bmiCategory
+            )
+            .presentationDetents([.fraction(0.5), .fraction(0.9)])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showBodyFatDetailSheet) {
+            BodyFatDetailSheet(
+                bodyFat: vm.latestBodyFat,
+                gender: profileViewModel.userProfile.gender,
+                recordDate: latestBodyFatRecordDate
+            )
+            .presentationDetents([.fraction(0.5), .fraction(0.9)])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    // MARK: - Subviews (split to reduce type-checking complexity)
+    private var currentIndicatorsSection: some View {
+        let items: [MetricDisplay] = [
+            .init(title: "体重", value: formatted(latestWeight, precision: 1), unit: "公斤", icon: "scalemass.fill", color: .blue),
+            .init(title: "BMI", value: formatted(bmi, precision: 1), unit: "", icon: "figure.walk", color: .green),
+            .init(title: "体脂率", value: formatted(latestBodyFat, precision: 1), unit: "%", icon: "flame.fill", color: .orange),
+            .init(title: "静息心率", value: formatted(latestHeartRate, precision: 0), unit: "bpm", icon: "heart.fill", color: .red)
+        ]
+        return metricSection(title: nil, items: items)
+    }
+
+    @ViewBuilder private var vo2QuickSection: some View {
+        if !healthKitManager.isVO2MaxAvailableOnThisDevice() {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle").foregroundStyle(.secondary)
+                    Text("VO2max 需要支持的设备（通常为 Apple Watch）")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal)
+        } else if let latest = metrics.first(where: { $0.type == .vo2Max })?.value, latest > 0 {
+            let items = [MetricDisplay(title: "VO2max", value: formatted(latest, precision: 1), unit: "ml/kg/min", icon: "lungs.fill", color: .teal)]
+            metricSection(title: "心肺耐力", items: items)
+        }
+    }
+
+    private var additionalMetricsSection: some View {
+        let items: [MetricDisplay] = [
+            .init(title: "腰围", value: formatted(latestWaistCircumference, precision: 1), unit: "cm", icon: "figure", color: .purple),
+            .init(title: "胸围", value: formatted(latestChestCircumference, precision: 1), unit: "cm", icon: "figure.stand", color: .pink),
+            .init(title: "腰臀比", value: formatted(latestWaistToHipRatio, precision: 2), unit: "", icon: "circle.grid.cross", color: .teal)
+        ]
+        return metricSection(title: "身体围度", items: items)
+    }
+
+    private var bodyCompositionSection: some View {
+        let items: [MetricDisplay] = [
+            .init(title: "体脂肪量", value: formatted(latestBodyFatMass, precision: 1), unit: "kg", icon: "scalemass.fill", color: .orange),
+            .init(title: "骨骼肌量", value: formatted(latestSkeletalMuscleMass, precision: 1), unit: "kg", icon: "figure.strengthtraining.traditional", color: .purple),
+            .init(title: "身体水分率", value: formatted(latestBodyWaterPercentage, precision: 1), unit: "%", icon: "drop.fill", color: .blue),
+            .init(title: "基础代谢率", value: formatted(latestBasalMetabolicRate, precision: 0), unit: "kcal", icon: "flame.circle.fill", color: .red)
+        ]
+        return Group {
+            metricSection(title: "身体成分", items: items)
+            BodyCompositionSummary(bmi: bmi, bodyFat: latestBodyFat)
+                .padding(.horizontal)
+        }
+    }
+
+    // insightsSection removed per design requirements
+
+    private var visualRecordsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("视觉记录")
+                .font(.title2)
+                .fontWeight(.bold)
+                .padding(.horizontal)
+
+            VStack(alignment: .center) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.largeTitle)
+                    .foregroundColor(.secondary)
+                    .padding(.bottom, 5)
+                Text("记录你的蜕变，见证每一次进步")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                Text("点击添加照片 (即将推出)")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.gray.opacity(0.1))
+            .cornerRadius(12)
+            .padding(.horizontal)
+        }
+    }
+
+    // Floating action removed (no manual record entry here)
+
+    // MARK: - Empty Data (authorization banner removed by design)
+
+    @ViewBuilder private var emptyDataHintSection: some View {
+        if metrics.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("还没有身体指标记录")
+                    .font(.headline)
+                Text("可在健康 App 中开启数据同步。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button(action: openHealthApp) {
+                    Label("打开健康 App", systemImage: "heart")
+                }
             }
             .padding()
+            .background(Color.gray.opacity(0.1))
+            .cornerRadius(12)
+            .padding(.horizontal)
         }
-        .sheet(isPresented: $showInputSheet) {
-            InputSheetView()
+    }
+
+    private func openHealthApp() {
+        if let url = URL(string: "x-apple-health://"), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        } else if let url = URL(string: UIApplication.openSettingsURLString), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
         }
     }
 
@@ -214,14 +227,16 @@ struct BodyProfileView: View {
     }
 
     @ViewBuilder
-    private func metricSection(title: String, items: [MetricDisplay]) -> some View {
+    private func metricSection(title: String?, items: [MetricDisplay]) -> some View {
         let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
         VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.title2)
-                .fontWeight(.bold)
-                .padding(.horizontal)
+            if let title, !title.isEmpty {
+                Text(title)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .padding(.horizontal)
+            }
 
             LazyVGrid(columns: columns, spacing: 10) {
                 ForEach(items) { item in
@@ -232,10 +247,258 @@ struct BodyProfileView: View {
                         icon: item.icon,
                         color: item.color
                     )
+                    .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .onTapGesture {
+                        handleMetricTap(item)
+                    }
                 }
             }
             .padding(.horizontal)
         }
+    }
+
+}
+
+private extension BodyProfileView {
+    func refreshVM() {
+        vm.refresh(metrics: metrics, profile: profileViewModel.userProfile)
+    }
+
+    func handleMetricTap(_ item: MetricDisplay) {
+        if item.title == "体重" {
+            showTrajectorySheet = true
+        } else if item.title == "BMI" {
+            showBMIDetailSheet = true
+        } else if item.title == "体脂率" {
+            showBodyFatDetailSheet = true
+        }
+    }
+}
+
+private struct BMIDetailSheet: View {
+    let bmi: Double
+    let height: Double
+    let latestWeight: Double?
+    let category: HealthStandards.BMICategory
+    
+    private let columns = [GridItem(.flexible()), GridItem(.flexible())]
+    
+    private var formattedBMI: String {
+        bmi > 0 ? String(format: "%.1f", bmi) : "--"
+    }
+    
+    private var heightText: String {
+        height > 0 ? "\(Int(round(height))) cm" : "--"
+    }
+    
+    private var weightText: String {
+        if let latestWeight, latestWeight > 0 {
+            return String(format: "%.1f kg", latestWeight)
+        }
+        return "--"
+    }
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Spacer()
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("BMI 详情")
+                        .font(.title3.bold())
+                    Text("根据身高与体重即时计算")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(formattedBMI)
+                        .font(.system(size: 46, weight: .heavy, design: .rounded))
+                    Text(category.displayTitle)
+                        .font(.headline)
+                        .foregroundColor(category.accentColor)
+                    Text(category.guidance)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(category.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                
+                LazyVGrid(columns: columns, spacing: 12) {
+                    infoTile(title: "最新体重", value: weightText, icon: "scalemass.fill")
+                    infoTile(title: "身高设置", value: heightText, icon: "ruler")
+                }
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("WHO 区间")
+                        .font(.headline)
+                    ForEach(HealthStandards.BMICategory.allCases) { band in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(band.displayTitle)
+                                    .font(.subheadline.bold())
+                                Text(band.rangeDescription)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            if band == category {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(band.accentColor)
+                            }
+                        }
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(band == category ? band.accentColor.opacity(0.12) : Color.gray.opacity(0.08))
+                        )
+                    }
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("计算方式")
+                        .font(.headline)
+                    Text("BMI = 体重(kg) ÷ 身高(m)²。建议结合体脂率等指标综合判断。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 24)
+        }
+        .scrollIndicators(.hidden)
+    }
+    
+    private func infoTile(title: String, value: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(title, systemImage: icon)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Text(value)
+                .font(.title3.bold())
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color(.systemGray6))
+        )
+    }
+}
+
+private struct BodyFatDetailSheet: View {
+    let bodyFat: Double?
+    let gender: Gender
+    let recordDate: Date?
+    
+    private var category: HealthStandards.BodyFatBand? {
+        guard let bodyFat, bodyFat > 0 else { return nil }
+        return HealthStandards.bodyFatBand(gender: gender, value: bodyFat)
+    }
+    
+    private var valueText: String {
+        guard let bodyFat, bodyFat > 0 else { return "--" }
+        return String(format: "%.1f%%", bodyFat)
+    }
+    
+    private var recordDateText: String {
+        guard let recordDate else { return "暂无记录" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh-Hans")
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: recordDate)
+    }
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Spacer()
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("体脂率详情")
+                        .font(.title3.bold())
+                    Text("结合性别差异的健康区间")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(valueText)
+                        .font(.system(size: 42, weight: .heavy, design: .rounded))
+                    Text(category?.displayTitle ?? "等待记录")
+                        .font(.headline)
+                        .foregroundColor(category?.accentColor ?? .secondary)
+                    Text(category?.guidance ?? "记录体脂率，解锁更精确的身体成分分析。")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill((category?.accentColor ?? .gray).opacity(0.12))
+                )
+                
+                HStack(spacing: 12) {
+                    infoTile(title: "最近记录", value: recordDateText, icon: "calendar")
+                    infoTile(title: "性别设定", value: gender.rawValue, icon: "figure.stand")
+                }
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("参考区间 (\(gender.rawValue))")
+                        .font(.headline)
+                    ForEach(HealthStandards.BodyFatBand.allCases) { band in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(band.displayTitle)
+                                    .font(.subheadline.bold())
+                                Text(band.rangeDescription(for: gender))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            if band == category {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(band.accentColor)
+                            }
+                        }
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(band == category ? band.accentColor.opacity(0.12) : Color.gray.opacity(0.08))
+                        )
+                    }
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("提示")
+                        .font(.headline)
+                    Text("体脂率受水分、饮食、测量方式影响，建议固定时间点测量，并结合围度、体重等指标综合判断。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 24)
+        }
+        .scrollIndicators(.hidden)
+    }
+    
+    private func infoTile(title: String, value: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(title, systemImage: icon)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Text(value)
+                .font(.title3.bold())
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color(.systemGray6))
+        )
     }
 }
 
@@ -276,6 +539,103 @@ struct MetricDisplay: Identifiable {
         self.unit = unit
         self.icon = icon
         self.color = color
+    }
+}
+
+extension HealthStandards.BMICategory: CaseIterable, Identifiable {
+    static var allCases: [HealthStandards.BMICategory] { [.underweight, .normal, .overweight, .obese] }
+    var id: HealthStandards.BMICategory { self }
+}
+
+private extension HealthStandards.BMICategory {
+    var displayTitle: String {
+        switch self {
+        case .underweight: return "偏瘦"
+        case .normal: return "标准"
+        case .overweight: return "超重"
+        case .obese: return "肥胖"
+        }
+    }
+    
+    var rangeDescription: String {
+        switch self {
+        case .underweight: return "< 18.5"
+        case .normal: return "18.5 – 24.9"
+        case .overweight: return "25 – 29.9"
+        case .obese: return "≥ 30"
+        }
+    }
+    
+    var guidance: String {
+        switch self {
+        case .underweight: return "适度增加热量与力量训练，帮助提升瘦体重。"
+        case .normal: return "保持当前饮食与训练节奏，继续跟踪体脂等指标。"
+        case .overweight: return "结合控热与耐力训练，逐步回到健康区间。"
+        case .obese: return "建议循序渐进调整饮食，并搭配低冲击训练。"
+        }
+    }
+    
+    var accentColor: Color {
+        switch self {
+        case .underweight: return .teal
+        case .normal: return .green
+        case .overweight: return .orange
+        case .obese: return .red
+        }
+    }
+}
+
+extension HealthStandards.BodyFatBand: CaseIterable, Identifiable {
+    static var allCases: [HealthStandards.BodyFatBand] { [.athletic, .fit, .average, .high] }
+    var id: HealthStandards.BodyFatBand { self }
+}
+
+private extension HealthStandards.BodyFatBand {
+    var displayTitle: String {
+        switch self {
+        case .athletic: return "运动型"
+        case .fit: return "良好"
+        case .average: return "平均"
+        case .high: return "偏高"
+        }
+    }
+    
+    func rangeDescription(for gender: Gender) -> String {
+        switch (gender, self) {
+        case (.male, .athletic): return "< 10%"
+        case (.male, .fit): return "10% – 16%"
+        case (.male, .average): return "17% – 24%"
+        case (.male, .high): return "≥ 25%"
+        case (.female, .athletic): return "< 18%"
+        case (.female, .fit): return "18% – 24%"
+        case (.female, .average): return "25% – 31%"
+        case (.female, .high): return "≥ 32%"
+        case (.preferNotToSay, _):
+            switch self {
+            case .athletic: return "< 15%"
+            case .fit: return "15% – 22%"
+            case .average: return "23% – 30%"
+            case .high: return "≥ 31%"
+            }
+        }
+    }
+    
+    var guidance: String {
+        switch self {
+        case .athletic: return "训练状态良好，注意补充能量并保持恢复。"
+        case .fit: return "身体成分优秀，可持续当前训练节奏。"
+        case .average: return "处于正常范围，可搭配力量+有氧稳步优化。"
+        case .high: return "建议关注饮食结构，并循序渐进增加活动量。"
+        }
+    }
+    
+    var accentColor: Color {
+        switch self {
+        case .athletic: return .teal
+        case .fit: return .green
+        case .average: return .orange
+        case .high: return .red
+        }
     }
 }
 

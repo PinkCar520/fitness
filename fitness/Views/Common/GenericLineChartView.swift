@@ -13,9 +13,41 @@ struct GenericLineChartView: View {
     let data: [DateValuePoint]
     let color: Color
     let unit: String
+    let averageValue: Double?
+    let goalValue: Double?
+    let xAxisRange: ClosedRange<Date>?
+    let xAxisTicks: [Date]?
+    let axisDateFormat: Date.FormatStyle?
+    let axisLabelProvider: ((Date) -> Text)?
 
     @State private var selectedPoint: DateValuePoint? // For tap gesture
     @State private var currentPoint: DateValuePoint?  // For drag gesture
+
+    init(
+        title: String,
+        data: [DateValuePoint],
+        color: Color,
+        unit: String,
+        averageValue: Double? = nil,
+        goalValue: Double? = nil,
+        xAxisRange: ClosedRange<Date>? = nil,
+        xAxisTicks: [Date]? = nil,
+        axisDateFormat: Date.FormatStyle? = nil,
+        axisLabelProvider: ((Date) -> Text)? = nil
+    ) {
+        self.title = title
+        self.data = data
+        self.color = color
+        self.unit = unit
+        self.averageValue = averageValue
+        self.goalValue = goalValue
+        self.xAxisRange = xAxisRange
+        self.xAxisTicks = xAxisTicks
+        self.axisDateFormat = axisDateFormat
+        self.axisLabelProvider = axisLabelProvider
+        self._selectedPoint = State(initialValue: nil)
+        self._currentPoint = State(initialValue: nil)
+    }
 
     private var yAxisDomain: ClosedRange<Double> {
         let values = data.map { $0.value }
@@ -60,6 +92,28 @@ struct GenericLineChartView: View {
                         }
                     }
                     
+                    // Mean/Goal Rule Marks
+                    if let avg = averageValue {
+                        RuleMark(y: .value("Average", avg))
+                            .foregroundStyle(Color.gray.opacity(0.4))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                            .annotation(position: .top, alignment: .leading) {
+                                Text("均值 \(String(format: "%.1f", avg)) \(unit)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                    }
+                    if let goal = goalValue {
+                        RuleMark(y: .value("Goal", goal))
+                            .foregroundStyle(color.opacity(0.5))
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [6, 3]))
+                            .annotation(position: .top, alignment: .trailing) {
+                                Text("目标 \(String(format: "%.1f", goal)) \(unit)")
+                                    .font(.caption)
+                                    .foregroundStyle(color)
+                            }
+                    }
+
                     // RuleMark for drag/tap interaction
                     if let currentPoint = self.currentPoint {
                         RuleMark(x: .value("Selected", currentPoint.date))
@@ -70,6 +124,14 @@ struct GenericLineChartView: View {
                     }
                 }
                 .chartYScale(domain: yAxisDomain)
+                .modifier(OptionalChartXScaleModifier(domain: xAxisRange))
+                .modifier(
+                    OptionalChartXAxisTicksModifier(
+                        ticks: xAxisTicks,
+                        format: axisDateFormat,
+                        labelProvider: axisLabelProvider
+                    )
+                )
                 .chartOverlay { proxy in
                     GeometryReader { geometry in
                         Rectangle().fill(.clear).contentShape(Rectangle())
@@ -122,5 +184,50 @@ extension Color {
     func brighter(by percentage: Double = 30.0) -> Color {
         // This is a simplified implementation. A real implementation would use UIColor or NSColor.
         return self // Placeholder
+    }
+}
+
+// MARK: - Optional Axis Helpers
+
+private struct OptionalChartXScaleModifier: ViewModifier {
+    let domain: ClosedRange<Date>?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let domain {
+            content.chartXScale(domain: domain)
+        } else {
+            content
+        }
+    }
+}
+
+private struct OptionalChartXAxisTicksModifier: ViewModifier {
+    let ticks: [Date]?
+    let format: Date.FormatStyle?
+    let labelProvider: ((Date) -> Text)?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let ticks, !ticks.isEmpty {
+            content.chartXAxis {
+                AxisMarks(values: ticks) { value in
+                    AxisGridLine()
+                    AxisTick()
+                    if let date = value.as(Date.self) {
+                        AxisValueLabel {
+                            if let labelProvider {
+                                labelProvider(date)
+                            } else {
+                                let style = format ?? Date.FormatStyle.dateTime.month(.twoDigits).day(.twoDigits)
+                                Text(date, format: style)
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            content
+        }
     }
 }

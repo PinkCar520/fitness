@@ -65,8 +65,6 @@ struct PlanDetailView: View {
             }
             .padding()
         }
-        .navigationTitle("计划详情")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

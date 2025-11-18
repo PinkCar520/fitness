@@ -56,6 +56,7 @@ struct WeightSlider: View {
                     RoundedRectangle(cornerRadius: 30)
                         .fill(Color.gray.opacity(0.2))
                         .frame(height: 60)
+                        .glassEffect()
 
                     // Tick Marks
                     ForEach(0..<allPossibleWeights.count, id: \.self) { index in
@@ -87,6 +88,7 @@ struct WeightSlider: View {
                         .frame(width: 6, height: 6)
                         .offset(x: positionForValue(initialWeight, sliderWidth: sliderWidth) - 3)
                         .offset(y: -10)
+                        .glassEffect()
 
                     // Thumb
                     Circle()

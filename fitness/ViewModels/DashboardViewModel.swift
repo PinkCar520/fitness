@@ -3,6 +3,10 @@ import SwiftUI
 import HealthKit // Add this
 import SwiftData // Add this
 import Combine
+import WidgetKit
+
+// Shared insights
+import Foundation
 
 // 1. Model for a single dashboard card
 struct DashboardCard: Identifiable, Codable, Hashable {
@@ -15,9 +19,10 @@ struct DashboardCard: Identifiable, Codable, Hashable {
         case fitnessRings = "FitnessRings"
         case goalProgress = "GoalProgress"
         case stepsAndDistance = "StepsAndDistance"
+        case hydration = "Hydration"
+        case menstrualCycle = "MenstrualCycle"
         case monthlyChallenge = "MonthlyChallenge"
         case recentActivity = "RecentActivity"
-        case historyList = "HistoryList"
     }
 }
 
@@ -34,29 +39,26 @@ struct DashboardQuickAction: Identifiable, Equatable {
     let subtitle: String?
     let icon: String
     let tint: Color
+    let chips: [QuickActionChip]? // Optional metadata chips (e.g., 3组 / 120千卡)
     let intent: Intent
-}
 
-struct DashboardInsightItem: Identifiable, Equatable {
-    enum Intent: Equatable {
-        case startWorkout
-        case logWeight
-        case openPlan
-        case none
+    init(title: String, subtitle: String?, icon: String, tint: Color, chips: [QuickActionChip]? = nil, intent: Intent) {
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+        self.tint = tint
+        self.chips = chips
+        self.intent = intent
     }
-
-    let id = UUID()
-    let title: String
-    let message: String
-    let tone: InsightCard.Tone
-    let intent: Intent
 }
+
+typealias DashboardInsightItem = InsightItem
 
 // 2. View Model to manage the cards
 class DashboardViewModel: ObservableObject {
     @Published var cards: [DashboardCard] = []
     @Published var quickActions: [DashboardQuickAction] = []
-    @Published var insights: [DashboardInsightItem] = []
+    // Insights removed from in-app dashboard; now provided via Widget
     private let userDefaultsKey = "dashboard_card_order"
 
     // Dependencies
@@ -70,6 +72,13 @@ class DashboardViewModel: ObservableObject {
     @Published var activitySummary: HKActivitySummary?
     @Published var weeklyStepData: [DailyStepData] = []
     @Published var weeklyDistanceData: [DailyDistanceData] = []
+    // Extended ranges for sheets
+    @Published var monthlyStepData: [DailyStepData] = []
+    @Published var quarterStepData: [DailyStepData] = []
+    @Published var yearStepData: [DailyStepData] = []
+    @Published var monthlyDistanceData: [DailyDistanceData] = []
+    @Published var quarterDistanceData: [DailyDistanceData] = []
+    @Published var yearDistanceData: [DailyDistanceData] = []
     @Published var monthlyChallengeCompletion: [Int: Bool] = [:]
     @Published var mostRecentWorkout: HKWorkout?
     @Published var lastWeightSample: HKQuantitySample?
@@ -192,24 +201,40 @@ class DashboardViewModel: ObservableObject {
     }
 
     func loadCardOrder() {
-        if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
-           let decoded = try? JSONDecoder().decode([DashboardCard].self, from: data) {
-            self.cards = decoded
-            addNewCardTypes(to: &self.cards)
-        } else {
+        guard let data = UserDefaults.standard.data(forKey: userDefaultsKey) else {
             self.cards = defaultCards
+            return
         }
+
+        if let decoded = try? JSONDecoder().decode([DashboardCard].self, from: data) {
+            self.cards = sanitizedCards(from: decoded)
+            addNewCardTypes(to: &self.cards)
+            return
+        }
+
+        // Legacy fallback: decode using raw identifiers to skip removed card types gracefully
+        if let legacyDecoded = try? JSONDecoder().decode([StoredDashboardCard].self, from: data) {
+            let mapped = legacyDecoded.compactMap { stored -> DashboardCard? in
+                guard let type = DashboardCard.CardType(rawValue: stored.id) else { return nil }
+                return DashboardCard(id: type, name: stored.name, isVisible: stored.isVisible ?? true)
+            }
+            self.cards = sanitizedCards(from: mapped)
+            addNewCardTypes(to: &self.cards)
+            return
+        }
+
+        self.cards = defaultCards
     }
     
     private var defaultCards: [DashboardCard] {
         [
-            DashboardCard(id: .todaysWorkout, name: "今日训练"), // Add this
             DashboardCard(id: .fitnessRings, name: "健身圆环"),
             DashboardCard(id: .goalProgress, name: "目标进度"),
             DashboardCard(id: .stepsAndDistance, name: "步数与距离"),
+            DashboardCard(id: .hydration, name: "喝水提醒"),
+            DashboardCard(id: .menstrualCycle, name: "经期"),
             DashboardCard(id: .monthlyChallenge, name: "每月挑战"),
-            DashboardCard(id: .recentActivity, name: "最近活动"),
-            DashboardCard(id: .historyList, name: "历史记录", isVisible: false) // Hidden by default
+            DashboardCard(id: .recentActivity, name: "最近活动")
         ]
     }
     
@@ -224,6 +249,16 @@ class DashboardViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    private func sanitizedCards(from cards: [DashboardCard]) -> [DashboardCard] {
+        cards.filter { $0.id != .todaysWorkout }
+    }
+
+    private struct StoredDashboardCard: Codable {
+        let id: String
+        let name: String
+        let isVisible: Bool?
     }
 
     // MARK: - Data Loading
@@ -242,6 +277,37 @@ class DashboardViewModel: ObservableObject {
         self.mostRecentWorkout = await healthKitManager.fetchMostRecentWorkout()
     }
 
+    // MARK: - Demand loading for extended ranges (used by sheets)
+    enum SeriesRange { case week, month, quarter, year }
+
+    @MainActor
+    func loadStepsSeriesIfNeeded(_ range: SeriesRange) async {
+        switch range {
+        case .week:
+            if weeklyStepData.isEmpty { weeklyStepData = await healthKitManager.readWeeklyStepCounts() }
+        case .month:
+            if monthlyStepData.isEmpty { monthlyStepData = await healthKitManager.readDailySteps(days: 30) }
+        case .quarter:
+            if quarterStepData.isEmpty { quarterStepData = await healthKitManager.readDailySteps(days: 90) }
+        case .year:
+            if yearStepData.isEmpty { yearStepData = await healthKitManager.readDailySteps(days: 365) }
+        }
+    }
+
+    @MainActor
+    func loadDistanceSeriesIfNeeded(_ range: SeriesRange) async {
+        switch range {
+        case .week:
+            if weeklyDistanceData.isEmpty { weeklyDistanceData = await healthKitManager.readWeeklyDistance() }
+        case .month:
+            if monthlyDistanceData.isEmpty { monthlyDistanceData = await healthKitManager.readDailyDistance(days: 30) }
+        case .quarter:
+            if quarterDistanceData.isEmpty { quarterDistanceData = await healthKitManager.readDailyDistance(days: 90) }
+        case .year:
+            if yearDistanceData.isEmpty { yearDistanceData = await healthKitManager.readDailyDistance(days: 365) }
+        }
+    }
+
     // MARK: - Insight & Quick Action Builders
 
     func refreshAuxiliaryData(
@@ -250,43 +316,63 @@ class DashboardViewModel: ObservableObject {
         weightMetrics: [HealthMetric]
     ) {
         quickActions = buildQuickActions(activePlan: activePlan, todaysTask: todaysTask)
-        insights = buildInsights(activePlan: activePlan, todaysTask: todaysTask, weightMetrics: weightMetrics)
+        // In-app insights removed; only generate shared snapshot for Widget
+
+        // Write snapshot for widget consumption
+        let engineMetrics = weightMetrics
+            .filter { $0.type == .weight }
+            .map { InsightsEngine.WeightMetric(date: $0.date, value: $0.value) }
+        let taskContext = todaysTask.map { task in
+            InsightsEngine.Context.TaskContext(
+                isSkipped: task.isSkipped,
+                totalWorkouts: task.workouts.count,
+                completedWorkouts: task.workouts.filter { $0.isCompleted }.count,
+                totalMeals: task.meals.count,
+                pendingMeals: task.meals.filter { !$0.isCompleted }.count
+            )
+        }
+
+        let context = InsightsEngine.Context(
+            hasActivePlan: (activePlan != nil),
+            task: taskContext,
+            weightMetrics: engineMetrics
+        )
+        let sharedItems = InsightsEngine.generate(from: context)
+        let snapshot = InsightsSnapshot(generatedAt: Date(), items: sharedItems)
+        let store = InsightsSnapshotStore(appGroup: AppGroup.suiteName)
+        store.write(snapshot)
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     private func buildQuickActions(activePlan: Plan?, todaysTask: DailyTask?) -> [DashboardQuickAction] {
         var actions: [DashboardQuickAction] = []
 
-        if let task = todaysTask, !(task.workouts.isEmpty) {
+        // 新增：将“下一项训练”作为顶部快捷卡片
+        if let task = todaysTask, let first = task.workouts.first {
+            var chips: [QuickActionChip] = []
+            if let sets = first.sets, !sets.isEmpty { chips.append(QuickActionChip(icon: "repeat", text: "\(sets.count)组")) }
+            let subtitle = first.name
+            let iconName: String = {
+                switch first.type {
+                case .strength: return "dumbbell.fill"
+                case .cardio: return "figure.run"
+                case .flexibility: return "figure.cooldown"
+                case .other: return "target"
+                }
+            }()
             actions.append(
                 DashboardQuickAction(
-                    title: "开始今日训练",
-                    subtitle: "专注完成当前计划",
-                    icon: "play.fill",
+                    title: "下一项训练",
+                    subtitle: subtitle,
+                    icon: iconName,
                     tint: .accentColor,
+                    chips: chips,
                     intent: .startWorkout
                 )
             )
-        } else if activePlan != nil {
-            actions.append(
-                DashboardQuickAction(
-                    title: "查看训练计划",
-                    subtitle: "查看本周安排与摘要",
-                    icon: "calendar.badge.clock",
-                    tint: .blue,
-                    intent: .openPlan
-                )
-            )
-        } else {
-            actions.append(
-                DashboardQuickAction(
-                    title: "制定新计划",
-                    subtitle: "让系统为你生成专属训练",
-                    icon: "target",
-                    tint: .blue,
-                    intent: .openPlan
-                )
-            )
         }
+
+        // 计划相关快捷卡已按新设计移除
 
         actions.append(
             DashboardQuickAction(
@@ -313,92 +399,20 @@ class DashboardViewModel: ObservableObject {
         return actions
     }
 
-    private func buildInsights(
-        activePlan: Plan?,
-        todaysTask: DailyTask?,
-        weightMetrics: [HealthMetric]
-    ) -> [DashboardInsightItem] {
-        var items: [DashboardInsightItem] = []
-
-        if activePlan == nil {
-            items.append(
-                DashboardInsightItem(
-                    title: "制定专属计划",
-                    message: "系统可以根据体重与目标生成个性化训练安排，马上体验。",
-                    tone: .informational,
-                    intent: .openPlan
-                )
-            )
-        } else {
-            if let todaysTask {
-                if todaysTask.workouts.isEmpty {
-                    items.append(
-                        DashboardInsightItem(
-                            title: "休息日提示",
-                            message: "善用休息日调整状态，保持足够的睡眠与营养摄入。",
-                            tone: .positive,
-                            intent: .none
-                        )
-                    )
-                } else {
-                    let completedSets = todaysTask.workouts.filter { $0.isCompleted }.count
-                    if completedSets == 0 {
-                        items.append(
-                            DashboardInsightItem(
-                                title: "今日训练待完成",
-                                message: "保持专注，完成今日计划可以巩固训练习惯。",
-                                tone: .warning,
-                                intent: .startWorkout
-                            )
-                        )
-                    }
-                }
-            } else {
-                items.append(
-                    DashboardInsightItem(
-                        title: "选择一个训练日",
-                        message: "在计划页选择日期，可查看当天的训练与饮食安排。",
-                        tone: .informational,
-                        intent: .openPlan
-                    )
-                )
-            }
-        }
-
-        if let weightTrendMessage = weightTrendInsight(from: weightMetrics) {
-            items.append(weightTrendMessage)
-        }
-
-        return items
-    }
+    // buildInsights removed from ViewModel
 
     private func weightTrendInsight(from metrics: [HealthMetric]) -> DashboardInsightItem? {
-        let weightMetrics = metrics.filter { $0.type == .weight }.sorted { $0.date < $1.date }
-        guard let latest = weightMetrics.last else { return nil }
-
-        // Compare against weight 7 days ago if possible
-        let oneWeekAgo = calendar.date(byAdding: .day, value: -7, to: latest.date) ?? latest.date
-        let baseline = weightMetrics.last(where: { $0.date <= oneWeekAgo }) ?? weightMetrics.dropLast().last
-
-        guard let comparison = baseline else { return nil }
-        let delta = latest.value - comparison.value
-
-        if abs(delta) < 0.3 { return nil }
-
-        if delta > 0 {
-            return DashboardInsightItem(
-                title: "体重略有上升",
-                message: "与一周前相比上升了 \(String(format: "%.1f", delta)) kg，保持饮食节奏并适度增加活动量。",
-                tone: .warning,
-                intent: .logWeight
-            )
-        } else {
-            return DashboardInsightItem(
-                title: "体重在下降",
-                message: "较一周前下降 \(String(format: "%.1f", abs(delta))) kg，记得补充优质蛋白与充足睡眠。",
-                tone: .positive,
-                intent: .none
-            )
+        // Delegate to shared engine for consistency
+        let engineMetrics = metrics
+            .filter { $0.type == .weight }
+            .map { InsightsEngine.WeightMetric(date: $0.date, value: $0.value) }
+        let context = InsightsEngine.Context(
+            hasActivePlan: true,
+            task: nil,
+            weightMetrics: engineMetrics
+        )
+        return InsightsEngine.generate(from: context).first { item in
+            switch item.intent { case .openBodyProfileWeight: return true; default: return false }
         }
     }
 }

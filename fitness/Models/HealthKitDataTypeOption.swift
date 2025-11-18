@@ -13,6 +13,7 @@ enum HealthKitDataTypeOption: CaseIterable, Identifiable {
     case workout
     case heartRate
     case sleepAnalysis
+    case vo2Max
 
     var id: Self { self }
 
@@ -38,6 +39,8 @@ enum HealthKitDataTypeOption: CaseIterable, Identifiable {
             return "心率"
         case .sleepAnalysis:
             return "睡眠分析"
+        case .vo2Max:
+            return "VO2max"
         }
     }
 
@@ -63,6 +66,8 @@ enum HealthKitDataTypeOption: CaseIterable, Identifiable {
             return "记录您的心率数据，帮助您监测心血管健康。"
         case .sleepAnalysis:
             return "分析您的睡眠模式和质量，改善睡眠健康。"
+        case .vo2Max:
+            return "最大摄氧量，反映心肺耐力水平。"
         }
     }
 
@@ -88,6 +93,8 @@ enum HealthKitDataTypeOption: CaseIterable, Identifiable {
             return HKObjectType.quantityType(forIdentifier: .heartRate)
         case .sleepAnalysis:
             return HKObjectType.categoryType(forIdentifier: .sleepAnalysis)
+        case .vo2Max:
+            return HKObjectType.quantityType(forIdentifier: .vo2Max)
         }
     }
 }
